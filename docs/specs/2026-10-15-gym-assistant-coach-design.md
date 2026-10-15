@@ -227,11 +227,11 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 ```
 gym-assistant-coach/
 ├── apps/
-│   ├── api/        # Node 22 + TypeScript + Fastify + Drizzle ORM
+│   ├── api/        # Node 24 + TypeScript + Fastify + Drizzle ORM
 │   ├── bot/        # Python 3.12 + FastAPI + line-bot-sdk
 │   └── liff/       # React + Vite + TypeScript + @line/liff
 ├── packages/
-│   └── shared/     # api 與 liff 共用的型別與 schema（TypeScript）
+│   └── shared/     # api 與 liff 共用的型別與 schema（TypeScript，只含原始碼）
 ├── db/             # migrations、種子資料（動作庫、食藥署營養資料）
 ├── infra/          # GCP 設定腳本或 Terraform
 ├── docs/
