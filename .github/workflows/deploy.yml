@@ -141,5 +141,9 @@ jobs:
           service_account: ${{ vars.DEPLOYER_SA }}
           create_credentials_file: true
       - run: npm ci
-      - run: npm run build -w @gac/liff
+      - name: Build liff
+        run: npm run build -w @gac/liff
+        env:
+          VITE_LIFF_ID: ${{ vars.LIFF_ID }}
+          VITE_API_URL: ${{ vars.API_URL }}
       - run: npx --yes firebase-tools@15.34.0 deploy --only hosting:liff --project "$GCP_PROJECT_ID" --non-interactive

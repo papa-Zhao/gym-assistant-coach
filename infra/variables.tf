@@ -25,3 +25,15 @@ variable "budget_amount_twd" {
   default     = 1000
   description = "Monthly budget in TWD."
 }
+
+variable "line_login_channel_id" {
+  type        = string
+  default     = ""
+  description = "LINE Login channel ID (not secret). See docs/line-setup.md."
+}
+
+variable "liff_id" {
+  type        = string
+  default     = ""
+  description = "LIFF app ID (not secret). See docs/line-setup.md."
+}
