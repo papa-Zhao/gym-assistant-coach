@@ -45,9 +45,10 @@ terraform apply
 **【使用者自行操作】**
 
 1. 在 Neon 建立專案：region 選 `aws-ap-southeast-1`，資料庫名稱 `gac`。
-2. 把連線字串寫入 Secret Manager（先把連線字串放進 `URL` 變數，不要寫進指令歷史或 commit）：
+2. 把連線字串寫入 Secret Manager。migration 請使用直連（非 pooled）連線字串。先用 `read -rs` 把連線字串讀進 `URL` 變數（輸入不會顯示，也不會進入 shell 歷史），不要 commit：
 
 ```sh
+read -rs URL
 printf %s "$URL" | gcloud secrets versions add database-url --project <project-id> --data-file=-
 ```
 
@@ -61,7 +62,7 @@ gh secret set NEON_API_KEY
 
 ## 6. GitHub variables
 
-`deploy.yml` 使用五個 `vars.*`。前四個來自 Terraform（在 `infra/` 目錄下執行）：
+`deploy.yml` 使用五個 `vars.*`。其中 `WIF_PROVIDER` 與 `DEPLOYER_SA` 來自 Terraform output（在 `infra/` 目錄下執行），其餘自行填入：
 
 | 變數              | 來源                                                        |
 | ----------------- | ----------------------------------------------------------- |
@@ -90,14 +91,14 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
 
 1. 決定還原時間點：取 GitHub Actions 該次 Deploy 的 migrate job 開始時間，或 `pre-migrate-<sha>` branch 在 Neon **Branches** 頁顯示的建立時間，並取稍早於此的時間。
-2. 在 Neon console 選取 `main`，進入 **Postgres database** > **Backup & Restore** > **Restore from history**。
+2. 在 Neon console 選取預設分支（`main` 或 `production`），進入 **Postgres database** > **Backup & Restore** > **Restore from history**。
 3. 確認選在 **From history** 分頁，輸入上述時間（或切換為 LSN）。
 4. 按 **Next**，檢視確認視窗後按 **Restore**。
 5. 修正問題後 push 新 commit，或將 Cloud Run 回到前一個 revision。
 
 注意：
 
-- 還原是整個覆蓋，不是合併。所選時間點之後寫入 `main` 的資料都會遺失。Neon 會先把還原前的 `main` 另存為 `main_old_<timestamp>` branch，必要時可救回。
+- 還原是整個覆蓋，不是合併。所選時間點之後寫入預設分支的資料都會遺失。Neon 會先把還原前的預設分支另存為 `<分支名>_old_<timestamp>` branch，必要時可救回。
 - 可還原的歷史長度依 Neon 方案而異，Neon 文件未列出各方案的天數，請查 Neon 的 History window 說明；要還原的時間點必須在此範圍內。
 - 以上標籤取自 Neon 官方文件（branch-restore）。
 - `pre-migrate-<sha>` 是 migration 前的快照，用來檢視或複製當時的資料。Neon 的「從另一個 branch 還原」要求來源為 root branch，因此不要把它當作還原來源。它只保留最新 3 個。
@@ -106,4 +107,4 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 
 - **`deploy-liff` 回 403**：在 `infra/wif.tf` 為 deployer 服務帳號加上 `roles/serviceusage.serviceUsageConsumer`（或 `roles/firebase.viewer`），再 `terraform apply`。
 - **migrate job 說讀不到 `database-url`**：該 secret 還沒有任何版本（重做第 4 步），或 deployer 服務帳號沒有存取權限（確認 `infra/wif.tf` 的 `roles/secretmanager.secretAccessor` 已套用）。
-- **重跑同一個 commit 的部署，在 Neon 備份步驟失敗**：`pre-migrate-<sha>` 已存在。先到 Neon console 刪除該 branch，或 push 一個新 commit。
+- **重跑同一個 commit 的部署**：備份步驟會偵測到已存在的 `pre-migrate-<sha>` 並沿用，不會失敗，仍會清理舊備份。若備份步驟仍失敗，請檢查 `NEON_API_KEY` 與 `NEON_PROJECT_ID`。
