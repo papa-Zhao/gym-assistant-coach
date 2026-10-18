@@ -31,3 +31,7 @@ uv sync
 uv run ruff check . && uv run ruff format --check . && uv run pytest
 uv run uvicorn app.main:app --reload --port 8081
 ```
+
+## 部署
+
+GCP 基礎設施、CI/CD 與 Neon 設定步驟見 [infra/README.md](infra/README.md)。
