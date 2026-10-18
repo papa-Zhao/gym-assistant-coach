@@ -39,3 +39,10 @@ bucket = "${STATE_BUCKET}"
 prefix = "infra"
 HCL
 echo "wrote ${DIR}/backend.hcl"
+
+cat >"${DIR}/terraform.tfvars" <<HCL
+# Written by bootstrap.sh; non-secret values.
+project_id      = "${PROJECT_ID}"
+billing_account = "${BILLING_ACCOUNT}"
+HCL
+echo "wrote ${DIR}/terraform.tfvars"
