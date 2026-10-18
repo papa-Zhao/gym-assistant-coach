@@ -28,6 +28,14 @@ run "core" {
   }
 
   assert {
+    condition = anytrue([
+      for p in google_artifact_registry_repository.gac.cleanup_policies :
+      p.action == "DELETE" && anytrue([for c in p.condition : c.tag_state == "ANY" && c.older_than == "2592000s"])
+    ])
+    error_message = "Registry must delete tagged images older than 30 days."
+  }
+
+  assert {
     condition     = google_storage_bucket.meal_photos.soft_delete_policy[0].retention_duration_seconds == 0
     error_message = "Soft delete must be disabled on the photo bucket."
   }
