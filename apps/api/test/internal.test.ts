@@ -12,10 +12,14 @@ const auth = { authorization: "Bearer good" };
 describe("/internal/users", () => {
   let app: ReturnType<typeof buildApp>;
   let db: Db;
+  let closeDb: () => Promise<void>;
 
   beforeAll(async () => {
+    const t = await createTestDb();
+    db = t.db;
+    closeDb = t.close;
     const deps: AppDeps = {
-      db: (db = await createTestDb()),
+      db,
       verifyServiceToken: async (token) => {
         if (token === "good") return { email: BOT };
         if (token === "other")
@@ -29,7 +33,10 @@ describe("/internal/users", () => {
     };
     app = buildApp(deps);
   });
-  afterAll(() => app.close());
+  afterAll(async () => {
+    await app.close();
+    await closeDb();
+  });
 
   const post = (
     url: string,
@@ -49,6 +56,11 @@ describe("/internal/users", () => {
       { lineUserId: LINE_ID },
       { authorization: "Bearer other" },
     );
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("unauthenticated malformed body gets 401", async () => {
+    const res = await post("/internal/users/sync", { lineUserId: "nope" }, {});
     expect(res.statusCode).toBe(401);
   });
 

@@ -40,7 +40,7 @@ export const internalRoutes =
   async (app) => {
     const { db, verifyServiceToken, botServiceAccount } = deps;
 
-    app.addHook("preHandler", async (req, reply) => {
+    app.addHook("onRequest", async (req, reply) => {
       const match = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
       const unauthorized = () =>
         reply.code(401).send({ error: "unauthorized" } satisfies ApiError);

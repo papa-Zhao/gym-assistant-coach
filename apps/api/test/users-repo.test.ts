@@ -1,5 +1,5 @@
 import { CONSENT_VERSION } from "@gac/shared";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   findByLineUserId,
   hasCurrentConsent,
@@ -10,8 +10,20 @@ import {
 import { createTestDb } from "./db";
 
 describe("users repo", () => {
+  let close: (() => Promise<void>) | undefined;
+  afterEach(async () => {
+    await close?.();
+    close = undefined;
+  });
+
+  async function newDb() {
+    const t = await createTestDb();
+    close = t.close;
+    return t.db;
+  }
+
   it("syncUser creates a user once", async () => {
-    const db = await createTestDb();
+    const db = await newDb();
     const a = await syncUser(db, "U1", "Amy");
     const b = await syncUser(db, "U1", "Amy");
     expect(b.userId).toBe(a.userId);
@@ -19,7 +31,7 @@ describe("users repo", () => {
   });
 
   it("syncUser updates display name but keeps it when null", async () => {
-    const db = await createTestDb();
+    const db = await newDb();
     await syncUser(db, "U1", "Amy");
     await syncUser(db, "U1", "Amy2");
     expect((await findByLineUserId(db, "U1"))?.displayName).toBe("Amy2");
@@ -28,7 +40,7 @@ describe("users repo", () => {
   });
 
   it("recordConsent makes hasCurrentConsent true and is idempotent", async () => {
-    const db = await createTestDb();
+    const db = await newDb();
     const { userId } = await syncUser(db, "U1", "Amy");
     await recordConsent(db, "U1", CONSENT_VERSION);
     await recordConsent(db, "U1", CONSENT_VERSION);
@@ -37,14 +49,14 @@ describe("users repo", () => {
   });
 
   it("older consent version does not count", async () => {
-    const db = await createTestDb();
+    const db = await newDb();
     const { userId } = await syncUser(db, "U1", "Amy");
     await recordConsent(db, "U1", "2020-01-01");
     expect(await hasCurrentConsent(db, userId)).toBe(false);
   });
 
   it("refollow after unfollow restores active and keeps consent", async () => {
-    const db = await createTestDb();
+    const db = await newDb();
     await syncUser(db, "U1", "Amy");
     await recordConsent(db, "U1", CONSENT_VERSION);
     await markUnfollowed(db, "U1");

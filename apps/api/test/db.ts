@@ -8,8 +8,12 @@ const migrationsFolder = fileURLToPath(
   new URL("../../../db/migrations/", import.meta.url),
 );
 
-export async function createTestDb(): Promise<Db> {
-  const db = drizzle(new PGlite());
+export async function createTestDb(): Promise<{
+  db: Db;
+  close: () => Promise<void>;
+}> {
+  const client = new PGlite();
+  const db = drizzle(client);
   await migrate(db, { migrationsFolder });
-  return db;
+  return { db, close: () => client.close() };
 }
