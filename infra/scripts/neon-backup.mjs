@@ -16,6 +16,11 @@ export function branchesToDelete(branches, keep) {
     .map((b) => b.id);
 }
 
+/** The branch with exactly this name, or undefined. */
+export function findBranchByName(branches, name) {
+  return branches.find((b) => b.name === name);
+}
+
 function createClient(apiKey, projectId) {
   const base = `${API_BASE}/projects/${encodeURIComponent(projectId)}`;
   // Errors carry method, path and status only; never headers or the key.
@@ -41,8 +46,8 @@ async function waitForOperations(client, operations) {
   const deadline = Date.now() + OPERATION_TIMEOUT_MS;
   for (const op of operations ?? []) {
     let status = op.status;
-    while (status !== "finished") {
-      if (status === "failed" || status === "cancelled") {
+    while (status !== "finished" && status !== "skipped") {
+      if (status === "error" || status === "failed" || status === "cancelled") {
         throw new Error(`Neon operation ${op.id} ${status}`);
       }
       if (Date.now() > deadline) {
@@ -59,11 +64,16 @@ export async function backup({ apiKey, projectId, sha }) {
   const client = createClient(apiKey, projectId);
   const name = `${PREFIX}${sha}`;
 
-  const created = await client.request("POST", "/branches", {
-    branch: { name },
-  });
-  await waitForOperations(client, created.operations);
-  console.log(`Created Neon branch ${name}`);
+  const existing = await client.request("GET", "/branches");
+  if (findBranchByName(existing.branches, name)) {
+    console.log(`Neon backup branch ${name} already exists, reusing`);
+  } else {
+    const created = await client.request("POST", "/branches", {
+      branch: { name },
+    });
+    await waitForOperations(client, created.operations);
+    console.log(`Created Neon branch ${name}`);
+  }
 
   const { branches } = await client.request("GET", "/branches");
   for (const id of branchesToDelete(branches, KEEP)) {

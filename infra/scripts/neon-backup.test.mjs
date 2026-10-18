@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { branchesToDelete } from "./neon-backup.mjs";
+import { branchesToDelete, findBranchByName } from "./neon-backup.mjs";
 
 const branch = (id, name, day, isDefault = false) => ({
   id,
@@ -47,4 +47,13 @@ test("returns [] when at or under keep", () => {
   ];
   assert.deepEqual(branchesToDelete(branches, 3), []);
   assert.deepEqual(branchesToDelete(branches.slice(0, 2), 3), []);
+});
+
+test("findBranchByName matches the exact name only", () => {
+  const branches = [
+    branch("p1", "pre-migrate-abc", 1),
+    branch("p2", "pre-migrate-abcd", 2),
+  ];
+  assert.equal(findBranchByName(branches, "pre-migrate-abc")?.id, "p1");
+  assert.equal(findBranchByName(branches, "pre-migrate-ab"), undefined);
 });
