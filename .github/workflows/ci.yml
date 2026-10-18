@@ -44,6 +44,21 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
 
+  infra:
+    name: Infra (terraform, scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive infra
+      - run: terraform -chdir=infra init -backend=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra test
+      - run: npm run test:infra
+
   images:
     name: Container images (api, bot)
     runs-on: ubuntu-latest
