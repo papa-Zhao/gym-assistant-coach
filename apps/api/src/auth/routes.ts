@@ -1,5 +1,6 @@
 import type { ApiError, LiffAuthResponse, MeResponse } from "@gac/shared";
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
 import {
   findById,
@@ -29,14 +30,7 @@ export const authRoutes =
   async (app) => {
     const { db, verifyLineIdToken, sessionSecret } = deps;
 
-    app.setErrorHandler((err, _req, reply) => {
-      if ((err as { validation?: unknown }).validation) {
-        return reply
-          .code(400)
-          .send({ error: "bad_request" } satisfies ApiError);
-      }
-      throw err;
-    });
+    app.setErrorHandler(apiErrorHandler);
 
     app.post<{ Body: { idToken: string } }>(
       "/auth/liff",
@@ -68,19 +62,12 @@ export const authRoutes =
       },
     );
 
-    const authenticate = async (req: FastifyRequest, reply: FastifyReply) => {
-      const match = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
-      const unauthorized = () =>
-        reply.code(401).send({ error: "unauthorized" } satisfies ApiError);
-      if (!match?.[1]) return unauthorized();
-      try {
-        req.sessionUserId = (
-          await verifySession(sessionSecret, match[1])
-        ).userId;
-      } catch {
-        return unauthorized();
-      }
-    };
+    const authenticate = bearerAuth(
+      (token) => verifySession(sessionSecret, token),
+      (req, { userId }) => {
+        req.sessionUserId = userId;
+      },
+    );
 
     app.get(
       "/me",

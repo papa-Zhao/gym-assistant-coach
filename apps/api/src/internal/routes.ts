@@ -1,5 +1,5 @@
-import { type ApiError } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
+import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
 import { markUnfollowed, recordConsent, syncUser } from "../users/repo";
 
@@ -40,27 +40,15 @@ export const internalRoutes =
   async (app) => {
     const { db, verifyServiceToken, botServiceAccount } = deps;
 
-    app.addHook("onRequest", async (req, reply) => {
-      const match = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
-      const unauthorized = () =>
-        reply.code(401).send({ error: "unauthorized" } satisfies ApiError);
-      if (!match?.[1]) return unauthorized();
-      try {
-        const { email } = await verifyServiceToken(match[1]);
-        if (email !== botServiceAccount) return unauthorized();
-      } catch {
-        return unauthorized();
-      }
-    });
+    app.addHook(
+      "onRequest",
+      bearerAuth(async (token) => {
+        const { email } = await verifyServiceToken(token);
+        if (email !== botServiceAccount) throw new Error("wrong service");
+      }),
+    );
 
-    app.setErrorHandler((err, _req, reply) => {
-      if ((err as { validation?: unknown }).validation) {
-        return reply
-          .code(400)
-          .send({ error: "bad_request" } satisfies ApiError);
-      }
-      throw err;
-    });
+    app.setErrorHandler(apiErrorHandler);
 
     app.post<{ Body: { lineUserId: string; displayName?: string | null } }>(
       "/users/sync",
