@@ -12,6 +12,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ["infra/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+  },
+  {
     files: ["apps/liff/**/*.{ts,tsx}"],
     languageOptions: { globals: globals.browser },
     plugins: { "react-hooks": reactHooks },
