@@ -46,3 +46,19 @@ project_id      = "${PROJECT_ID}"
 billing_account = "${BILLING_ACCOUNT}"
 HCL
 echo "wrote ${DIR}/terraform.tfvars"
+
+cat >"${DIR}/../.firebaserc" <<JSON
+{
+  "projects": {
+    "default": "${PROJECT_ID}"
+  },
+  "targets": {
+    "${PROJECT_ID}": {
+      "hosting": {
+        "liff": ["${PROJECT_ID}-liff"]
+      }
+    }
+  }
+}
+JSON
+echo "wrote ${DIR}/../.firebaserc"

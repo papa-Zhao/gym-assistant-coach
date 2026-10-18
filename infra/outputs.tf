@@ -18,3 +18,7 @@ output "bot_url" {
 output "registry" {
   value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.gac.repository_id}"
 }
+
+output "liff_url" {
+  value = "https://${google_firebase_hosting_site.liff.site_id}.web.app"
+}
