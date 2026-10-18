@@ -51,21 +51,23 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
       - uses: google-github-actions/setup-gcloud@v3
-      - name: Read database-url secret
+      - run: npm ci
+      - name: Check database-url secret is readable
         run: |
-          if ! url=$(gcloud secrets versions access latest --secret=database-url --project "$GCP_PROJECT_ID") || [ -z "$url" ]; then
-            echo "database-url has no version; see infra/README.md"
+          if ! gcloud secrets versions access latest --secret=database-url --project "$GCP_PROJECT_ID" > /dev/null 2>&1; then
+            echo "cannot read secret database-url (no version yet, or missing access); see infra/README.md"
             exit 1
           fi
-          echo "::add-mask::$url"
-          echo "DATABASE_URL=$url" >> "$GITHUB_ENV"
       - name: Back up Neon database
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
         run: node infra/scripts/neon-backup.mjs "$SHA"
-      - run: npm ci
-      - run: npm run db:migrate -w @gac/api
+      - name: Migrate database
+        run: |
+          url=$(gcloud secrets versions access latest --secret=database-url --project "$GCP_PROJECT_ID")
+          echo "::add-mask::$url"
+          DATABASE_URL="$url" npm run db:migrate -w @gac/api
 
   deploy-api:
     name: Deploy api
