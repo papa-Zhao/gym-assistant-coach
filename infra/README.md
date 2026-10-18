@@ -48,7 +48,7 @@ terraform apply
 2. 把連線字串寫入 Secret Manager（先把連線字串放進 `URL` 變數，不要寫進指令歷史或 commit）：
 
 ```sh
-printf %s "$URL" | gcloud secrets versions add database-url --data-file=-
+printf %s "$URL" | gcloud secrets versions add database-url --project <project-id> --data-file=-
 ```
 
 ## 5. GitHub secret
@@ -89,9 +89,16 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
 
-1. 到 Neon console，找到出錯那次部署對應的 `pre-migrate-<sha>` branch。
-2. 把 `main` branch 從該 branch 重設（Reset from parent / restore），資料即回到 migration 之前。
-3. 修正問題後 push 新 commit，或將 Cloud Run 回到前一個 revision。
+1. 到 Neon console 的 **Branches** 頁，確認出錯那次部署對應的 `pre-migrate-<sha>` branch 存在。
+2. 選取 `main`，進入 **Postgres database** > **Backup & Restore** > **Restore from history**。
+3. **Branch to restore** 選 `main`（目標），切到 **From another branch** 分頁，來源選 `pre-migrate-<sha>`。
+4. 依 Neon 文件，預設會取來源最新資料（head）；按 **Next**，確認後按 **Restore**。
+5. 修正問題後 push 新 commit，或將 Cloud Run 回到前一個 revision。
+
+注意：
+
+- 還原是整個覆蓋，不是合併。migration 之後寫入 `main` 的資料都會遺失。Neon 會先把還原前的 `main` 另存為 `main_old_<timestamp>` branch，必要時可再救回。
+- 上述標籤取自 Neon 官方文件（branch-restore）。文件指出「From another branch」要求目標與來源都是 root branch；`pre-migrate-<sha>` 是 `main` 的子 branch，主控台是否允許此操作文件沒有確認。若 Restore 不可選，請改用 Neon 的 branch restore 文件中對子 branch 的做法，或從 `pre-migrate-<sha>` 取連線字串，更新 `database-url` secret 並重新部署。
 
 ## 疑難排解
 
