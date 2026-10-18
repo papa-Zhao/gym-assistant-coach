@@ -1,11 +1,11 @@
 {
   "projects": {
-    "default": "gym-assistant-coach-xxxx"
+    "default": "gym-assistant-coach-4734"
   },
   "targets": {
-    "gym-assistant-coach-xxxx": {
+    "gym-assistant-coach-4734": {
       "hosting": {
-        "liff": ["gym-assistant-coach-xxxx-liff"]
+        "liff": ["gym-assistant-coach-4734-liff"]
       }
     }
   }
