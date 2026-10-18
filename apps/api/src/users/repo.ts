@@ -83,3 +83,22 @@ export async function hasCurrentConsent(
     );
   return new Set(rows.map((r) => r.doc)).size === CONSENT_DOCS.length;
 }
+
+export async function updateDisplayName(
+  db: Db,
+  userId: string,
+  name: string,
+): Promise<void> {
+  await db.update(users).set({ displayName: name }).where(eq(users.id, userId));
+}
+
+export async function findById(
+  db: Db,
+  userId: string,
+): Promise<{ id: string; displayName: string | null } | null> {
+  const [row] = await db
+    .select({ id: users.id, displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row ?? null;
+}

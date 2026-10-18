@@ -6,6 +6,7 @@ import {
   markUnfollowed,
   recordConsent,
   syncUser,
+  updateDisplayName,
 } from "../src/users/repo";
 import { createTestDb } from "./db";
 
@@ -64,5 +65,26 @@ describe("users repo", () => {
     const again = await syncUser(db, "U1", null);
     expect((await findByLineUserId(db, "U1"))?.status).toBe("active");
     expect(again.consented).toBe(true);
+  });
+});
+
+describe("updateDisplayName", () => {
+  let close: (() => Promise<void>) | undefined;
+  afterEach(async () => {
+    await close?.();
+    close = undefined;
+  });
+
+  it("changes the name without touching status", async () => {
+    const t = await createTestDb();
+    close = t.close;
+    const { userId } = await syncUser(t.db, "U9", "Old");
+    await markUnfollowed(t.db, "U9");
+    await updateDisplayName(t.db, userId, "New");
+    expect(await findByLineUserId(t.db, "U9")).toEqual({
+      id: userId,
+      displayName: "New",
+      status: "unfollowed",
+    });
   });
 });
