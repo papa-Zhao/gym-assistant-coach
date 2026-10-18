@@ -8,23 +8,36 @@
 
 ## 為什麼順序很重要
 
-Cloud Run 的 `bot` 會以 `latest` 版本掛載 `line-channel-secret` 與 `line-channel-access-token`。這兩個 secret 在沒有版本時，新 revision 會啟動失敗。所以請依下列順序：
+合併 PR 3 會觸發部署，新版 `api` 與 `bot` 沒有各自的環境變數與 secret 就會啟動失敗。所以 **步驟 A 到完整 `terraform apply`（步驟 8.3）都要在 `pr3-line-auth` 分支的 checkout 上執行，且必須在合併 PR 3 之前完成**；接著設定 GitHub variables，最後才合併 PR 3。
 
-1. 先只建立 secret（步驟 A）。
+另外，Cloud Run 以 `latest` 版本掛載 `database-url`、`line-channel-secret`、`line-channel-access-token`，這些 secret 沒有版本時新 revision 會啟動失敗。所以請依下列順序：
+
+1. 先只建立 secret 與存取權限（步驟 A），讓 IAM 在你操作 LINE 的同時生效。
 2. 到 LINE 取得值並寫入 secret（步驟 1 至 7）。
-3. 再做完整 `terraform apply`，並把 Webhook 指向 `bot`（步驟 8 至 10）。
+3. 填入 ID、commit `infra/terraform.tfvars`，再做完整 `terraform apply`（步驟 8）。
+4. 設定 GitHub variables、合併 PR 3，之後設定 Webhook（步驟 9 至 10）。
 
-## A. 先建立兩個空的 secret
+## A. 先建立 secret 與存取權限
 
-**【使用者自行操作】**（需要你的 GCP 登入）
+**【使用者自行操作】**（需要你的 GCP 登入；在 `pr3-line-auth` 分支上執行）
 
 ```sh
 cd infra
 terraform init -backend-config=backend.hcl
 terraform apply \
+  -target=google_secret_manager_secret.database_url \
+  -target=google_secret_manager_secret_iam_member.api_database_url \
   -target=google_secret_manager_secret.line_channel_secret \
-  -target=google_secret_manager_secret.line_channel_access_token
+  -target=google_secret_manager_secret.line_channel_access_token \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_secret \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_access_token \
+  -target=random_password.api_session_secret \
+  -target=google_secret_manager_secret.api_session_secret \
+  -target=google_secret_manager_secret_version.api_session_secret \
+  -target=google_secret_manager_secret_iam_member.api_session_secret
 ```
+
+這會建立三個 LINE／session 相關 secret（`api-session-secret` 會自動產生值）、`database-url`，以及 `api-runtime`、`bot-runtime` 的 `secretAccessor` 權限。若 `database-url` 還沒有版本，請先依 `infra/README.md` 第 4 節寫入。
 
 ## 1. 建立 Provider
 
@@ -86,16 +99,22 @@ unset LINE_CHANNEL_ACCESS_TOKEN
 這兩個值都不是機密。
 
 1. LINE Login channel ID 在該 channel 的「Basic settings」分頁；LIFF ID 在步驟 6 建立的 LIFF app。
-2. 填入 `infra/terraform.tfvars`：
+2. 填入 `infra/terraform.tfvars`，並 **commit 到 PR 3 分支**（兩個值都不是機密）。否則之後從 `main` 執行 apply 時，`LINE_LOGIN_CHANNEL_ID` 會變成空字串使 `api` 啟動失敗，`bot` 的 `LIFF_ID` 也會是空的：
 
    ```hcl
    line_login_channel_id = "<LINE Login channel ID>"
    liff_id               = "<LIFF ID>"
    ```
 
+   ```sh
+   git add infra/terraform.tfvars
+   git commit -m "chore(infra): set LINE login channel id and LIFF id"
+   git push
+   ```
+
    （`infra/bootstrap.sh` 重跑時會保留這兩個值。）
 
-3. **【使用者自行操作】** 完整套用：
+3. **【使用者自行操作】** 在 `pr3-line-auth` 分支、合併 PR 3 之前完整套用：
 
    ```sh
    cd infra
@@ -109,7 +128,7 @@ unset LINE_CHANNEL_ACCESS_TOKEN
    gh variable set API_URL --body "$(terraform output -raw api_url)"
    ```
 
-   然後 push 到 `main` 觸發部署（或手動觸發 `Deploy` workflow），讓 `bot`、`api` 換成真正的 image，LIFF 也會以新的環境變數重新建置。
+   然後合併 PR 3，觸發部署（或手動觸發 `Deploy` workflow），讓 `bot`、`api` 換成真正的 image，LIFF 也會以新的環境變數重新建置。
 
 ## 9. 設定 Webhook URL 並驗證
 
@@ -122,7 +141,7 @@ echo "$(terraform output -raw bot_url)/webhook"
 目前的值為 `https://bot-i3z5vwadgq-as.a.run.app/webhook`（以 `terraform output` 為準）。
 
 1. 在 LINE Developers Console 的 Messaging API channel，「Messaging API」分頁填入 Webhook URL，並開啟「Use webhook」。
-2. 按 **Verify**，應顯示 Success。這一步需要 `bot` 已部署並設好 `LINE_CHANNEL_SECRET`（步驟 8 與 push 部署完成後）。
+2. 按 **Verify**，應顯示 Success。這一步需要 `bot` 已部署並設好 `LINE_CHANNEL_SECRET`（步驟 8 與合併 PR 3 後的部署完成後）。
 
 ## 10. 試用
 

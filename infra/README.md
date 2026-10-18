@@ -33,6 +33,22 @@ git commit -m "chore(infra): set real project id"
 ```sh
 cd infra
 terraform init -backend-config=backend.hcl
+terraform apply \
+  -target=google_secret_manager_secret.database_url \
+  -target=google_secret_manager_secret_iam_member.api_database_url \
+  -target=google_secret_manager_secret.line_channel_secret \
+  -target=google_secret_manager_secret.line_channel_access_token \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_secret \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_access_token \
+  -target=random_password.api_session_secret \
+  -target=google_secret_manager_secret.api_session_secret \
+  -target=google_secret_manager_secret_version.api_session_secret \
+  -target=google_secret_manager_secret_iam_member.api_session_secret
+```
+
+上面先只建立 secret 與存取權限：`api` 以 `latest` 掛載 `database-url`、`bot` 掛載 LINE secret，這些 secret 沒有版本時 Cloud Run revision 會啟動失敗。接著依第 4 節寫入 `database-url`、依 [LINE 設定手冊](../docs/line-setup.md) 寫入 LINE secret，然後才做完整套用：
+
+```sh
 terraform apply
 ```
 
@@ -90,7 +106,7 @@ gh variable set API_URL --body "$(terraform output -raw api_url)"
 
 ## 7. LINE 設定
 
-建立 LINE 官方帳號、LINE Login channel、LIFF app，並把 channel secret 與 access token 寫入 Secret Manager，請照 [LINE 設定手冊](../docs/line-setup.md)。注意順序：`line-channel-secret` 與 `line-channel-access-token` 沒有版本時，`bot` 的新 revision 無法啟動，所以手冊先只建立 secret，寫入值之後才做完整 `terraform apply`。`api-session-secret` 由 Terraform 自動產生（`random_password`，48 字元），不需手動處理。
+建立 LINE 官方帳號、LINE Login channel、LIFF app，並把 channel secret 與 access token 寫入 Secret Manager，請照 [LINE 設定手冊](../docs/line-setup.md)。注意順序：`database-url`、`line-channel-secret` 與 `line-channel-access-token` 沒有版本時，新 revision 無法啟動，所以先只建立 secret（第 3 節的 targeted apply），寫入值之後才做完整 `terraform apply`；並且要在 `pr3-line-auth` 分支、合併 PR 3 之前完成。`api-session-secret` 由 Terraform 自動產生（`random_password`，48 字元），不需手動處理。
 
 ## 8. 部署
 
