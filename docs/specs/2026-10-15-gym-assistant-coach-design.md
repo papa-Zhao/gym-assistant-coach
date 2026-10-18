@@ -76,7 +76,7 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 - Cloud Run 預設只在處理請求期間分配 CPU：**回應送出後不能再做背景工作**。`bot` 必須在 webhook 請求內完成處理並回覆 LINE 後才回應 200。
   - 先顯示 LINE 的「載入中」動畫，再處理。Haiku 回應通常在數秒內，預期可在 reply token 有效期內完成。
   - 若實測發生逾時，再改為 Cloud Tasks 佇列處理，並以 push 訊息補送（會消耗 push 額度）。
-- 區域：建議 Cloud Run 放在 `asia-southeast1`（新加坡），與 Neon 的 `aws-ap-southeast-1` 相近，減少每次查詢的延遲（實際區域在 PR 2 再確認）。
+- 區域：建議 Cloud Run 放在 `asia-southeast1`（新加坡），與 Neon 的 `aws-ap-southeast-1` 相近，減少每次查詢的延遲（2026-10-18 PR 2 已確認，見 §12 #8）。
 
 ---
 
@@ -307,9 +307,9 @@ PR 1–2 不涉及畫面，所以設計與它們同時進行；**PR 3 開始做�
 |---|---|---|
 | 1 | 年齡限制 | MVP 限 18 歲以上 |
 | 2 | 照片儲存 | **Google Cloud Storage**（取代 R2）：使用服務帳號權限、不需管理金鑰 |
-| 3 | LIFF 前端託管 | Cloudflare Pages 或 Firebase Hosting，PR 2 時二選一 |
+| 3 | LIFF 前端託管 | **Firebase Hosting**（2026-10-18 決定：與 Cloud Run 同一個 GCP 專案、同一套 WIF 部署） |
 | 4 | 網域 | 第 1 期用託管服務的預設網域；正式上線前購買 |
 | 5 | LINE 官方帳號方案 | 免費方案；第 2 期有推播需求時再評估 |
 | 6 | AI 每日上限 | 依 §7 初始值，上線後調整 |
 | 7 | GitHub repo | `papa-Zhao/gym-assistant-coach`（私人） |
-| 8 | 區域 | 新加坡（Cloud Run `asia-southeast1`、Neon `aws-ap-southeast-1`），PR 2 實測延遲後確認 |
+| 8 | 區域 | 新加坡（Cloud Run `asia-southeast1`、Neon `aws-ap-southeast-1`）。**2026-10-18 已確認**：從台灣呼叫 `api` `/health`（熱啟動）中位數約 0.1 秒 |
