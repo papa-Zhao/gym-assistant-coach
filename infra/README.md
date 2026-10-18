@@ -89,16 +89,18 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
 
-1. 到 Neon console 的 **Branches** 頁，確認出錯那次部署對應的 `pre-migrate-<sha>` branch 存在。
-2. 選取 `main`，進入 **Postgres database** > **Backup & Restore** > **Restore from history**。
-3. **Branch to restore** 選 `main`（目標），切到 **From another branch** 分頁，來源選 `pre-migrate-<sha>`。
-4. 依 Neon 文件，預設會取來源最新資料（head）；按 **Next**，確認後按 **Restore**。
+1. 決定還原時間點：取 GitHub Actions 該次 Deploy 的 migrate job 開始時間，或 `pre-migrate-<sha>` branch 在 Neon **Branches** 頁顯示的建立時間，並取稍早於此的時間。
+2. 在 Neon console 選取 `main`，進入 **Postgres database** > **Backup & Restore** > **Restore from history**。
+3. 確認選在 **From history** 分頁，輸入上述時間（或切換為 LSN）。
+4. 按 **Next**，檢視確認視窗後按 **Restore**。
 5. 修正問題後 push 新 commit，或將 Cloud Run 回到前一個 revision。
 
 注意：
 
-- 還原是整個覆蓋，不是合併。migration 之後寫入 `main` 的資料都會遺失。Neon 會先把還原前的 `main` 另存為 `main_old_<timestamp>` branch，必要時可再救回。
-- 上述標籤取自 Neon 官方文件（branch-restore）。文件指出「From another branch」要求目標與來源都是 root branch；`pre-migrate-<sha>` 是 `main` 的子 branch，主控台是否允許此操作文件沒有確認。若 Restore 不可選，請改用 Neon 的 branch restore 文件中對子 branch 的做法，或從 `pre-migrate-<sha>` 取連線字串，更新 `database-url` secret 並重新部署。
+- 還原是整個覆蓋，不是合併。所選時間點之後寫入 `main` 的資料都會遺失。Neon 會先把還原前的 `main` 另存為 `main_old_<timestamp>` branch，必要時可救回。
+- 可還原的歷史長度依 Neon 方案而異，Neon 文件未列出各方案的天數，請查 Neon 的 History window 說明；要還原的時間點必須在此範圍內。
+- 以上標籤取自 Neon 官方文件（branch-restore）。
+- `pre-migrate-<sha>` 是 migration 前的快照，用來檢視或複製當時的資料。Neon 的「從另一個 branch 還原」要求來源為 root branch，因此不要把它當作還原來源。它只保留最新 3 個。
 
 ## 疑難排解
 
