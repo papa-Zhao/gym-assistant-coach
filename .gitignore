@@ -6,3 +6,9 @@ dist/
 __pycache__/
 .venv/
 .DS_Store
+
+.superpowers/
+
+# terraform
+infra/.terraform/
+*.tfstate*

@@ -1,0 +1,145 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  # Single gate: dependents are skipped whenever this job is skipped. Only
+  # successful push runs of this repo's own CI may deploy (never fork PRs).
+  gate:
+    name: Gate
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying $SHA"
+
+  migrate:
+    name: Backup and migrate database
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: npm ci
+      - name: Check database-url secret is readable
+        run: |
+          if ! gcloud secrets versions access latest --secret=database-url --project "$GCP_PROJECT_ID" > /dev/null 2>&1; then
+            echo "cannot read secret database-url (no version yet, or missing access); see infra/README.md"
+            exit 1
+          fi
+      - name: Back up Neon database
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: node infra/scripts/neon-backup.mjs "$SHA"
+      - name: Migrate database
+        run: |
+          url=$(gcloud secrets versions access latest --secret=database-url --project "$GCP_PROJECT_ID")
+          echo "::add-mask::$url"
+          DATABASE_URL="$url" npm run db:migrate -w @gac/api
+
+  deploy-api:
+    name: Deploy api
+    needs: [gate, migrate]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/gac/api:${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+      - name: Build and push image
+        run: |
+          docker build -f apps/api/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+      - name: Deploy to Cloud Run
+        run: gcloud run deploy api --image "$IMAGE" --region "$GCP_REGION" --project "$GCP_PROJECT_ID" --quiet
+      - name: Health check
+        run: |
+          url=$(gcloud run services describe api --region "$GCP_REGION" --project "$GCP_PROJECT_ID" --format='value(status.url)')
+          curl -fsS "$url/health"
+
+  deploy-bot:
+    name: Deploy bot
+    needs: [gate, migrate]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/gac/bot:${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+      - name: Build and push image
+        run: |
+          docker build -t "$IMAGE" apps/bot
+          docker push "$IMAGE"
+      - name: Deploy to Cloud Run
+        run: gcloud run deploy bot --image "$IMAGE" --region "$GCP_REGION" --project "$GCP_PROJECT_ID" --quiet
+      - name: Health check
+        run: |
+          url=$(gcloud run services describe bot --region "$GCP_REGION" --project "$GCP_PROJECT_ID" --format='value(status.url)')
+          curl -fsS "$url/health"
+
+  deploy-liff:
+    name: Deploy liff to Firebase Hosting
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+          create_credentials_file: true
+      - run: npm ci
+      - run: npm run build -w @gac/liff
+      - run: npx --yes firebase-tools@15.34.0 deploy --only hosting:liff --project "$GCP_PROJECT_ID" --non-interactive

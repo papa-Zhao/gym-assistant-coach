@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "test:infra": "node --test \"infra/scripts/*.test.mjs\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

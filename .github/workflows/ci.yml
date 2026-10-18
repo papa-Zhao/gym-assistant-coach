@@ -43,3 +43,45 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -q
+
+  infra:
+    name: Infra (terraform, scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive infra
+      - run: terraform -chdir=infra init -backend=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra test
+      - run: npm run test:infra
+
+  images:
+    name: Container images (api, bot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build images
+        run: |
+          docker build -f apps/api/Dockerfile -t gac-api .
+          docker build -t gac-bot apps/bot
+      - name: Smoke test images
+        run: |
+          for svc in api bot; do
+            docker run -d --name "$svc" -e PORT=8080 -p 8080:8080 "gac-$svc"
+            ok=0
+            for _ in $(seq 1 20); do
+              if body=$(curl -fsS localhost:8080/health 2>/dev/null); then ok=1; break; fi
+              sleep 1
+            done
+            if [ "$ok" != 1 ] || [ "$body" != "{\"status\":\"ok\",\"service\":\"$svc\"}" ]; then
+              echo "health check failed for $svc: ${body:-no response}"
+              docker logs "$svc"
+              exit 1
+            fi
+            echo "$svc ok: $body"
+            docker rm -f "$svc"
+          done
