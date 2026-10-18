@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, pr2-cloud-infra]
+    branches: [main]
 
 permissions:
   contents: read
