@@ -18,6 +18,8 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   app.register(cors, {
     // A plain string would always be echoed; match the request origin instead.
     origin: (origin, cb) => cb(null, origin === deps.corsOrigin),
+    // The plugin's default omits PUT, which the LIFF profile save needs.
+    methods: ["GET", "HEAD", "POST", "PUT"],
   });
   app.register(authRoutes(deps));
   app.register(profileRoutes(deps));
