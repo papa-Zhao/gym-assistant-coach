@@ -1,12 +1,23 @@
+import { useState } from "react";
 import type { AuthState } from "./auth";
+import { route } from "./router";
+import { Placeholder } from "./pages/Placeholder";
+import { Profile } from "./pages/Profile";
+import { Settings } from "./pages/Settings";
 
 interface AppProps {
   state: AuthState;
+  pathname: string;
+  /** Taipei calendar date (`YYYY-MM-DD`) used for age and target maths. */
+  today: string;
   onClose: () => void;
 }
 
-export function App({ state, onClose }: AppProps) {
-  switch (state.kind) {
+export function App({ state, pathname, today, onClose }: AppProps) {
+  const [failed, setFailed] = useState(false);
+  const shown: AuthState = failed ? { kind: "error" } : state;
+
+  switch (shown.kind) {
     case "loading":
       return (
         <main>
@@ -14,14 +25,23 @@ export function App({ state, onClose }: AppProps) {
         </main>
       );
     case "ready":
-      return (
-        <main>
-          <section className="card">
-            <h1>嗨，{state.displayName}</h1>
-            <p>帳號已連結完成。個人檔案設定會在下一個版本開放。</p>
-          </section>
-        </main>
-      );
+      switch (route(pathname)) {
+        case "profile":
+          return (
+            <Profile
+              today={today}
+              onClose={onClose}
+              onFatal={() => setFailed(true)}
+            />
+          );
+        case "settings":
+          return <Settings />;
+        case "records":
+          return <Placeholder title="我的紀錄" onClose={onClose} />;
+        case "workout":
+          return <Placeholder title="記訓練" onClose={onClose} />;
+      }
+      break;
     case "consent_required":
       return (
         <main>
