@@ -2,16 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 能在 LIFF 完整記錄一次訓練（spec §10 PR 6 完成條件）。內容包括：動作庫、從範本或空白開始、記錄每組、帶出上次重量與漸進超負荷建議、偵測個人最佳紀錄（PR）並在聊天室恭喜、存成範本、本週各肌群組數。
+**Goal:** 能在 LIFF 完整記錄一次訓練（spec §10 PR 6 完成條件）。內容包括：中英文動作庫（重訓與有氧）、從範本或空白開始、記錄重訓的每組與有氧的時間和距離、帶出上次重量與漸進超負荷建議、偵測個人最佳紀錄（PR）並在聊天室恭喜、存成範本、本週各肌群組數。
 
 **Architecture:**
 
 - `packages/shared` 放純函式：估算 1RM（Epley 公式）、漸進超負荷建議、本週範圍（台北時區的週一到週日）、訓練量。
-- `api` 新增 6 張表（spec §5 的 5 張，加上 1 張「本次訓練的動作清單」），以及動作庫種子資料、訓練 API。
+- `api` 新增 7 張表（spec §5 的 5 張，加上「本次訓練的動作清單」與「有氧紀錄」），以及動作庫種子資料、訓練 API。
 - LIFF 實作開始畫面、訓練進行中畫面、結束摘要。
 - 個人最佳紀錄的恭喜訊息：LIFF 結束訓練時用 `liff.sendMessages` 以使用者身分送出固定文字「完成今天的訓練」。這會觸發 webhook 並取得 reply token，bot 再用這個 reply token 回覆摘要與恭喜，不消耗 push 額度（spec §6.4）。
 
-**Tech Stack:** 沿用現有技術，不新增套件。有一個新的 migration（0003）。
+**Tech Stack:** 沿用現有技術，不新增套件。有兩個新的 migration（0003 建表、0004 動作庫種子）。
 
 **Spec:** [docs/specs/2026-10-15-gym-assistant-coach-design.md](../../specs/2026-10-15-gym-assistant-coach-design.md) §5（`exercises`、`workout_sessions`、`workout_sets`、`workout_templates`／`template_items`）、§6.4、§10 PR 6、§10.1 設計稿（LIFF「訓練進行中」、Flex 今日總覽的訓練列）。
 
@@ -26,7 +26,25 @@
   - 不記錄 id、token 或內容
 - **CORS：** 這個 PR 第一次用到 `DELETE`，必須把 `DELETE` 加進 CORS 允許的方法，並寫測試確認 LIFF 網域的 DELETE 預檢會通過。（PR 4 曾因為漏了 PUT，所有單元測試都沒抓到。）
 - 肌群（`MuscleGroup`）：`chest` 胸、`back` 背、`shoulders` 肩、`biceps` 二頭、`triceps` 三頭、`quads` 股四頭、`hamstrings` 腿後、`glutes` 臀、`calves` 小腿、`core` 核心。
-- 器材（`Equipment`）：`barbell` 槓鈴、`dumbbell` 啞鈴、`machine` 機械、`cable` 滑輪、`bodyweight` 自體重量、`other` 其他。
+- **動作種類（`ExerciseKind`）：** `strength` 重訓、`cardio` 有氧。重訓動作必須有肌群；有氧動作的肌群為 null。
+- **器材（`Equipment`）與器材類別（`EquipmentCategory`）：** 資料庫只存器材，類別一律由 shared 的 `equipmentCategory(equipment)` 推導，不另外存，避免兩者不一致。
+
+  | 類別 | 器材 |
+  |---|---|
+  | `machine` 機械式 | `selectorized_machine` 插銷式機械、`plate_loaded_machine` 掛片式機械 |
+  | `semi_machine` 半機械式 | `smith_machine` 史密斯機、`cable` 滑輪 |
+  | `free_weight` 自由重量 | `barbell` 槓鈴、`dumbbell` 啞鈴、`kettlebell` 壺鈴、`ez_bar` 曲槓 |
+  | `bodyweight` 徒手 | `bodyweight` 自體重量 |
+  | `cardio_equipment` 有氧器材 | `treadmill` 跑步機、`stair_climber` 階梯機、`stationary_bike` 飛輪／固定式腳踏車、`rower` 划船機、`elliptical` 橢圓機、`none` 無器材（例如戶外跑步、跳繩） |
+
+- **名稱：** 內建動作一定有中文與英文名稱，並有固定的英文代號 `slug`（例如 `barbell-bench-press`），未來可用來對應教學影片。自訂動作的英文名稱選填，沒有 slug。畫面上中英並列，搜尋同時比對中文與英文。
+- **有氧紀錄的合理範圍：**
+  - 時間 1–600 分鐘的整數（必填）
+  - 距離 0–100 km，兩位小數（選填）
+  - 坡度 0–40%，一位小數（選填，跑步機與爬坡）
+  - 速度 0–40 km/h，一位小數（選填）
+  - 阻力或等級 1–30 的整數（選填，階梯機、飛輪、划船機、橢圓機）
+- **有氧不計入** 1RM、PR、訓練量與肌群組數；本週統計與摘要另外顯示「有氧分鐘數」。
 - 每組的合理範圍：
   - 次數 1–100 的整數
   - 重量 0–500 kg，一位小數；0 代表自體重量
@@ -46,7 +64,7 @@
 
 1. **中途關閉 LIFF 再打開**：要回到同一個進行中的訓練，已記錄的組都還在。由 Task 4、Task 6 測試涵蓋。
 2. **第一次做某個動作**：不顯示「上次」、不建議加重、不算 PR，畫面也不能出錯。由 Task 1、Task 4 測試涵蓋。
-3. **自體重量動作（重量 0）**：可以記錄，但不參與 1RM 與 PR 計算。由 Task 1、Task 4 測試涵蓋。
+3. **自體重量（重量 0）與有氧動作**：可以記錄，但不參與 1RM、PR 與訓練量；有氧只計入有氧分鐘數。由 Task 1、Task 4 測試涵蓋。
 4. **在 LINE 以外的瀏覽器開啟，`sendMessages` 無法使用**：結束訓練仍要成功，恭喜改顯示在 LIFF 畫面上。由 Task 6 測試涵蓋。
 5. **刪除範本或自訂動作**：只能刪除自己的；刪除已用於歷史紀錄的自訂動作時，不能破壞歷史資料，改成封存。由 Task 3 測試涵蓋。
 
@@ -56,8 +74,8 @@
 
 | 路徑 | 職責 |
 |---|---|
-| `packages/shared/src/workouts.ts` | 肌群與器材常數、範圍、`estimate1RM`、`overloadHint`、`weekRange`、`volume`、API 型別 |
-| `apps/api/src/db/schema.ts`、`db/migrations/0003_*.sql`、`db/migrations/0004_seed_exercises.sql` | 6 張表與動作庫種子 |
+| `packages/shared/src/workouts.ts` | 肌群、器材與器材類別常數、有氧範圍、`estimate1RM`、`overloadHint`、`weekRange`、`volume`、API 型別 |
+| `apps/api/src/db/schema.ts`、`db/migrations/0003_*.sql`、`db/migrations/0004_seed_exercises.sql` | 7 張表與動作庫種子（重訓與有氧，中英文） |
 | `apps/api/src/workouts/repo.ts` | 訓練、組、範本的存取 |
 | `apps/api/src/workouts/exercise-routes.ts`、`template-routes.ts`、`session-routes.ts` | LIFF 用的 API |
 | `apps/api/src/internal/routes.ts`（修改） | 今日總覽的訓練摘要、訓練完成摘要 |
@@ -77,7 +95,11 @@
 **Interfaces:**
 
 - Produces:
-  - 常數：`MUSCLE_GROUPS`、`EQUIPMENT`（中文標籤見 Global Constraints）、`SET_LIMITS = { reps: {min:1,max:100}, weightKg: {min:0,max:500}, rpe: {min:1,max:10} }`
+  - 常數（中文標籤見 Global Constraints）：
+    - `MUSCLE_GROUPS`、`EXERCISE_KINDS`、`EQUIPMENT`、`EQUIPMENT_CATEGORIES`
+    - `SET_LIMITS = { reps: {min:1,max:100}, weightKg: {min:0,max:500}, rpe: {min:1,max:10} }`
+    - `CARDIO_LIMITS = { durationMin: {min:1,max:600}, distanceKm: {min:0,max:100}, inclinePct: {min:0,max:40}, speedKmh: {min:0,max:40}, level: {min:1,max:30} }`
+  - `equipmentCategory(equipment: Equipment): EquipmentCategory`：依 Global Constraints 的對照表
   - `estimate1RM(weightKg, reps): number | null`：不符合條件時回傳 null
   - `bestE1RM(sets: {weightKg, reps}[]): number | null`
   - `overloadHint(last: {weightKg, reps}[], targetReps: number | null): { suggestWeightKg: number } | null`
@@ -85,7 +107,10 @@
     - `last` 為空陣列時回傳 null
   - `weekRange(today: string): { from: string; to: string }`：週一到週日
   - `volume(sets): number`
-  - 型別：`Exercise`、`WorkoutSet`、`SessionItem`、`ActiveSession`、`FinishSummary`、`Template`、`WeekStats`
+  - 型別：`Exercise`、`WorkoutSet`、`CardioEntry`、`SessionItem`、`ActiveSession`、`FinishSummary`、`Template`、`WeekStats`
+    - `Exercise`：`{ id, slug: string | null, nameZh, nameEn: string | null, kind, muscleGroup: MuscleGroup | null, equipment, equipmentCategory, isCustom }`
+    - `CardioEntry`：`{ entryIndex, durationMin, distanceKm?, inclinePct?, speedKmh?, level? }`
+    - 重訓 item 帶 `sets`，有氧 item 帶 `cardio`
     - `ActiveSession` 的每個 item 包含 `last: { date, sets } | null` 與 `hint`
 
 - [ ] **Step 1: 寫失敗的測試**：
@@ -96,6 +121,7 @@
   - `overloadHint missed set gives null`：上次 80×8、80×7
   - `overloadHint blank workout uses first set reps as target`
   - `overloadHint empty last gives null`
+  - `equipmentCategory maps every equipment`：EQUIPMENT 的每個值都對到一個類別；例如 smith_machine → semi_machine、kettlebell → free_weight、treadmill → cardio_equipment
   - `weekRange monday to sunday`：
     - 2026-10-20（週二）→ from 2026-10-19、to 2026-10-25
     - 2026-10-25（週日）→ 同一週
@@ -122,13 +148,16 @@
 - 表：
   - `exercises`：
     - `id uuid pk`
+    - `slug text unique`：內建動作必填，自訂動作為 null
     - `name_zh text not null`、`name_en text`
-    - `muscle_group text not null`，check 為肌群列舉
+    - `kind text not null`，check 為 `strength`／`cardio`
+    - `muscle_group text`，check 為肌群列舉；check：`kind = 'cardio' or muscle_group is not null`
     - `equipment text not null`，check 為器材列舉
     - `is_custom boolean not null default false`
     - `owner_user_id uuid`，references users，on delete cascade
     - `archived_at timestamptz`
     - check：`is_custom = (owner_user_id is not null)`
+    - check：`is_custom or (slug is not null and name_en is not null)`
     - 部分唯一索引：`(name_zh)`，`where not is_custom`
   - `workout_sessions`：
     - `id uuid pk`
@@ -152,6 +181,14 @@
     - `weight_kg numeric(5,1) not null`、`rpe numeric(3,1)`
     - `completed_at timestamptz not null default now()`
     - pk `(session_id, exercise_id, set_index)`
+  - `cardio_entries`：
+    - `session_id uuid`，cascade
+    - `exercise_id uuid not null`
+    - `entry_index int not null`
+    - `duration_min int not null`
+    - `distance_km numeric(5,2)`、`incline_pct numeric(3,1)`、`speed_kmh numeric(3,1)`、`level int`
+    - `completed_at timestamptz not null default now()`
+    - pk `(session_id, exercise_id, entry_index)`
   - `workout_templates`：
     - `id uuid pk`
     - `user_id uuid`，cascade
@@ -162,13 +199,28 @@
     - `exercise_id uuid`
     - `position int`、`sets int not null`、`reps int not null`
     - pk `(template_id, exercise_id)`
-- 種子：約 40 個常見動作，每個肌群至少 3 個。
-  - 例：槓鈴臥推／Barbell Bench Press／chest／barbell、槓鈴深蹲、羅馬尼亞硬舉、引體向上、啞鈴肩推、側平舉、二頭彎舉、繩索下拉、腿推、腿後彎舉、臀推、提踵、棒式……
-  - 寫法：`insert … on conflict do nothing`。
+- 種子（`slug`、中文、英文、種類、肌群、器材全部必填）：
+  - 重訓約 45 個，每個肌群至少 3 個；機械式、半機械式、自由重量、徒手四類都要有
+    - 例：`barbell-bench-press` 槓鈴臥推／Barbell Bench Press／chest／barbell
+    - 例：`smith-machine-squat` 史密斯機深蹲／Smith Machine Squat／quads／smith_machine
+    - 例：`chest-press-machine` 坐姿胸推機／Chest Press Machine／chest／selectorized_machine
+    - 例：`lat-pulldown` 滑輪下拉／Lat Pulldown／back／cable
+    - 例：`pull-up` 引體向上／Pull-up／back／bodyweight
+  - 有氧至少 8 個：
+    - `treadmill-run` 跑步機跑步／Treadmill Run／treadmill
+    - `treadmill-incline-walk` 跑步機爬坡走／Treadmill Incline Walk／treadmill
+    - `outdoor-run` 戶外跑步／Outdoor Run／none
+    - `stair-climber` 階梯機／Stair Climber／stair_climber
+    - `stationary-bike` 飛輪／Stationary Bike／stationary_bike
+    - `rowing-machine` 划船機／Rowing Machine／rower
+    - `elliptical` 橢圓機／Elliptical／elliptical
+    - `jump-rope` 跳繩／Jump Rope／none
+  - 寫法：`insert … on conflict (slug) do nothing`。
 - Repo（只列對外介面，皆以 `userId` 限定範圍）：
   - 動作：`listExercises(db, userId, { q?, muscle? })`、`createCustomExercise`、`archiveCustomExercise`
   - 範本：`listTemplates`、`createTemplateFromSession(db, userId, sessionId, name)`、`deleteTemplate`
-  - 訓練進行中：`getActiveSession(db, userId, today)`、`startSession(db, userId, today, templateId?)`、`addItem`、`upsertSet`、`deleteSet`
+  - 訓練進行中：`getActiveSession(db, userId, today)`、`startSession(db, userId, today, templateId?)`、`addItem`、`upsertSet`、`deleteSet`、`upsertCardio`、`deleteCardio`
+  - `upsertSet` 只接受重訓動作，`upsertCardio` 只接受有氧動作；用錯種類時丟出錯誤，由 route 回 400
   - 結束與統計：`finishSession(db, userId, sessionId) → FinishSummary`、`weekStats(db, userId, from, to)`、`latestUncelebrated(db, userId)`、`markCelebrated`、`todayWorkoutSummary(db, userId, today)`
   - `getActiveSession` 的每個 item 都附上次的組與建議：
     - 上次 = 同一動作最近一次已完成訓練的組
@@ -178,6 +230,10 @@
 - [ ] **Step 1: 寫 schema，產生兩個 migration。** 0004 的種子手寫，並在檔頭註解說明格式。
 - [ ] **Step 2: 寫失敗的測試**（必須關閉 `createTestDb`）：
   - `seed has at least 3 exercises per muscle group and unique names`
+  - `seed covers all equipment categories and has 8+ cardio exercises, all with slug and English name`
+  - `search matches English name`：例如 `bench` 找得到槓鈴臥推
+  - `record cardio entry and reopen`
+  - `cardio is excluded from volume, PRs and muscle sets`
   - `custom exercise visible only to owner`
   - `archiving a used custom exercise keeps history`
   - `only one active session; starting again returns it`
@@ -205,10 +261,10 @@
 **Interfaces（皆需 LIFF session，在 `onRequest` 驗證）：**
 
 - 動作：
-  - `GET /exercises?q=&muscle=` → `Exercise[]`：種子加上自己的自訂動作，排除已封存
+  - `GET /exercises?q=&muscle=&category=&kind=` → `Exercise[]`：種子加上自己的自訂動作，排除已封存；`q` 同時比對中文與英文名稱
   - `POST /exercises` → 201 `Exercise`
-    - body：`{ nameZh, muscleGroup, equipment }`
-    - `nameZh` 為 1–30 字
+    - body：`{ nameZh, nameEn?, kind, muscleGroup?, equipment }`
+    - `nameZh` 為 1–30 字，`nameEn` 為 1–60 字；重訓必須有 `muscleGroup`
   - `DELETE /exercises/:id` → 204
     - 只能刪自己的自訂動作，否則回 404
     - 已用於歷史紀錄的改成封存
@@ -221,7 +277,7 @@
 
 - [ ] **Step 1: 寫失敗的測試**：
   - `CORS preflight allows DELETE for the LIFF origin`
-  - `list exercises filters by q and muscle`
+  - `list exercises filters by q (zh and en), muscle, category and kind`
   - `create custom then list includes it only for owner`
   - `delete other user's exercise is 404`
   - `create template from own finished session`
@@ -254,10 +310,14 @@
     - body：`{ exerciseId, setIndex, reps, weightKg, rpe? }`
     - 值必須在 `SET_LIMITS` 範圍內
   - `DELETE /workouts/:id/sets/:exerciseId/:setIndex` → `ActiveSession`
+  - `PUT /workouts/:id/cardio` → `ActiveSession`
+    - body：`{ exerciseId, entryIndex, durationMin, distanceKm?, inclinePct?, speedKmh?, level? }`
+    - 值必須在 `CARDIO_LIMITS` 範圍內；對重訓動作呼叫時回 400
+  - `DELETE /workouts/:id/cardio/:exerciseId/:entryIndex` → `ActiveSession`
   - `POST /workouts/:id/finish` → `FinishSummary`
-    - 回傳 `{ sessionId, volumeKg, exerciseCount, setCount, prs: [{ exerciseId, nameZh, e1rm, weightKg, reps }] }`
-    - 至少要有一組已完成，否則回 409 `conflict`
-  - `GET /workouts/week` → `WeekStats`：`{ from, to, sessions, setsByMuscle: Record<MuscleGroup, number> }`
+    - 回傳 `{ sessionId, volumeKg, exerciseCount, setCount, cardioMinutes, prs: [{ exerciseId, nameZh, nameEn, e1rm, weightKg, reps }] }`
+    - 至少要有一組重訓或一筆有氧，否則回 409 `conflict`
+  - `GET /workouts/week` → `WeekStats`：`{ from, to, sessions, setsByMuscle: Record<MuscleGroup, number>, cardioMinutes }`
   - 不是自己的訓練一律回 404
 - bot（需服務 token）：
   - `POST /internal/workouts/celebrate`
@@ -265,7 +325,7 @@
     - 回傳最近一次今天完成、而且還沒恭喜過的訓練摘要（含 PR），並標記為已恭喜
     - 沒有的話回 `{ summary: null }`
   - 修改 `/internal/users/today`：`workoutSummary` 改為今天已完成訓練的摘要
-    - 格式：`"{範本名稱或「訓練」}・{n} 個動作・{volume} kg"`
+    - 格式：`"{範本名稱或「訓練」}・{n} 個動作・{volume} kg"`；有有氧時再加「・有氧 {m} 分鐘」；只有有氧時省略訓練量
     - 今天沒有訓練時為 null
 - 今天的日期一律用 `taipeiDate(deps.now())`。
 
@@ -277,6 +337,8 @@
   - `finish with no sets is 409`
   - `other user's session is 404`
   - `week stats after finish`
+  - `cardio entry recorded, out-of-range is 400, wrong kind is 400`
+  - `finish with only cardio succeeds and reports cardio minutes`
   - `celebrate returns summary once then null`
   - `today summary shows workout after finish`
 - [ ] **Step 2: 執行測試**。Expected：FAIL。
@@ -300,7 +362,7 @@
     - 沒有摘要時，回覆「今天還沒有完成的訓練紀錄喔。」
   - `messages.workout_done(summary, liff_id)`：
     - 標題「今天辛苦了！」
-    - 內文：動作數、組數、總訓練量
+    - 內文：動作數、組數、總訓練量；有有氧時加「有氧 {m} 分鐘」
     - 每個 PR 一行，例如「新紀錄：槓鈴深蹲 估算 1RM 116.7 kg（100 kg × 5）」，用 accent-soft 色塊標示
     - 按鈕「看今天的總覽」：postback `action=today`
     - `altText`：「訓練完成」
@@ -327,14 +389,15 @@
 
 - **WorkoutHome**（沒有進行中的訓練時）：
   - 標題「記訓練」
-  - 「本週訓練 N 次」與各肌群組數的橫條（只列 > 0 的肌群）
+  - 「本週訓練 N 次」、各肌群組數的橫條（只列 > 0 的肌群），以及「有氧 {m} 分鐘」
   - 範本列表，每個有「開始」與「刪除」（刪除前要確認）
   - 主要按鈕「空白開始」
   - 有進行中的訓練時，直接顯示 ActiveWorkout
 - **ActiveWorkout**：
   - 頂部：「{範本名稱或「訓練進行中」}」與經過時間 mm:ss
   - 每個動作一張卡：
-    - 名稱用 serif 字體
+    - 中文名稱用 serif 字體，英文名稱以小字顯示在下方
+    - 有氧動作的卡片改為輸入：時間（分鐘，必填）、距離、坡度、速度、等級（選填）；「完成這筆」送出 `PUT /cardio`
     - 有上次紀錄時顯示「上次（M/D）：80 kg × 8、8、8」
     - 有建議時顯示 accent-soft 框：「上次每組都做到了，今天試試 82.5 kg？」
     - 組列表：組號、重量、次數、RPE（選填）
@@ -342,9 +405,11 @@
     - 「完成這組」送出 `PUT`；「＋ 加一組」
   - 底部：「＋ 加動作」開啟 ExercisePicker；「結束訓練」需確認後才送出 finish
 - **ExercisePicker**：
-  - 搜尋框，加上肌群篩選 chip
+  - 搜尋框（中英文皆可）
+  - 第一列 chip：重訓／有氧；重訓時第二列 chip 依肌群篩選，第三列依器材類別（機械式、半機械式、自由重量、徒手）篩選
+  - 每個動作顯示中文、英文與器材標籤
   - 點選即加入訓練
-  - 「新增自訂動作」：名稱、肌群、器材
+  - 「新增自訂動作」：中文名稱、英文名稱（選填）、種類、肌群（重訓才要）、器材
 - **FinishSummary**：
   - 總訓練量、動作數、組數
   - 有 PR 時用 accent-soft 卡逐一列出
@@ -360,7 +425,8 @@
   - `last sets and hint are shown; first-time exercise shows none`
   - `complete set sends PUT with prefilled values`
   - `invalid reps shows field error`
-  - `picker filters and adds exercise; custom exercise form`
+  - `picker filters by kind, muscle and equipment category; English search; adds exercise; custom exercise form`
+  - `cardio card records duration and optional fields`
   - `finish requires confirm and shows PRs`
   - `finish sends chat message; failure still shows summary`
   - `save as template`
