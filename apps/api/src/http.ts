@@ -27,14 +27,27 @@ export function bearerAuth<T>(
   };
 }
 
-/** Maps schema validation failures to 400 bad_request; rethrows the rest. */
+/**
+ * Maps errors to fixed, content-free API bodies. Validation and other 4xx
+ * errors become 400 bad_request; anything else is a 500 "internal". The 5xx
+ * path logs only the error name/code: DB driver messages embed SQL text and
+ * params (LINE userIds), which must reach neither the client nor the logs.
+ */
 export function apiErrorHandler(
   err: FastifyError,
-  _req: FastifyRequest,
+  req: FastifyRequest,
   reply: FastifyReply,
 ) {
-  if (err.validation) {
+  const status = err.statusCode;
+  if (
+    err.validation ||
+    (status !== undefined && status >= 400 && status < 500)
+  ) {
     return reply.code(400).send({ error: "bad_request" } satisfies ApiError);
   }
-  throw err;
+  req.log.error(
+    { err: { name: err.name, code: err.code } },
+    "request failed with an internal error",
+  );
+  return reply.code(500).send({ error: "internal" } satisfies ApiError);
 }

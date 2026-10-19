@@ -136,3 +136,65 @@ describe("auth", () => {
     expect(evil.headers["access-control-allow-origin"]).toBeUndefined();
   });
 });
+
+describe("error handling", () => {
+  const LEAK = "Failed query: select * from users\nparams: Uabc";
+  const build = async (throwing: boolean) => {
+    const t = await createTestDb();
+    const lines: string[] = [];
+    const stream = { write: (l: string) => void lines.push(l) };
+    const app = buildApp(
+      {
+        db: t.db,
+        verifyServiceToken: async () => {
+          throw new Error("unused");
+        },
+        botServiceAccount: "bot@x",
+        verifyLineIdToken: async () => {
+          if (throwing) throw new Error(LEAK);
+          return { sub: "Uabc", name: null };
+        },
+        sessionSecret: SECRET,
+        corsOrigin: ORIGIN,
+      },
+      { logger: { level: "info", stream } },
+    );
+    app.get("/boom", async () => {
+      throw new Error(LEAK);
+    });
+    return { app, lines, close: t.close };
+  };
+
+  it("5xx replies a fixed internal body and logs no query text or ids", async () => {
+    const { app, lines, close } = await build(false);
+    try {
+      const res = await app.inject({ method: "GET", url: "/boom" });
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toBe('{"error":"internal"}');
+      const logs = lines.join("");
+      expect(logs).toContain("internal error");
+      expect(logs).not.toContain("Failed query");
+      expect(logs).not.toContain("Uabc");
+    } finally {
+      await app.close();
+      await close();
+    }
+  });
+
+  it("malformed JSON on /auth/liff is 400 bad_request", async () => {
+    const { app, close } = await build(false);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/liff",
+        headers: { "content-type": "application/json" },
+        payload: "{not json",
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toBe('{"error":"bad_request"}');
+    } finally {
+      await app.close();
+      await close();
+    }
+  });
+});
