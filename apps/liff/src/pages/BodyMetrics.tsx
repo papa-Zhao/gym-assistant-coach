@@ -15,6 +15,11 @@ const RANGES = [7, 30, 90] as const;
 const KEYS: readonly MetricKey[] = ["weightKg", "bodyFatPct", "waistCm"];
 const SIDE_KEYS: readonly MetricKey[] = ["bodyFatPct", "waistCm"];
 const DEFAULT_DAYS = 30;
+const EXAMPLES: Record<MetricKey, string> = {
+  weightKg: "72.5",
+  bodyFatPct: "18.6",
+  waistCm: "81",
+};
 
 type FormValues = Record<MetricKey, string>;
 const EMPTY_FORM: FormValues = { weightKg: "", bodyFatPct: "", waistCm: "" };
@@ -138,12 +143,12 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
               </span>
               {latest && <span className="metric-unit">{unit}</span>}
             </div>
-            <p className="change">
-              {days} 天內 {change}
-              {change !== "—" && ` ${unit}`}
-            </p>
-            {latest && first && (
+            {latest && first ? (
               <>
+                <p className="change">
+                  {days} 天內 {change}
+                  {change !== "—" && ` ${unit}`}
+                </p>
                 <TrendChart
                   points={series}
                   average={average}
@@ -161,6 +166,11 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
                   <span className="l-line">7 日平均</span>
                 </p>
               </>
+            ) : (
+              <p className="muted">
+                這段期間還沒有{label}紀錄。可以在聊天室輸入「{label}{" "}
+                {EXAMPLES[metric]}」或按下方「記錄今天的數據」。
+              </p>
             )}
             {metric !== "weightKg" && (
               <button

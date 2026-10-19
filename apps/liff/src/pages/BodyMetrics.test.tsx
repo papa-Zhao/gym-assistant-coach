@@ -77,6 +77,27 @@ describe("BodyMetrics", () => {
     ).toBeInTheDocument();
   });
 
+  it("selected metric without data explains how to record it", async () => {
+    current = {
+      ...DATA,
+      points: DATA.points.map((p) => ({
+        ...p,
+        bodyFatPct: null,
+        waistCm: null,
+      })),
+    };
+    const { container } = render(<BodyMetrics onFatal={onFatal} />);
+    await screen.findByText("72.4");
+    fireEvent.click(screen.getByRole("button", { name: /體脂/ }));
+    expect(
+      screen.getByText(
+        "這段期間還沒有體脂紀錄。可以在聊天室輸入「體脂 18.6」或按下方「記錄今天的數據」。",
+      ),
+    ).toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.queryByText(/— %/)).not.toBeInTheDocument();
+  });
+
   it("record today validates range and sends PUT with only filled fields", async () => {
     render(<BodyMetrics onFatal={onFatal} />);
     await screen.findByText("72.4");

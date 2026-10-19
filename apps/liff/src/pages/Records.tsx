@@ -29,6 +29,7 @@ export function Records({ onFatal }: RecordsProps) {
 
   const weight = data ? seriesFor(data.points, "weightKg") : [];
   const latest = weight.at(-1);
+  const change = formatChange(weight);
   const { unit } = METRIC_LIMITS.weightKg;
 
   return (
@@ -45,7 +46,9 @@ export function Records({ onFatal }: RecordsProps) {
               <span className="metric-unit">{unit}</span>
             </p>
             <p className="change">
-              30 天內 {formatChange(weight)} {unit}
+              {change === "—"
+                ? "目前只有一筆紀錄"
+                : `30 天內 ${change} ${unit}`}
             </p>
           </>
         ) : (

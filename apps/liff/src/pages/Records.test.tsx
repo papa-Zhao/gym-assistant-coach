@@ -14,15 +14,17 @@ const DATA: BodyMetricsResponse = {
 };
 
 describe("Records", () => {
+  let DATA_NOW: BodyMetricsResponse;
   const paths: string[] = [];
 
   beforeEach(() => {
     paths.length = 0;
+    DATA_NOW = DATA;
     configureApi({
       apiUrl: "https://api.test",
       fetchImpl: (async (url: string) => {
         paths.push(url.replace("https://api.test", ""));
-        return new Response(JSON.stringify(DATA));
+        return new Response(JSON.stringify(DATA_NOW));
       }) as unknown as typeof fetch,
       relogin: async () => ({ kind: "error" }),
     });
@@ -37,6 +39,17 @@ describe("Records", () => {
       "href",
       "/records/body",
     );
+  });
+
+  it("one weight record shows a single-record note without a dash unit", async () => {
+    DATA_NOW = {
+      ...DATA,
+      points: [DATA.points[1]!],
+    };
+    render(<Records onFatal={vi.fn()} />);
+    expect(await screen.findByText("72.4")).toBeInTheDocument();
+    expect(screen.getByText("目前只有一筆紀錄")).toBeInTheDocument();
+    expect(screen.queryByText(/— kg/)).not.toBeInTheDocument();
   });
 
   it("diet and training are coming soon", async () => {
