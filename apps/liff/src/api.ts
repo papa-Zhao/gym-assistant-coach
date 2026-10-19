@@ -59,5 +59,6 @@ export async function apiFetch<T>(
     if (res.status === 401) throw new AuthExpiredError();
   }
   if (!res.ok) throw new ApiHttpError(res.status);
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

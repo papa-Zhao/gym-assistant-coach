@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { METRIC_LIMITS, type BodyMetricsResponse } from "@gac/shared";
+import {
+  METRIC_LIMITS,
+  type BodyMetricsResponse,
+  type WeekStats,
+} from "@gac/shared";
 import { apiFetch } from "../api";
 import { formatChange, seriesFor } from "../bodyMetricsView";
 
@@ -8,16 +12,24 @@ interface RecordsProps {
   onFatal: () => void;
 }
 
-const SOON = ["飲食", "訓練"] as const;
+const SOON = ["飲食"] as const;
 
 export function Records({ onFatal }: RecordsProps) {
   const [data, setData] = useState<BodyMetricsResponse | null>(null);
+  const [week, setWeek] = useState<WeekStats | null>(null);
 
   useEffect(() => {
     let live = true;
     apiFetch<BodyMetricsResponse>("/body-metrics?days=30")
       .then((res) => {
         if (live) setData(res);
+      })
+      .catch(() => {
+        if (live) onFatal();
+      });
+    apiFetch<WeekStats>("/workouts/week")
+      .then((res) => {
+        if (live) setWeek(res);
       })
       .catch(() => {
         if (live) onFatal();
@@ -55,6 +67,15 @@ export function Records({ onFatal }: RecordsProps) {
           <p className="muted">還沒有紀錄</p>
         )}
         <span className="muted">看趨勢 ›</span>
+      </a>
+      <a className="card link" href="/workout">
+        <h2>訓練</h2>
+        {week ? (
+          <p>本週訓練 {week.sessions} 次</p>
+        ) : (
+          <p className="muted">載入中…</p>
+        )}
+        <span className="muted">記訓練 ›</span>
       </a>
       {SOON.map((label) => (
         <button key={label} type="button" className="card soon" disabled>
