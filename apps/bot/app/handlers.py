@@ -26,6 +26,32 @@ def _is_consent_postback(data: str) -> bool:
     return fields.get("action") == ["consent"] and fields.get("version") == [CONSENT_VERSION]
 
 
+_MENU_ACTIONS = ("today", "photo", "ask")
+
+
+def _menu_action(data: str) -> str | None:
+    fields = parse_qs(data)
+    if list(fields) != ["action"] or len(fields["action"]) != 1:
+        return None
+    return fields["action"][0] if fields["action"][0] in _MENU_ACTIONS else None
+
+
+def _handle_menu(event: PostbackEvent, action: str, user_id: str, deps: "_Deps") -> None:
+    token = event.reply_token
+    if not deps.api.sync(user_id, deps.line.profile_name(user_id)).consented:
+        deps.line.reply(token, [messages.welcome(deps.settings.public_site_url)])
+    elif action == "photo":
+        deps.line.reply(token, [messages.photo_coming_soon()])
+    elif action == "ask":
+        deps.line.reply(token, [messages.ask_coming_soon()])
+    else:
+        today = deps.api.today(user_id)
+        if today.has_profile and today.targets is not None:
+            deps.line.reply(token, [messages.today_summary(today, deps.settings.liff_id)])
+        else:
+            deps.line.reply(token, [messages.profile_needed(deps.settings.liff_id)])
+
+
 def _sync_and_greet(event: FollowEvent | MessageEvent, user_id: str, deps: "_Deps") -> None:
     result = deps.api.sync(user_id, deps.line.profile_name(user_id))
     token = event.reply_token
@@ -54,13 +80,18 @@ def _handle_event(event: Event, deps: _Deps) -> None:
         return
     if not isinstance(event, FollowEvent | MessageEvent | PostbackEvent):
         return
-    if isinstance(event, PostbackEvent) and not _is_consent_postback(event.postback.data):
-        return
+    action = None
+    if isinstance(event, PostbackEvent):
+        action = _menu_action(event.postback.data)
+        if action is None and not _is_consent_postback(event.postback.data):
+            return
     try:
         deps.line.show_loading(user_id)
     except Exception:
         logger.warning("loading animation failed event=%s", event.type)
-    if isinstance(event, PostbackEvent):
+    if isinstance(event, PostbackEvent) and action is not None:
+        _handle_menu(event, action, user_id, deps)
+    elif isinstance(event, PostbackEvent):
         deps.api.consent(user_id, CONSENT_VERSION)
         deps.line.reply(event.reply_token, [messages.consent_done(deps.settings.liff_id)])
     else:
