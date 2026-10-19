@@ -1,7 +1,9 @@
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from app.api_client import Macros, TodayResult
+from app.api_client import Macros, MetricRecorded, TodayResult
+from app.commands import METRIC_LIMITS
 from app.settings import CONSENT_VERSION
 
 PRIMARY = "#B4492A"
@@ -343,3 +345,60 @@ def today_summary(t: TodayResult, liff_id: str) -> Message:
             },
         },
     }
+
+
+_METRIC_LABELS = {
+    "weightKg": ("體重", "kg", "72.5"),
+    "bodyFatPct": ("體脂", "%", "18.6"),
+    "waistCm": ("腰圍", "cm", "81"),
+}
+
+
+def _num(value: float | Decimal) -> str:
+    one = Decimal(str(value)).quantize(Decimal("0.1"), ROUND_HALF_UP)
+    return str(one.quantize(Decimal("1"))) if one == one.to_integral_value() else str(one)
+
+
+def _with_trend_quick_reply(text: str, liff_id: str) -> Message:
+    return {
+        "type": "text",
+        "text": text,
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {
+                        "type": "uri",
+                        "label": "看趨勢",
+                        "uri": f"https://liff.line.me/{liff_id}/records/body",
+                    },
+                }
+            ]
+        },
+    }
+
+
+def metric_recorded(result: MetricRecorded, liff_id: str) -> Message:
+    label, unit, _ = _METRIC_LABELS[result.key]
+    text = f"已記錄{label} {_num(result.value)} {unit}"
+    prev = result.previous
+    if prev is None:
+        text += "。"
+    else:
+        d = date.fromisoformat(prev.date)
+        when = f"{d.month}/{d.day}"
+        diff = Decimal(str(result.value)) - Decimal(str(prev.value))
+        diff = diff.quantize(Decimal("0.1"), ROUND_HALF_UP)
+        if diff == 0:
+            text += f"，和上次（{when}）一樣。"
+        else:
+            word = "多" if diff > 0 else "少"
+            text += f"，比上次（{when}）{word} {_num(abs(diff))} {unit}。"
+    return _with_trend_quick_reply(text, liff_id)
+
+
+def metric_range_error(key: str, liff_id: str) -> Message:
+    label, _, example = _METRIC_LABELS[key]
+    low, high = METRIC_LIMITS[key]
+    text = f"{label}的數字好像不太對，請輸入 {low}–{high} 之間的數字，例如「{label} {example}」。"
+    return _with_trend_quick_reply(text, liff_id)

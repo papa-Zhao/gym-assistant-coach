@@ -1,6 +1,12 @@
-export type Route = "profile" | "settings" | "records" | "workout";
+export type Route = "profile" | "settings" | "records" | "body" | "workout";
 
-const ROUTES: readonly Route[] = ["profile", "settings", "records", "workout"];
+const ROUTES: readonly Route[] = [
+  "profile",
+  "settings",
+  "records",
+  "body",
+  "workout",
+];
 
 /**
  * Maps `location.pathname` to a page. LIFF opens

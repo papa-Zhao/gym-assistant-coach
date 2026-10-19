@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { AuthState } from "./auth";
 import { route } from "./router";
+import { BodyMetrics } from "./pages/BodyMetrics";
 import { Placeholder } from "./pages/Placeholder";
 import { Profile } from "./pages/Profile";
+import { Records } from "./pages/Records";
 import { Settings } from "./pages/Settings";
 
 interface AppProps {
@@ -37,7 +39,9 @@ export function App({ state, pathname, today, onClose }: AppProps) {
         case "settings":
           return <Settings />;
         case "records":
-          return <Placeholder title="我的紀錄" onClose={onClose} />;
+          return <Records onFatal={() => setFailed(true)} />;
+        case "body":
+          return <BodyMetrics onFatal={() => setFailed(true)} />;
         case "workout":
           return <Placeholder title="記訓練" onClose={onClose} />;
       }

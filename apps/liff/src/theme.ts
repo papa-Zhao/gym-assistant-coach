@@ -128,6 +128,61 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
+.seg {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+}
+.seg button {
+  flex: 1;
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.metric-value { font-family: var(--font-display); font-weight: 900; font-size: var(--font-size-display); }
+.metric-unit { margin-left: var(--space-1); color: var(--color-text-muted); }
+.change { margin: 0; color: var(--color-accent); font-weight: 700; }
+.chart { display: block; width: 100%; height: auto; }
+.chart-range { display: flex; justify-content: space-between; }
+.legend { display: flex; gap: var(--space-4); margin: 0; }
+.legend span::before {
+  content: "";
+  display: inline-block;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+.legend .l-dot::before { width: 8px; height: 8px; border-radius: 50%; background: var(--color-border); }
+.legend .l-line::before { width: 16px; height: 3px; background: var(--color-primary); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); }
+button.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: ${radius.lg}px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 400;
+  text-align: left;
+}
+button.tile[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+button.tile strong { font-size: var(--font-size-heading); }
+.tile.back { margin-top: var(--space-3); }
+a.card.link { display: block; color: inherit; text-decoration: none; }
+.card.soon { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; min-height: ${minTouchTarget}px; font-weight: 400; color: var(--color-text); text-align: left; }
+.card + a.card, a.card + .card, .tiles + .card, .card + p.muted, p.muted + .card { margin-top: var(--space-4); }
 button {
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-6);

@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app import messages
 from app.api_client import ApiClient, ApiError
+from app.commands import InvalidMetric, MetricCommand, parse_metric_command
 from app.line_replier import LineReplier
 from app.settings import CONSENT_VERSION, Settings
 
@@ -59,6 +60,20 @@ def _sync_and_greet(event: FollowEvent | MessageEvent, user_id: str, deps: "_Dep
         deps.line.reply(token, [messages.welcome(deps.settings.public_site_url)])
     elif isinstance(event, FollowEvent):
         deps.line.reply(token, [messages.welcome_back()])
+    else:
+        _reply_to_text(event, user_id, deps)
+
+
+def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
+    token = event.reply_token
+    text = getattr(event.message, "text", None)
+    command = parse_metric_command(text) if isinstance(text, str) else None
+    liff_id = deps.settings.liff_id
+    if isinstance(command, MetricCommand):
+        recorded = deps.api.record_metric(user_id, command.key, command.value)
+        deps.line.reply(token, [messages.metric_recorded(recorded, liff_id)])
+    elif isinstance(command, InvalidMetric):
+        deps.line.reply(token, [messages.metric_range_error(command.key, liff_id)])
     else:
         deps.line.reply(token, [messages.placeholder_reply()])
 

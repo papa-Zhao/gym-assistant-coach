@@ -12,3 +12,4 @@ export * from "./tokens";
 export * from "./auth";
 export * from "./targets";
 export * from "./profile";
+export * from "./metrics";
