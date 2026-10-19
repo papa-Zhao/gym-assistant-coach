@@ -1,7 +1,16 @@
-import { taipeiDate, type TodayResponse } from "@gac/shared";
+import {
+  isValidMetric,
+  roundMetric,
+  taipeiDate,
+  type ApiError,
+  type MetricKey,
+  type MetricRecordedResponse,
+  type TodayResponse,
+} from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
+import { previousMetric, recordMetric } from "../metrics/repo";
 import { getProfile } from "../profile/repo";
 import {
   findByLineUserId,
@@ -39,6 +48,19 @@ const unfollowSchema = {
     required: ["lineUserId"],
     additionalProperties: false,
     properties: { lineUserId },
+  },
+} as const;
+
+const bodyMetricSchema = {
+  body: {
+    type: "object",
+    required: ["lineUserId", "key", "value"],
+    additionalProperties: false,
+    properties: {
+      lineUserId,
+      key: { enum: ["weightKg", "bodyFatPct", "waistCm"] },
+      value: { type: "number" },
+    },
   },
 } as const;
 
@@ -98,6 +120,28 @@ export const internalRoutes =
           workoutSummary: null,
           weightKg: profile?.weightKg ?? null,
           streakDays: 0,
+        };
+      },
+    );
+
+    app.post<{ Body: { lineUserId: string; key: MetricKey; value: number } }>(
+      "/body-metrics",
+      { schema: bodyMetricSchema },
+      async (req, reply): Promise<MetricRecordedResponse> => {
+        const { lineUserId, key, value } = req.body;
+        if (!isValidMetric(key, value)) {
+          return reply
+            .code(400)
+            .send({ error: "bad_request" } satisfies ApiError);
+        }
+        const { userId } = await syncUser(db, lineUserId, null);
+        const date = taipeiDate(now());
+        await recordMetric(db, userId, date, key, value);
+        return {
+          key,
+          value: roundMetric(value),
+          date,
+          previous: await previousMetric(db, userId, key, date),
         };
       },
     );

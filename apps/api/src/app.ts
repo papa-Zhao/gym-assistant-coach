@@ -5,6 +5,7 @@ import type { AppDeps } from "./deps.js";
 import { apiErrorHandler } from "./http.js";
 import { authRoutes } from "./auth/routes.js";
 import { profileRoutes } from "./profile/routes.js";
+import { metricsRoutes } from "./metrics/routes.js";
 import { internalRoutes } from "./internal/routes.js";
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
@@ -23,6 +24,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   });
   app.register(authRoutes(deps));
   app.register(profileRoutes(deps));
+  app.register(metricsRoutes(deps));
   app.register(internalRoutes(deps), { prefix: "/internal" });
 
   return app;
