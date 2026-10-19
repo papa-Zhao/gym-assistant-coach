@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   calcTargets,
   isBelowFloor,
+  TARGET_LIMITS,
   validateProfile,
   type ActivityLevel,
   type Goal,
@@ -93,19 +94,37 @@ function manualFrom(t: Targets): ManualForm {
   };
 }
 
-function parseManual(m: ManualForm): Targets | null {
-  const values = [m.kcal, m.proteinG, m.carbG, m.fatG].map((v) =>
-    v.trim() === "" ? NaN : Number(v),
-  );
-  if (values.some((v) => !Number.isFinite(v) || v < 0) || !(values[0]! > 0))
-    return null;
-  const [kcal, proteinG, carbG, fatG] = values.map(Math.round) as [
-    number,
-    number,
-    number,
-    number,
-  ];
-  return { kcal, proteinG, carbG, fatG };
+const KCAL_ERROR = `請輸入 ${TARGET_LIMITS.kcal.min}–${TARGET_LIMITS.kcal.max} 的整數`;
+const GRAM_ERROR = `請輸入 ${TARGET_LIMITS.gram.min}–${TARGET_LIMITS.gram.max} 的整數`;
+
+type ManualErrors = Partial<Record<keyof ManualForm, string>>;
+
+function inRange(text: string, min: number, max: number): number | null {
+  const n = text.trim() === "" ? NaN : Number(text);
+  return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}
+
+/** Validates the manual form against the shared limits (same as the api). */
+function parseManual(m: ManualForm): {
+  targets: Targets | null;
+  errors: ManualErrors;
+} {
+  const { kcal: k, gram: g } = TARGET_LIMITS;
+  const kcal = inRange(m.kcal, k.min, k.max);
+  const proteinG = inRange(m.proteinG, g.min, g.max);
+  const carbG = inRange(m.carbG, g.min, g.max);
+  const fatG = inRange(m.fatG, g.min, g.max);
+  const errors: ManualErrors = {};
+  if (kcal === null) errors.kcal = KCAL_ERROR;
+  if (proteinG === null) errors.proteinG = GRAM_ERROR;
+  if (carbG === null) errors.carbG = GRAM_ERROR;
+  if (fatG === null) errors.fatG = GRAM_ERROR;
+  const valid =
+    kcal !== null && proteinG !== null && carbG !== null && fatG !== null;
+  return {
+    targets: valid ? { kcal, proteinG, carbG, fatG } : null,
+    errors,
+  };
 }
 
 interface ProfileProps {
@@ -121,7 +140,8 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
   const [errors, setErrors] = useState<string[]>([]);
   const [hasProfile, setHasProfile] = useState(false);
   const [savedTargets, setSavedTargets] = useState<Targets | null>(null);
-  const [overridden, setOverridden] = useState(false);
+  // True while the saved manual targets are shown untouched (not yet recalculated).
+  const [keepOverride, setKeepOverride] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState<ManualForm>({
     kcal: "",
@@ -141,7 +161,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
           const { targetsOverridden, ...input } = res.profile;
           setForm(formFrom(input));
           setHasProfile(true);
-          setOverridden(targetsOverridden);
+          setKeepOverride(targetsOverridden && res.targets !== null);
           setSavedTargets(res.targets);
           setStep(2);
         } else {
@@ -159,7 +179,11 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
   const set = <K extends keyof Form>(key: K, value: Form[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  async function request<T>(path: string, body: unknown): Promise<T | null> {
+  async function request<T>(
+    path: string,
+    body: unknown,
+    badRequestMessage = "資料格式有誤，請回上一步檢查。",
+  ): Promise<T | null> {
     setSaving(true);
     setSaveError(null);
     try {
@@ -170,7 +194,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
     } catch (err) {
       if (err instanceof AuthExpiredError) onFatal();
       else if (err instanceof ApiHttpError && err.status === 400)
-        setSaveError("資料格式有誤，請回上一步檢查。");
+        setSaveError(badRequestMessage);
       else setSaveError("儲存失敗，請稍後再試。");
       return null;
     } finally {
@@ -190,7 +214,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
   }
 
   async function saveManual() {
-    const targets = parseManual(manual);
+    const { targets } = parseManual(manual);
     if (!targets) return;
     if (!hasProfile) {
       const created = await request<ProfileResponse>(
@@ -200,7 +224,11 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
       if (!created) return;
       setHasProfile(true);
     }
-    const res = await request<ProfileResponse>("/profile/targets", targets);
+    const res = await request<ProfileResponse>(
+      "/profile/targets",
+      targets,
+      "數字格式有誤，請檢查上面的欄位。",
+    );
     if (res) setStep("done");
   }
 
@@ -297,17 +325,15 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
 
   const input = inputFrom(form);
   const calc = calcTargets(input, today);
-  const manualTargets = parseManual(manual);
+  const { targets: manualTargets, errors: manualErrors } = parseManual(manual);
+  const shown = keepOverride && savedTargets ? savedTargets : calc.targets;
   const showWarning =
     manualOpen &&
     manualTargets !== null &&
     isBelowFloor(input, manualTargets.kcal, today);
 
   function toggleManual() {
-    if (!manualOpen)
-      setManual(
-        manualFrom(overridden && savedTargets ? savedTargets : calc.targets),
-      );
+    if (!manualOpen) setManual(manualFrom(shown));
     setManualOpen(!manualOpen);
   }
 
@@ -325,32 +351,65 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
                 name="goal"
                 label={GOAL_LABELS[goal]}
                 checked={form.goal === goal}
-                onSelect={() => set("goal", goal)}
+                onSelect={() => {
+                  set("goal", goal);
+                  setKeepOverride(false);
+                }}
               />
             ))}
           </div>
         </fieldset>
         <div className="kcal">
-          <span className="kcal-num">{calc.targets.kcal}</span>
+          <span className="kcal-num">{shown.kcal}</span>
           <span className="kcal-unit">kcal／天</span>
         </div>
         <div className="macros">
-          <Macro label="蛋白質" grams={calc.targets.proteinG} />
-          <Macro label="碳水" grams={calc.targets.carbG} />
-          <Macro label="脂肪" grams={calc.targets.fatG} />
+          <Macro label="蛋白質" grams={shown.proteinG} />
+          <Macro label="碳水" grams={shown.carbG} />
+          <Macro label="脂肪" grams={shown.fatG} />
         </div>
         <div className="explain">
-          <p>依你的身高、體重、年齡與活動量計算（Mifflin-St Jeor 公式）</p>
-          {calc.clampedToFloor && <p>已調整到安全下限</p>}
+          {keepOverride ? (
+            <p>目前使用你手動設定的目標。</p>
+          ) : (
+            <>
+              <p>依你的身高、體重、年齡與活動量計算（Mifflin-St Jeor 公式）</p>
+              {calc.clampedToFloor && <p>已調整到安全下限</p>}
+            </>
+          )}
         </div>
         {saveError && (
           <p className="error-text" role="alert">
             {saveError}
           </p>
         )}
-        <button type="button" disabled={saving} onClick={() => void saveGoal()}>
-          就用這個目標
-        </button>
+        {keepOverride ? (
+          <>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setStep("done")}
+            >
+              保留目前目標
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={saving}
+              onClick={() => void saveGoal()}
+            >
+              改回計算值（{calc.targets.kcal} kcal）
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void saveGoal()}
+          >
+            就用這個目標
+          </button>
+        )}
         <button
           type="button"
           className="secondary"
@@ -359,7 +418,14 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
         >
           手動調整數字
         </button>
-        <button type="button" className="secondary" onClick={() => setStep(1)}>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            setKeepOverride(false);
+            setStep(1);
+          }}
+        >
           修改基本資料
         </button>
       </section>
@@ -369,24 +435,28 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
             label="熱量（kcal）"
             inputMode="decimal"
             value={manual.kcal}
+            error={manualErrors.kcal}
             onChange={(v) => setManual((m) => ({ ...m, kcal: v }))}
           />
           <TextField
             label="蛋白質（g）"
             inputMode="decimal"
             value={manual.proteinG}
+            error={manualErrors.proteinG}
             onChange={(v) => setManual((m) => ({ ...m, proteinG: v }))}
           />
           <TextField
             label="碳水（g）"
             inputMode="decimal"
             value={manual.carbG}
+            error={manualErrors.carbG}
             onChange={(v) => setManual((m) => ({ ...m, carbG: v }))}
           />
           <TextField
             label="脂肪（g）"
             inputMode="decimal"
             value={manual.fatG}
+            error={manualErrors.fatG}
             onChange={(v) => setManual((m) => ({ ...m, fatG: v }))}
           />
           {showWarning && (
@@ -430,18 +500,23 @@ function TextField(props: {
   label: string;
   inputMode: "decimal" | "numeric";
   value: string;
+  error?: string | undefined;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="field">
-      <span>{props.label}</span>
-      <input
-        type="text"
-        inputMode={props.inputMode}
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-      />
-    </label>
+    <div>
+      <label className="field">
+        <span>{props.label}</span>
+        <input
+          type="text"
+          inputMode={props.inputMode}
+          value={props.value}
+          aria-invalid={props.error ? true : undefined}
+          onChange={(e) => props.onChange(e.target.value)}
+        />
+      </label>
+      {props.error && <p className="error-text">{props.error}</p>}
+    </div>
   );
 }
 

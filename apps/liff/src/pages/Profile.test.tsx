@@ -176,6 +176,116 @@ describe("Profile", () => {
     expect(put?.body).toMatchObject({ kcal: 1000 });
   });
 
+  it("saves 0 g carbs and blocks out-of-range values per field", async () => {
+    current = responseFor(INPUT);
+    renderProfile();
+    await screen.findByText("步驟 2／2");
+    fireEvent.click(screen.getByRole("button", { name: "手動調整數字" }));
+    fireEvent.change(screen.getByLabelText("碳水（g）"), {
+      target: { value: "2001" },
+    });
+    expect(screen.getByText("請輸入 0–2000 的整數")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "儲存調整" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("碳水（g）"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("熱量（kcal）"), {
+      target: { value: "799" },
+    });
+    expect(screen.getByText("請輸入 800–10000 的整數")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "儲存調整" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("熱量（kcal）"), {
+      target: { value: "1800" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存調整" }));
+    expect(
+      await screen.findByText("完成！回到聊天室按「今日總覽」看看。"),
+    ).toBeInTheDocument();
+    expect(
+      calls.find((c) => c.path === "/profile/targets")?.body,
+    ).toMatchObject({ kcal: 1800, carbG: 0 });
+  });
+
+  it("shows a targets-specific message on a 400 from the targets save", async () => {
+    current = responseFor(INPUT);
+    configureApi({
+      apiUrl: "https://api.test",
+      fetchImpl: (async (url: string, init?: RequestInit) =>
+        init?.method === "PUT"
+          ? json({ error: "bad_request" }, 400)
+          : json(current)) as unknown as typeof fetch,
+      relogin: async () => ({ kind: "error" }),
+    });
+    renderProfile();
+    await screen.findByText("步驟 2／2");
+    fireEvent.click(screen.getByRole("button", { name: "手動調整數字" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存調整" }));
+    expect(
+      await screen.findByText("數字格式有誤，請檢查上面的欄位。"),
+    ).toBeInTheDocument();
+  });
+
+  describe("overridden targets", () => {
+    const SAVED = { kcal: 2222, proteinG: 111, carbG: 0, fatG: 66 };
+    beforeEach(() => {
+      current = { ...responseFor(INPUT, true), targets: SAVED };
+    });
+
+    it("shows saved targets and keeps them without a request", async () => {
+      renderProfile();
+      await screen.findByText("步驟 2／2");
+      expect(screen.getByText("2222")).toBeInTheDocument();
+      expect(
+        screen.getByText("目前使用你手動設定的目標。"),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "保留目前目標" }));
+      expect(
+        screen.getByText("完成！回到聊天室按「今日總覽」看看。"),
+      ).toBeInTheDocument();
+      expect(calls.filter((c) => c.method === "PUT")).toEqual([]);
+    });
+
+    it("reverts to the calculated values via PUT /profile", async () => {
+      renderProfile();
+      await screen.findByText("步驟 2／2");
+      const calc = calcTargets(INPUT, TODAY).targets;
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `改回計算值（${calc.kcal} kcal）`,
+        }),
+      );
+      expect(
+        await screen.findByText("完成！回到聊天室按「今日總覽」看看。"),
+      ).toBeInTheDocument();
+      const puts = calls.filter((c) => c.method === "PUT");
+      expect(puts).toEqual([{ method: "PUT", path: "/profile", body: INPUT }]);
+    });
+
+    it("prefills manual with saved targets", async () => {
+      renderProfile();
+      await screen.findByText("步驟 2／2");
+      fireEvent.click(screen.getByRole("button", { name: "手動調整數字" }));
+      expect(screen.getByLabelText("熱量（kcal）")).toHaveValue("2222");
+    });
+
+    it("changing the goal shows calculated numbers again", async () => {
+      renderProfile();
+      await screen.findByText("步驟 2／2");
+      fireEvent.click(screen.getByLabelText("減脂"));
+      const cut = calcTargets({ ...INPUT, goal: "cut" }, TODAY).targets;
+      expect(screen.getByText(String(cut.kcal))).toBeInTheDocument();
+      expect(screen.queryByText("2222")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("目前使用你手動設定的目標。"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "就用這個目標" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("reports an expired session through onFatal", async () => {
     configureApi({
       apiUrl: "https://api.test",
