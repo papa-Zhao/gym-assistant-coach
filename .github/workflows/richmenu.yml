@@ -7,6 +7,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: richmenu
+  cancel-in-progress: false
+
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
 
@@ -32,11 +36,6 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
       - uses: google-github-actions/setup-gcloud@v3
-      - name: Read LINE channel access token
-        run: |
-          token=$(gcloud secrets versions access latest --secret=line-channel-access-token --project "$GCP_PROJECT_ID")
-          echo "::add-mask::$token"
-          echo "LINE_CHANNEL_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v6
       - name: Publish rich menu
         working-directory: apps/bot
@@ -45,4 +44,6 @@ jobs:
           RICHMENU_IMAGE: ${{ github.workspace }}/richmenu.png
         run: |
           uv sync --locked
-          uv run python -m app.richmenu
+          token=$(gcloud secrets versions access latest --secret=line-channel-access-token --project "$GCP_PROJECT_ID")
+          echo "::add-mask::$token"
+          LINE_CHANNEL_ACCESS_TOKEN="$token" uv run python -m app.richmenu

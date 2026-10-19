@@ -90,6 +90,10 @@ def main(api: Any, blob: Any, env: Mapping[str, str]) -> int:
             ),
         )
         _run_step("set_default_rich_menu", lambda: api.set_default_rich_menu(menu_id))
+        current = _run_step("get_default_rich_menu_id", api.get_default_rich_menu_id)
+        if current.rich_menu_id != menu_id:
+            print("default rich menu changed concurrently; skipping cleanup")
+            return 0
         listing = _run_step("get_rich_menu_list", api.get_rich_menu_list)
         menus = [{"id": m.rich_menu_id, "name": m.name} for m in listing.richmenus]
         for old_id in menus_to_delete(menus, menu_id):

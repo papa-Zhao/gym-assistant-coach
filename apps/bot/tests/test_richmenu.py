@@ -77,7 +77,8 @@ def test_old_menus_selected_for_deletion():
 
 
 class FakeApi:
-    def __init__(self, fail_at: str | None = None) -> None:
+    def __init__(self, fail_at: str | None = None, default_id: str = "new") -> None:
+        self.default_id = default_id
         self.calls: list[str] = []
         self.deleted: list[str] = []
         self.fail_at = fail_at
@@ -93,6 +94,10 @@ class FakeApi:
 
     def set_default_rich_menu(self, rich_menu_id):
         self._step("default")
+
+    def get_default_rich_menu_id(self):
+        self._step("get_default")
+        return SimpleNamespace(rich_menu_id=self.default_id)
 
     def get_rich_menu_list(self):
         self._step("list")
@@ -137,7 +142,7 @@ def env(tmp_path):
 def test_main_publishes_and_cleans_up(env, capsys):
     api, blob = FakeApi(), FakeBlob()
     assert main(api, blob, env) == 0
-    assert api.calls == ["create", "default", "list", "delete"]
+    assert api.calls == ["create", "default", "get_default", "list", "delete"]
     assert api.deleted == ["old"]
     rich_menu_id, body, kwargs = blob.uploads[0]
     assert (rich_menu_id, body) == ("new", PNG)
@@ -162,3 +167,13 @@ def test_main_never_prints_token(env, capsys):
     out = capsys.readouterr()
     assert TOKEN not in out.out + out.err
     assert "401" in out.out
+
+
+def test_main_skips_cleanup_when_default_changed(env, capsys):
+    api = FakeApi(default_id="someone-elses")
+    assert main(api, FakeBlob(), env) == 0
+    assert "list" not in api.calls
+    assert api.deleted == []
+    out = capsys.readouterr().out
+    assert "skipping cleanup" in out
+    assert "someone-elses" not in out
