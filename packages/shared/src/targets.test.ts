@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calcTargets,
+  TARGET_LIMITS,
   floorKcal,
   isBelowFloor,
   taipeiDate,
@@ -110,5 +111,14 @@ describe("isBelowFloor", () => {
   it("true for override under floor", () => {
     expect(isBelowFloor(maleModerate, 1400, TODAY)).toBe(true);
     expect(isBelowFloor(maleModerate, 2580, TODAY)).toBe(false);
+  });
+});
+
+describe("TARGET_LIMITS", () => {
+  it("exposes the integer ranges for kcal and grams", () => {
+    expect(TARGET_LIMITS).toEqual({
+      kcal: { min: 800, max: 10000 },
+      gram: { min: 0, max: 2000 },
+    });
   });
 });

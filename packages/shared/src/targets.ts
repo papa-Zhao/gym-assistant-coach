@@ -21,6 +21,12 @@ export interface Targets {
   fatG: number;
 }
 
+/** Accepted range (integers) for saved daily targets; shared by LIFF and api. */
+export const TARGET_LIMITS = {
+  kcal: { min: 800, max: 10000 },
+  gram: { min: 0, max: 2000 },
+} as const;
+
 export const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
   light: 1.375,

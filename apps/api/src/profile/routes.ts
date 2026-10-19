@@ -1,5 +1,6 @@
 import {
   calcTargets,
+  TARGET_LIMITS,
   floorKcal,
   isBelowFloor,
   taipeiDate,
@@ -45,17 +46,26 @@ const profileSchema = {
   },
 } as const;
 
-const targetInt = { type: "integer", minimum: 1, maximum: 10000 } as const;
+const kcalInt = {
+  type: "integer",
+  minimum: TARGET_LIMITS.kcal.min,
+  maximum: TARGET_LIMITS.kcal.max,
+} as const;
+const gramInt = {
+  type: "integer",
+  minimum: TARGET_LIMITS.gram.min,
+  maximum: TARGET_LIMITS.gram.max,
+} as const;
 const targetsSchema = {
   body: {
     type: "object",
     required: ["kcal", "proteinG", "carbG", "fatG"],
     additionalProperties: false,
     properties: {
-      kcal: targetInt,
-      proteinG: targetInt,
-      carbG: targetInt,
-      fatG: targetInt,
+      kcal: kcalInt,
+      proteinG: gramInt,
+      carbG: gramInt,
+      fatG: gramInt,
     },
   },
 } as const;

@@ -147,6 +147,34 @@ describe("profile routes", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("PUT /profile/targets accepts 0 g of a macro", async () => {
+    const res = await req("PUT", "/profile/targets", h1, {
+      kcal: 1800,
+      proteinG: 150,
+      carbG: 0,
+      fatG: 100,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().targets.carbG).toBe(0);
+  });
+
+  it("PUT /profile/targets rejects kcal 799 and grams 2001", async () => {
+    const low = await req("PUT", "/profile/targets", h1, {
+      kcal: 799,
+      proteinG: 100,
+      carbG: 100,
+      fatG: 30,
+    });
+    expect(low.statusCode).toBe(400);
+    const high = await req("PUT", "/profile/targets", h1, {
+      kcal: 2000,
+      proteinG: 100,
+      carbG: 2001,
+      fatG: 30,
+    });
+    expect(high.statusCode).toBe(400);
+  });
+
   it("profile is isolated per session user", async () => {
     const mk = async (c: string) => ({
       authorization: `Bearer ${await issueSession(
