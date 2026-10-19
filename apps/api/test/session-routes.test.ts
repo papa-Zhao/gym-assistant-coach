@@ -50,6 +50,7 @@ describe("workout session routes", () => {
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),
+      notifyTimeoutMs: 50,
     });
     const all = (
       await app.inject({ method: "GET", url: "/exercises", headers: h1 })
@@ -387,6 +388,25 @@ describe("workout session routes", () => {
     expect(r2.statusCode).toBe(200);
     expect(r2.json<FinishSummary>().notified).toBe(false);
   }, 15000);
+
+  it("a notifier that outlives the deadline leaves no unhandled rejection", async () => {
+    await reset();
+    const seen: unknown[] = [];
+    const onUnhandled = (reason: unknown) => seen.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const s = await start();
+      await putSet(s.id, bench.id, 1);
+      notify = () => new Promise<void>(() => {});
+      const res = await finish(s.id);
+      expect(res.statusCode).toBe(200);
+      expect(res.json<FinishSummary>().notified).toBe(false);
+      await new Promise((r) => setTimeout(r, 150));
+      expect(seen).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 
   it("finishing an already finished session is 409 and does not notify again", async () => {
     await reset();

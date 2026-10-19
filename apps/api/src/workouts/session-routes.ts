@@ -26,7 +26,7 @@ import {
 } from "./repo";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
-const NOTIFY_TIMEOUT_MS = 5000;
+const DEFAULT_NOTIFY_TIMEOUT_MS = 5000;
 
 const uuid = { type: "string", format: "uuid" } as const;
 const index = { type: "integer", minimum: 1, maximum: 1000 } as const;
@@ -124,6 +124,8 @@ const deadline = (ms: number) => {
   const promise = new Promise<never>((_, reject) => {
     handle = setTimeout(() => reject(new Error("timeout")), ms);
   });
+  // Never an unhandled rejection, even if nothing awaits the promise in time.
+  promise.catch(() => {});
   return { promise, clear: () => clearTimeout(handle) };
 };
 
@@ -131,6 +133,7 @@ export const sessionRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
     const { db, sessionSecret, now, notifyWorkoutFinished } = deps;
+    const notifyTimeoutMs = deps.notifyTimeoutMs ?? DEFAULT_NOTIFY_TIMEOUT_MS;
     app.setErrorHandler(apiErrorHandler);
     const authenticate = workoutAuth(sessionSecret);
     const auth = { onRequest: authenticate };
@@ -309,7 +312,7 @@ export const sessionRoutes =
           sendWorkoutError(reply, err);
           return;
         }
-        const limit = deadline(NOTIFY_TIMEOUT_MS);
+        let clear = () => {};
         try {
           const lineUserId = await findLineUserId(db, userId);
           if (lineUserId) {
@@ -318,6 +321,8 @@ export const sessionRoutes =
               userId,
               sessionId,
             );
+            const limit = deadline(notifyTimeoutMs);
+            clear = limit.clear;
             await Promise.race([
               notifyWorkoutFinished(lineUserId, summary, templateName),
               limit.promise,
@@ -332,7 +337,7 @@ export const sessionRoutes =
             "workout notify failed",
           );
         } finally {
-          limit.clear();
+          clear();
         }
         return summary;
       },

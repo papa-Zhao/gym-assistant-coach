@@ -26,4 +26,6 @@ export interface AppDeps {
   corsOrigin: string;
   /** Current time; injectable so tests can pin the Taipei date. */
   now: () => Date;
+  /** How long finish waits for the bot notification; defaults to 5000. */
+  notifyTimeoutMs?: number;
 }
