@@ -146,4 +146,36 @@ describe("profile routes", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("profile is isolated per session user", async () => {
+    const mk = async (c: string) => ({
+      authorization: `Bearer ${await issueSession(
+        SECRET,
+        (await syncUser(db, `U${c.repeat(32)}`, null)).userId,
+      )}`,
+    });
+    const a = await mk("c");
+    const b = await mk("d");
+    const saved = (await req("PUT", "/profile", a, valid)).json();
+
+    const otherGet = await req("GET", "/profile", b);
+    expect(otherGet.json()).toEqual({
+      profile: null,
+      targets: null,
+      floorKcal: null,
+      belowFloor: false,
+    });
+    const otherPut = await req("PUT", "/profile/targets", b, {
+      kcal: 2000,
+      proteinG: 100,
+      carbG: 200,
+      fatG: 60,
+    });
+    expect(otherPut.statusCode).toBe(409);
+    expect(otherPut.json()).toEqual({ error: "conflict" });
+
+    const after = (await req("GET", "/profile", a)).json();
+    expect(after).toEqual(saved);
+    expect(after.profile.targetsOverridden).toBe(false);
+  });
 });
