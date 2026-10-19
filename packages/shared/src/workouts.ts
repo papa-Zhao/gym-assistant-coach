@@ -207,6 +207,8 @@ interface SessionItemBase {
   exercise: Exercise;
   last: { date: string; sets: WorkoutSet[] } | null;
   hint: OverloadHint | null;
+  targetSets: number | null;
+  targetReps: number | null;
 }
 
 export type SessionItem =
@@ -218,20 +220,23 @@ export interface ActiveSession {
   date: string;
   startedAt: string;
   templateId: string | null;
+  templateName: string | null;
   items: SessionItem[];
 }
 
 export interface FinishSummary {
   sessionId: string;
-  durationMin: number;
-  sets: number;
   volumeKg: number;
+  exerciseCount: number;
+  setCount: number;
   cardioMinutes: number;
   prs: {
     exerciseId: string;
     nameZh: string;
     nameEn: string | null;
     e1rm: number;
+    weightKg: number;
+    reps: number;
   }[];
   notified: boolean;
 }
@@ -246,8 +251,6 @@ export interface WeekStats {
   from: string;
   to: string;
   sessions: number;
-  sets: number;
-  volumeKg: number;
-  cardioMinutes: number;
   setsByMuscle: Record<MuscleGroup, number>;
+  cardioMinutes: number;
 }
