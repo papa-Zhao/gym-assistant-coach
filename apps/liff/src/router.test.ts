@@ -6,6 +6,7 @@ describe("route", () => {
     ["/profile", "profile"],
     ["/settings", "settings"],
     ["/records", "records"],
+    ["/records/body", "body"],
     ["/workout", "workout"],
     ["/", "profile"],
     ["", "profile"],

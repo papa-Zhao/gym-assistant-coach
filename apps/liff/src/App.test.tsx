@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { configureApi } from "./api";
 
 const base = { onClose: vi.fn(), today: "2026-10-19" };
 
@@ -10,7 +11,15 @@ describe("App", () => {
     expect(screen.getByText("載入中…")).toBeInTheDocument();
   });
 
-  it("renders the page for the path when ready", () => {
+  it("renders the page for the path when ready", async () => {
+    configureApi({
+      apiUrl: "https://api.test",
+      fetchImpl: (async () =>
+        new Response(
+          JSON.stringify({ from: "", to: "", points: [] }),
+        )) as unknown as typeof fetch,
+      relogin: async () => ({ kind: "error" }),
+    });
     render(
       <App
         {...base}
@@ -19,8 +28,9 @@ describe("App", () => {
       />,
     );
     expect(
-      screen.getByRole("heading", { name: "我的紀錄" }),
+      await screen.findByRole("heading", { name: "我的紀錄" }),
     ).toBeInTheDocument();
+    expect(await screen.findByText("還沒有紀錄")).toBeInTheDocument();
   });
 
   it("renders the workout and settings pages", () => {
