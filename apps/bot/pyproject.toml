@@ -5,6 +5,10 @@ description = "Gym Assistant Coach LINE bot service"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.143.1",
+    "google-auth>=2.62.0",
+    "httpx>=0.28.1",
+    "line-bot-sdk>=3.26.0",
+    "requests>=2.34.2",
     "uvicorn[standard]>=0.54.0",
 ]
 

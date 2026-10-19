@@ -61,3 +61,47 @@ run "core" {
     error_message = "WIF must be restricted to the main branch of the repo."
   }
 }
+
+run "service_env" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "INTERNAL_AUDIENCE" && e.value == "gac-api-internal"
+    ])
+    error_message = "api must set INTERNAL_AUDIENCE to gac-api-internal."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "SESSION_SECRET" && anytrue([for v in e.value_source : anytrue([for k in v.secret_key_ref : k.secret == "api-session-secret" && k.version == "latest"])])
+    ])
+    error_message = "api SESSION_SECRET must come from the api-session-secret secret."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["bot"].template[0].containers[0].env :
+      e.name == "LINE_CHANNEL_SECRET" && anytrue([for v in e.value_source : anytrue([for k in v.secret_key_ref : k.secret == "line-channel-secret"])])
+    ])
+    error_message = "bot LINE_CHANNEL_SECRET must come from the line-channel-secret secret."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["bot"].template[0].containers[0].env :
+      e.name == "API_URL" && startswith(e.value, "https://api-")
+    ])
+    error_message = "bot API_URL must start with https://api-."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "CORS_ORIGIN" && e.value == "https://test-project-liff.web.app"
+    ])
+    error_message = "api CORS_ORIGIN must be the LIFF site origin without a trailing slash."
+  }
+}

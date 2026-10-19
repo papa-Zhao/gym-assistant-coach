@@ -33,6 +33,22 @@ git commit -m "chore(infra): set real project id"
 ```sh
 cd infra
 terraform init -backend-config=backend.hcl
+terraform apply \
+  -target=google_secret_manager_secret.database_url \
+  -target=google_secret_manager_secret_iam_member.api_database_url \
+  -target=google_secret_manager_secret.line_channel_secret \
+  -target=google_secret_manager_secret.line_channel_access_token \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_secret \
+  -target=google_secret_manager_secret_iam_member.bot_line_channel_access_token \
+  -target=random_password.api_session_secret \
+  -target=google_secret_manager_secret.api_session_secret \
+  -target=google_secret_manager_secret_version.api_session_secret \
+  -target=google_secret_manager_secret_iam_member.api_session_secret
+```
+
+上面先只建立 secret 與存取權限：`api` 以 `latest` 掛載 `database-url`、`bot` 掛載 LINE secret，這些 secret 沒有版本時 Cloud Run revision 會啟動失敗。接著依第 4 節寫入 `database-url`、依 [LINE 設定手冊](../docs/line-setup.md) 寫入 LINE secret，然後才做完整套用：
+
+```sh
 terraform apply
 ```
 
@@ -62,15 +78,17 @@ gh secret set NEON_API_KEY
 
 ## 6. GitHub variables
 
-`deploy.yml` 使用五個 `vars.*`。其中 `WIF_PROVIDER` 與 `DEPLOYER_SA` 來自 Terraform output（在 `infra/` 目錄下執行），其餘自行填入：
+`deploy.yml` 使用七個 `vars.*`。其中 `WIF_PROVIDER` 與 `DEPLOYER_SA` 來自 Terraform output（在 `infra/` 目錄下執行），其餘自行填入：
 
-| 變數              | 來源                                                        |
-| ----------------- | ----------------------------------------------------------- |
-| `GCP_PROJECT_ID`  | 你的 project id（同 bootstrap 參數）                        |
-| `GCP_REGION`      | `asia-southeast1`                                           |
-| `WIF_PROVIDER`    | `terraform output -raw wif_provider`                        |
-| `DEPLOYER_SA`     | `terraform output -raw deployer_sa_email`                   |
-| `NEON_PROJECT_ID` | Neon console 的專案設定（Project settings 中的 Project ID） |
+| 變數              | 來源                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| `GCP_PROJECT_ID`  | 你的 project id（同 bootstrap 參數）                                                       |
+| `GCP_REGION`      | `asia-southeast1`                                                                          |
+| `WIF_PROVIDER`    | `terraform output -raw wif_provider`                                                       |
+| `DEPLOYER_SA`     | `terraform output -raw deployer_sa_email`                                                  |
+| `NEON_PROJECT_ID` | Neon console 的專案設定（Project settings 中的 Project ID）                                |
+| `LIFF_ID`         | LINE LIFF app 的 ID，見 [LINE 設定手冊](../docs/line-setup.md)                             |
+| `API_URL`         | `https://api-<project number>.asia-southeast1.run.app`，或 `terraform output -raw api_url` |
 
 ```sh
 gh variable set GCP_PROJECT_ID --body "<project-id>"
@@ -78,15 +96,23 @@ gh variable set GCP_REGION --body "asia-southeast1"
 gh variable set WIF_PROVIDER --body "$(terraform output -raw wif_provider)"
 gh variable set DEPLOYER_SA --body "$(terraform output -raw deployer_sa_email)"
 gh variable set NEON_PROJECT_ID --body "<neon-project-id>"
+gh variable set LIFF_ID --body "<liff-id>"
+gh variable set API_URL --body "$(terraform output -raw api_url)"
 ```
+
+`LIFF_ID` 與 `API_URL` 會在 deploy 時以 `VITE_LIFF_ID`、`VITE_API_URL` 傳給 LIFF 建置。
 
 其他輸出（`api_url`、`bot_url`、`liff_url`、`registry`）可用 `terraform output` 查看。
 
-## 7. 部署
+## 7. LINE 設定
+
+建立 LINE 官方帳號、LINE Login channel、LIFF app，並把 channel secret 與 access token 寫入 Secret Manager，請照 [LINE 設定手冊](../docs/line-setup.md)。注意順序：`database-url`、`line-channel-secret` 與 `line-channel-access-token` 沒有版本時，新 revision 無法啟動，所以先只建立 secret（第 3 節的 targeted apply），寫入值之後才做完整 `terraform apply`；並且要在 `pr3-line-auth` 分支、合併 PR 3 之前完成。`api-session-secret` 由 Terraform 自動產生（`random_password`，48 字元），不需手動處理。
+
+## 8. 部署
 
 push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon（建立 `pre-migrate-<sha>` branch）、執行 migration，再部署 api、bot 與 liff。也可手動觸發 `workflow_dispatch`。只有本 repo 的 `main` 能使用 deployer 服務帳號。
 
-## 8. 回滾：migration 出錯時
+## 9. 回滾：migration 出錯時
 
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
 

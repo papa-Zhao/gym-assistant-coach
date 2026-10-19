@@ -70,8 +70,20 @@ jobs:
           docker build -t gac-bot apps/bot
       - name: Smoke test images
         run: |
+          # api needs env to start; all values are obviously fake. postgres.js
+          # connects lazily, so /health works without a database.
+          api_env=(
+            -e DATABASE_URL=postgres://ci:ci@127.0.0.1:1/ci
+            -e SESSION_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            -e LINE_LOGIN_CHANNEL_ID=0
+            -e BOT_SA_EMAIL=ci@example.iam.gserviceaccount.com
+            -e INTERNAL_AUDIENCE=gac-api-internal
+            -e CORS_ORIGIN=https://example.web.app
+          )
           for svc in api bot; do
-            docker run -d --name "$svc" -e PORT=8080 -p 8080:8080 "gac-$svc"
+            extra=()
+            if [ "$svc" = api ]; then extra=("${api_env[@]}"); fi
+            docker run -d --name "$svc" -e PORT=8080 "${extra[@]}" -p 8080:8080 "gac-$svc"
             ok=0
             for _ in $(seq 1 20); do
               if body=$(curl -fsS localhost:8080/health 2>/dev/null); then ok=1; break; fi
