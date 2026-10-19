@@ -13,12 +13,16 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.1",
     "@gac/shared": "*",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
+    "google-auth-library": "^11.3.1",
+    "jose": "^6.2.12",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^24.19.2",
     "drizzle-kit": "^0.31.11",
     "tsup": "^9.0.0",

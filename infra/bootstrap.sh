@@ -40,10 +40,22 @@ prefix = "infra"
 HCL
 echo "wrote ${DIR}/backend.hcl"
 
+# Keep LINE ids already filled in by the user when re-running.
+existing_tfvar() {
+  [[ -f "${DIR}/terraform.tfvars" ]] || return 0
+  sed -n "s/^$1[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*\$/\1/p" "${DIR}/terraform.tfvars" | head -n1
+}
+LINE_LOGIN_CHANNEL_ID="$(existing_tfvar line_login_channel_id)"
+LIFF_ID="$(existing_tfvar liff_id)"
+
 cat >"${DIR}/terraform.tfvars" <<HCL
 # Written by bootstrap.sh; non-secret values.
 project_id      = "${PROJECT_ID}"
 billing_account = "${BILLING_ACCOUNT}"
+
+# LINE ids (not secret); fill in after docs/line-setup.md.
+line_login_channel_id = "${LINE_LOGIN_CHANNEL_ID}"
+liff_id               = "${LIFF_ID}"
 HCL
 echo "wrote ${DIR}/terraform.tfvars"
 
