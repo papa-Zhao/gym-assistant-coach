@@ -118,10 +118,14 @@ const hasPlaces = (v: number, places: number): boolean => {
 
 const isHalfStep = (v: number): boolean => Number.isInteger(v * 2);
 
-const timeout = (ms: number) =>
-  new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("timeout")), ms).unref();
+/** A rejecting timer whose handle the caller clears once the race is over. */
+const deadline = (ms: number) => {
+  let handle: NodeJS.Timeout | undefined;
+  const promise = new Promise<never>((_, reject) => {
+    handle = setTimeout(() => reject(new Error("timeout")), ms);
   });
+  return { promise, clear: () => clearTimeout(handle) };
+};
 
 export const sessionRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
@@ -305,6 +309,7 @@ export const sessionRoutes =
           sendWorkoutError(reply, err);
           return;
         }
+        const limit = deadline(NOTIFY_TIMEOUT_MS);
         try {
           const lineUserId = await findLineUserId(db, userId);
           if (lineUserId) {
@@ -315,7 +320,7 @@ export const sessionRoutes =
             );
             await Promise.race([
               notifyWorkoutFinished(lineUserId, summary, templateName),
-              timeout(NOTIFY_TIMEOUT_MS),
+              limit.promise,
             ]);
             await markNotified(db, sessionId);
             summary = { ...summary, notified: true };
@@ -326,6 +331,8 @@ export const sessionRoutes =
             { err: { name: err instanceof Error ? err.name : "unknown" } },
             "workout notify failed",
           );
+        } finally {
+          limit.clear();
         }
         return summary;
       },
