@@ -38,6 +38,7 @@ const deps: AppDeps = {
   verifyLineIdToken: createLineVerifier(config.lineLoginChannelId),
   sessionSecret: config.sessionSecret,
   corsOrigin: config.corsOrigin,
+  now: () => new Date(),
 };
 const app = buildApp(deps, { logger: true });
 
