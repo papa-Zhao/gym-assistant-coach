@@ -33,6 +33,20 @@ class TodayResult:
     streak_days: int
 
 
+@dataclass(frozen=True)
+class PreviousMetric:
+    value: float
+    date: str
+
+
+@dataclass(frozen=True)
+class MetricRecorded:
+    key: str
+    value: float
+    date: str
+    previous: PreviousMetric | None
+
+
 def _macros(data: dict) -> Macros:
     return Macros(
         kcal=round(data["kcal"]),
@@ -59,13 +73,15 @@ class ApiClient(Protocol):
 
     def today(self, line_user_id: str) -> TodayResult: ...
 
+    def record_metric(self, line_user_id: str, key: str, value: float) -> MetricRecorded: ...
+
 
 class HttpApiClient:
     def __init__(self, settings: Settings) -> None:
         self._base = settings.api_url
         self._audience = settings.internal_audience
 
-    def _post(self, path: str, body: dict[str, str]) -> httpx.Response:
+    def _post(self, path: str, body: dict[str, object]) -> httpx.Response:
         token = id_token.fetch_id_token(Request(), self._audience)
         res = httpx.post(
             f"{self._base}{path}",
@@ -102,4 +118,21 @@ class HttpApiClient:
             workout_summary=data.get("workoutSummary"),
             weight_kg=float(weight) if weight is not None else None,
             streak_days=int(data["streakDays"]),
+        )
+
+    def record_metric(self, line_user_id: str, key: str, value: float) -> MetricRecorded:
+        data = self._post(
+            "/internal/body-metrics",
+            {"lineUserId": line_user_id, "key": key, "value": value},
+        ).json()
+        previous = data.get("previous")
+        return MetricRecorded(
+            key=data["key"],
+            value=float(data["value"]),
+            date=data["date"],
+            previous=(
+                PreviousMetric(value=float(previous["value"]), date=previous["date"])
+                if previous
+                else None
+            ),
         )

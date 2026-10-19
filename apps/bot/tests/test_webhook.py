@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api_client import ApiError, Macros, SyncResult, TodayResult
+from app.api_client import ApiError, Macros, MetricRecorded, PreviousMetric, SyncResult, TodayResult
 from app.handlers import create_app
 from app.settings import CONSENT_VERSION, Settings
 
@@ -31,8 +31,10 @@ class FakeApi:
         consented: bool = False,
         fail_status: int | None = None,
         today: TodayResult | None = None,
+        metric_previous: dict[str, Any] | None = None,
     ) -> None:
         self.consented = consented
+        self.metric_previous = metric_previous
         self.today_result = today
         self.fail_status = fail_status
         self.calls: list[tuple[Any, ...]] = []
@@ -59,6 +61,17 @@ class FakeApi:
         self._maybe_fail()
         assert self.today_result is not None
         return self.today_result
+
+    def record_metric(self, line_user_id: str, key: str, value: float) -> MetricRecorded:
+        self.calls.append(("record_metric", line_user_id, key, value))
+        self._maybe_fail()
+        prev = self.metric_previous
+        return MetricRecorded(
+            key=key,
+            value=value,
+            date="2026-10-19",
+            previous=PreviousMetric(prev["value"], prev["date"]) if prev else None,
+        )
 
 
 class FakeLine:
@@ -363,3 +376,87 @@ def test_today_summary_is_valid_flex() -> None:
         widths = [m for m in re.findall(r'"width": "(\d+)%"', json.dumps(msg))]
         assert widths and all(1 <= int(w) <= 100 for w in widths)
     assert '"width": "100%"' in json.dumps(messages.today_summary(over, "x"))
+
+
+def _metric_setup(previous: dict[str, Any] | None = None, consented: bool = True):
+    api, line = FakeApi(consented=consented, metric_previous=previous), FakeLine()
+    return TestClient(create_app(SETTINGS, api, line)), api, line
+
+
+def _reply_text(line: FakeLine) -> str:
+    return line.replies[0][1][0]["text"]
+
+
+def test_weight_command_records_and_replies_diff() -> None:
+    client, api, line = _metric_setup({"value": 72.9, "date": "2026-10-14"})
+    post(client, [text_event("體重 72.5")])
+    assert ("record_metric", USER, "weightKg", 72.5) in api.calls
+    assert _reply_text(line) == "已記錄體重 72.5 kg，比上次（10/14）少 0.4 kg。"
+
+
+def test_heavier_than_last_says_more() -> None:
+    client, _, line = _metric_setup({"value": 72.0, "date": "2026-10-14"})
+    post(client, [text_event("體重 73")])
+    assert _reply_text(line) == "已記錄體重 73 kg，比上次（10/14）多 1 kg。"
+
+
+def test_first_weight_has_no_diff() -> None:
+    client, _, line = _metric_setup(None)
+    post(client, [text_event("體重 72.5")])
+    assert _reply_text(line) == "已記錄體重 72.5 kg。"
+
+
+def test_same_value_says_unchanged() -> None:
+    client, _, line = _metric_setup({"value": 72.5, "date": "2026-10-14"})
+    post(client, [text_event("體重 72.5")])
+    assert _reply_text(line) == "已記錄體重 72.5 kg，和上次（10/14）一樣。"
+
+
+def test_invalid_weight_replies_range_and_does_not_call_api() -> None:
+    client, api, line = _metric_setup()
+    post(client, [text_event("體重 7250")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert (
+        _reply_text(line) == "體重的數字好像不太對，請輸入 30–300 之間的數字，例如「體重 72.5」。"
+    )
+    assert "quickReply" in line.replies[0][1][0]
+
+
+def test_non_command_text_keeps_placeholder() -> None:
+    client, api, line = _metric_setup()
+    post(client, [text_event("今天吃了雞腿便當")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+
+
+def test_command_before_consent_replies_welcome() -> None:
+    client, api, line = _metric_setup(consented=False)
+    post(client, [text_event("體重 72.5")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_reply_has_trend_quick_reply() -> None:
+    client, _, line = _metric_setup(None)
+    post(client, [text_event("腰圍 81 公分")])
+    assert line.replies[0][1][0]["quickReply"] == {
+        "items": [
+            {
+                "type": "action",
+                "action": {
+                    "type": "uri",
+                    "label": "看趨勢",
+                    "uri": "https://liff.line.me/1234-abcd/records/body",
+                },
+            }
+        ]
+    }
+    assert _reply_text(line) == "已記錄腰圍 81 cm。"
+
+
+def test_metric_reply_is_valid_for_the_line_sdk() -> None:
+    from app import messages
+    from app.line_replier import _to_sdk
+
+    msg = messages.metric_range_error("bodyFatPct", "1234-abcd")
+    assert _to_sdk(msg).to_dict()["quickReply"]["items"][0]["action"]["label"] == "看趨勢"
