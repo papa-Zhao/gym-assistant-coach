@@ -68,6 +68,8 @@ terraform apply \
 
 **【使用者自行操作】** 在**同一個 Provider** 新增 LINE Login channel（Channel type 選 LINE Login，App types 勾選 Web app）。
 
+新建的 LINE Login channel 預設是「Developing」（開發中），只有該 channel 的管理員與 Tester 能登入它的 LIFF app。邀請其他人使用之前，請到這個 channel 的頁面最上方把狀態切換為 **Published**（公開）；若暫時不公開，至少要在「Roles」分頁把測試帳號加為 Tester。
+
 ## 6. 新增 LIFF app
 
 **【使用者自行操作】** 在這個 LINE Login channel 的「LIFF」分頁按 Add：
@@ -152,3 +154,4 @@ echo "$(terraform output -raw bot_url)/webhook"
 - **Verify 失敗**：確認 `bot` 已部署真正的 image（不是 hello placeholder），且 `line-channel-secret` 的值正確。
 - **`terraform apply` 說 secret 沒有版本**：回到步驟 7，確認兩個 LINE secret 都已有版本。
 - **LIFF 開啟後登入失敗**：確認 `liff_id`、`line_login_channel_id` 已填入並重新 apply，且 GitHub variables `LIFF_ID`、`API_URL` 已設定並重新部署 LIFF。
+- **非管理員帳號開啟 LIFF 出現 LINE 錯誤頁面**：LINE Login channel 仍是 Developing 狀態。到 channel 頁面切換為 Published，或把該帳號加為 Tester（見步驟 5）。
