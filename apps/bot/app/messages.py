@@ -2,7 +2,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from app.api_client import Macros, MetricRecorded, TodayResult
+from app.api_client import Macros, MetricRecorded, TodayResult, WorkoutSummary
 from app.commands import METRIC_LIMITS
 from app.settings import CONSENT_VERSION
 
@@ -402,3 +402,83 @@ def metric_range_error(key: str, liff_id: str) -> Message:
     low, high = METRIC_LIMITS[key]
     text = f"{label}的數字好像不太對，請輸入 {low}–{high} 之間的數字，例如「{label} {example}」。"
     return _with_trend_quick_reply(text, liff_id)
+
+
+def _volume(kg: float) -> str:
+    return f"{int(Decimal(str(kg)).quantize(Decimal('1'), ROUND_HALF_UP)):,}"
+
+
+def workout_done(summary: WorkoutSummary, template_name: str | None, liff_id: str) -> Message:
+    stats = [f"{summary.exercise_count} 個動作"]
+    if summary.set_count > 0:
+        stats.append(f"{summary.set_count} 組")
+        stats.append(f"總訓練量 {_volume(summary.volume_kg)} kg")
+    if summary.cardio_minutes > 0:
+        stats.append(f"有氧 {_num(summary.cardio_minutes)} 分鐘")
+    body: list[dict[str, Any]] = [
+        {"type": "text", "text": "今天辛苦了！", "weight": "bold", "size": "xl", "color": TEXT},
+        {"type": "text", "text": template_name or "訓練", "size": "sm", "color": MUTED},
+        {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "xs",
+            "contents": [
+                {"type": "text", "text": line, "size": "sm", "color": TEXT, "wrap": True}
+                for line in stats
+            ],
+        },
+    ]
+    for pr in summary.prs:
+        text = (
+            f"新紀錄：{pr.name_zh} 估算 1RM {_num(pr.e1rm)} kg"
+            f"（{_num(pr.weight_kg)} kg × {pr.reps}）"
+        )
+        body.append(
+            {
+                "type": "box",
+                "layout": "vertical",
+                "backgroundColor": ACCENT_SOFT,
+                "cornerRadius": "8px",
+                "paddingAll": "12px",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": text,
+                        "size": "sm",
+                        "weight": "bold",
+                        "color": ON_ACCENT_SOFT,
+                        "wrap": True,
+                    }
+                ],
+            }
+        )
+    return {
+        "type": "flex",
+        "altText": "訓練完成",
+        "contents": {
+            "type": "bubble",
+            "styles": {
+                "body": {"backgroundColor": SURFACE},
+                "footer": {"backgroundColor": SURFACE},
+            },
+            "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": body},
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "color": PRIMARY,
+                        "height": "md",
+                        "action": {
+                            "type": "postback",
+                            "label": "看今天的總覽",
+                            "data": "action=today",
+                            "displayText": "今日總覽",
+                        },
+                    }
+                ],
+            },
+        },
+    }

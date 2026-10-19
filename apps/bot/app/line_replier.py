@@ -7,6 +7,7 @@ from linebot.v3.messaging import (
     Configuration,
     FlexMessage,
     MessagingApi,
+    PushMessageRequest,
     ReplyMessageRequest,
     ShowLoadingAnimationRequest,
     TextMessage,
@@ -17,6 +18,8 @@ from app.messages import Message
 
 class LineReplier(Protocol):
     def reply(self, reply_token: str, messages: list[Message]) -> None: ...
+
+    def push(self, user_id: str, messages: list[Message]) -> None: ...
 
     def profile_name(self, user_id: str) -> str | None: ...
 
@@ -40,6 +43,12 @@ class SdkLineReplier:
                     reply_token=reply_token,
                     messages=[_to_sdk(m) for m in messages],
                 )
+            )
+
+    def push(self, user_id: str, messages: list[Message]) -> None:
+        with LineApiClient(self._configuration) as client:
+            MessagingApi(client).push_message(
+                PushMessageRequest(to=user_id, messages=[_to_sdk(m) for m in messages])
             )
 
     def profile_name(self, user_id: str) -> str | None:

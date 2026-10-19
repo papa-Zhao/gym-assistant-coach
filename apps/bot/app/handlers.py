@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from app import messages
 from app.api_client import ApiClient, ApiError
 from app.commands import InvalidMetric, MetricCommand, parse_metric_command
+from app.internal import VerifyApiToken, google_verifier, internal_router
 from app.line_replier import LineReplier
 from app.settings import CONSENT_VERSION, Settings
 
@@ -123,7 +124,12 @@ def _process(events: list[Event], deps: _Deps) -> None:
             logger.error("event handling failed event=%s error=%s", event.type, type(err).__name__)
 
 
-def create_app(settings: Settings, api: ApiClient, line: LineReplier) -> FastAPI:
+def create_app(
+    settings: Settings,
+    api: ApiClient,
+    line: LineReplier,
+    verify_api_token: VerifyApiToken | None = None,
+) -> FastAPI:
     app = FastAPI(title="Gym Assistant Coach bot")
     deps = _Deps(settings, api, line)
 
@@ -141,5 +147,7 @@ def create_app(settings: Settings, api: ApiClient, line: LineReplier) -> FastAPI
             return Response(status_code=400)
         await run_in_threadpool(_process, events, deps)
         return Response(status_code=200)
+
+    app.include_router(internal_router(settings, line, verify_api_token or google_verifier))
 
     return app

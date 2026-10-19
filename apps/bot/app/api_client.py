@@ -4,6 +4,8 @@ from typing import Protocol
 import httpx
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from app.settings import Settings
 
@@ -136,3 +138,26 @@ class HttpApiClient:
                 else None
             ),
         )
+
+
+class WorkoutPr(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
+    exercise_id: str
+    name_zh: str
+    name_en: str | None = None
+    e1rm: float
+    weight_kg: float
+    reps: int
+
+
+class WorkoutSummary(BaseModel):
+    """Finish summary sent by the api; its `notified` field is meaningless here and ignored."""
+
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
+    volume_kg: float = Field(ge=0)
+    exercise_count: int = Field(ge=0)
+    set_count: int = Field(ge=0)
+    cardio_minutes: float = Field(ge=0)
+    prs: list[WorkoutPr] = []
