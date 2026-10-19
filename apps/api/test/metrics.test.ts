@@ -83,6 +83,7 @@ describe("metrics routes", () => {
       },
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
+      notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),

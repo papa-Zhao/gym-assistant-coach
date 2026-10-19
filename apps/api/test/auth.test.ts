@@ -37,6 +37,7 @@ describe("auth", () => {
         if (tok === "unknown") return { sub: U_UNKNOWN, name: "Zed" };
         throw new Error("bad");
       },
+      notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
       now: () => new Date("2026-10-19T04:00:00Z"),
@@ -189,6 +190,7 @@ describe("error handling", () => {
           if (throwing) throw new Error(LEAK);
           return { sub: "Uabc", name: null };
         },
+        notifyWorkoutFinished: async () => {},
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,
         now: () => new Date("2026-10-19T04:00:00Z"),

@@ -8,6 +8,8 @@ const full = {
   BOT_SA_EMAIL: "bot@x.iam.gserviceaccount.com",
   INTERNAL_AUDIENCE: "gac-api-internal",
   CORS_ORIGIN: "https://example.web.app",
+  BOT_URL: "https://bot.example.run.app",
+  BOT_AUDIENCE: "gac-bot-internal",
 };
 
 describe("loadConfig", () => {
@@ -69,6 +71,27 @@ describe("loadConfig", () => {
     expect(message).not.toContain(origin);
   });
 
+  it("loadConfig requires BOT_URL and BOT_AUDIENCE", () => {
+    const rest: Record<string, string> = { ...full };
+    delete rest.BOT_URL;
+    delete rest.BOT_AUDIENCE;
+    expect(() => loadConfig(rest)).toThrow(/BOT_URL, BOT_AUDIENCE/);
+    for (const url of [
+      "http://bot.example.run.app",
+      "https://bot.example.run.app/",
+      "https://bot.example.run.app/x",
+    ]) {
+      let message = "";
+      try {
+        loadConfig({ ...full, BOT_URL: url });
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).toContain("BOT_URL");
+      expect(message).not.toContain(url);
+    }
+  });
+
   it("parses a full env", () => {
     const c = loadConfig(full);
     expect(c.port).toBe(8080);
@@ -80,6 +103,8 @@ describe("loadConfig", () => {
     expect(c.botServiceAccount).toBe(full.BOT_SA_EMAIL);
     expect(c.internalAudience).toBe("gac-api-internal");
     expect(c.corsOrigin).toBe("https://example.web.app");
+    expect(c.botUrl).toBe("https://bot.example.run.app");
+    expect(c.botAudience).toBe("gac-bot-internal");
     expect(loadConfig({ ...full, PORT: "9000" }).port).toBe(9000);
   });
 });

@@ -11,6 +11,7 @@ const deps: AppDeps = {
   verifyServiceToken: notUsed,
   botServiceAccount: "bot@example.iam.gserviceaccount.com",
   verifyLineIdToken: notUsed,
+  notifyWorkoutFinished: async () => {},
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",
   now: () => new Date("2026-10-19T04:00:00Z"),

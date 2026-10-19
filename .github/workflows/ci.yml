@@ -79,6 +79,8 @@ jobs:
             -e BOT_SA_EMAIL=ci@example.iam.gserviceaccount.com
             -e INTERNAL_AUDIENCE=gac-api-internal
             -e CORS_ORIGIN=https://example.web.app
+            -e BOT_URL=https://bot.example.run.app
+            -e BOT_AUDIENCE=gac-bot-internal
           )
           for svc in api bot; do
             extra=()

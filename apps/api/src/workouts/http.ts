@@ -25,6 +25,7 @@ export function sendWorkoutError(reply: FastifyReply, err: unknown) {
   if (err.code === "not_found") {
     return reply.code(404).send({ error: "not_found" } satisfies ApiError);
   }
+  if (err.code === "wrong_kind") return badRequest(reply);
   return reply.code(409).send({ error: "conflict" } satisfies ApiError);
 }
 

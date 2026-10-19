@@ -40,6 +40,7 @@ describe("profile routes", () => {
       verifyServiceToken: unused,
       botServiceAccount: "bot@x",
       verifyLineIdToken: unused,
+      notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),

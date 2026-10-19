@@ -49,7 +49,8 @@ export type WorkoutErrorCode =
   | "already_finished"
   | "session_finished"
   | "wrong_kind"
-  | "not_finished";
+  | "not_finished"
+  | "empty_session";
 
 /** Typed failure so routes can map it to 404 / 409 / 400. */
 export class WorkoutError extends Error {
@@ -704,11 +705,12 @@ export async function deleteCardio(
 
 // ---------- finishing and stats ----------
 
-/** Throws `already_finished` if the session has ended. `notified` is set by the caller. */
+/** Throws `already_finished` if the session has ended, and `empty_session` (rolled back) when `requireContent` is set and nothing was recorded. `notified` is set by the caller. */
 export async function finishSession(
   db: Db,
   userId: string,
   sessionId: string,
+  opts: { requireContent?: boolean } = {},
 ): Promise<FinishSummary> {
   return db.transaction(async (tx) => {
     // Atomic claim: only one concurrent finish can flip ended_at.
@@ -789,6 +791,11 @@ export async function finishSession(
       });
     }
 
+    if (opts.requireContent && mine.length === 0 && cardio.length === 0) {
+      // Rolls back the claim above, so the session stays in progress.
+      throw new WorkoutError("empty_session");
+    }
+
     const touched = new Set([
       ...byExercise.keys(),
       ...cardio.map((c) => c.exerciseId),
@@ -852,6 +859,28 @@ export async function weekStats(
     if (r.muscle) setsByMuscle[r.muscle as MuscleGroup] = r.n;
   }
   return { from, to, sessions: n, setsByMuscle, cardioMinutes: minutes };
+}
+
+/** Name of the template a session was started from, or null. */
+export async function sessionTemplateName(
+  db: Db,
+  userId: string,
+  sessionId: string,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ name: workoutTemplates.name })
+    .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.userId, userId),
+      ),
+    );
+  return row?.name ?? null;
 }
 
 /** Records that the finish push went out, so it is not sent twice. */

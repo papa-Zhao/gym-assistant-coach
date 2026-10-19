@@ -42,6 +42,7 @@ describe("exercise and template routes", () => {
       },
       botServiceAccount: "bot@x",
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
+      notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),
