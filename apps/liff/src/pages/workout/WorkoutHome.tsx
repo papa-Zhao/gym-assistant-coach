@@ -43,6 +43,13 @@ export function WorkoutHome({ onFatal, onClose }: WorkoutHomeProps) {
     return { kind: "home", data: { week, templates } };
   }, []);
 
+  const reload = useCallback(() => {
+    setPhase({ kind: "loading" });
+    loadHome()
+      .then(setPhase)
+      .catch(() => onFatal());
+  }, [loadHome, onFatal]);
+
   useEffect(() => {
     let live = true;
     loadHome()
@@ -70,6 +77,7 @@ export function WorkoutHome({ onFatal, onClose }: WorkoutHomeProps) {
           session={phase.session}
           onSession={(session) => setPhase({ kind: "active", session })}
           onFinished={(summary) => setPhase({ kind: "finished", summary })}
+          onDiscarded={reload}
           onFatal={onFatal}
         />
       );

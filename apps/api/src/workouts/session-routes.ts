@@ -15,6 +15,7 @@ import {
   addItem,
   deleteCardio,
   deleteSet,
+  discardSession,
   finishSession,
   getActiveSession,
   markNotified,
@@ -291,6 +292,19 @@ export const sessionRoutes =
             req.params.entryIndex,
           );
           return await current(uid(req));
+        } catch (err) {
+          return sendWorkoutError(reply, err);
+        }
+      },
+    );
+
+    app.delete<{ Params: { id: string } }>(
+      "/workouts/:id",
+      { ...auth, schema: idSchema },
+      async (req, reply) => {
+        try {
+          await discardSession(db, uid(req), req.params.id);
+          return reply.code(204).send();
         } catch (err) {
           return sendWorkoutError(reply, err);
         }

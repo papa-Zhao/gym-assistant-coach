@@ -18,16 +18,18 @@ function setup(
   const calls = fakeApi(handler);
   const onSession = vi.fn();
   const onFinished = vi.fn();
+  const onDiscarded = vi.fn();
   const onFatal = vi.fn();
   render(
     <ActiveWorkout
       session={initial}
       onSession={onSession}
       onFinished={onFinished}
+      onDiscarded={onDiscarded}
       onFatal={onFatal}
     />,
   );
-  return { calls, onSession, onFinished, onFatal };
+  return { calls, onSession, onFinished, onDiscarded, onFatal };
 }
 
 describe("ActiveWorkout", () => {
@@ -178,6 +180,23 @@ describe("ActiveWorkout", () => {
     ]);
   });
 
+  it("discarding needs a confirm and then sends DELETE", async () => {
+    const { calls, onDiscarded } = setup(session([]), () => undefined);
+    fireEvent.click(screen.getByRole("button", { name: "放棄這次訓練" }));
+    expect(
+      screen.getByText("放棄後，這次的紀錄都會刪除。"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(calls).toEqual([]);
+    expect(onDiscarded).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "放棄這次訓練" }));
+    fireEvent.click(screen.getByRole("button", { name: "確定放棄" }));
+    await waitFor(() => expect(onDiscarded).toHaveBeenCalled());
+    expect(calls).toEqual([
+      { method: "DELETE", path: "/workouts/s1", body: undefined },
+    ]);
+  });
+
   it("finish with no content explains why", async () => {
     setup(session([strengthItem()]), () => new Response("{}", { status: 409 }));
     fireEvent.click(screen.getByRole("button", { name: "結束訓練" }));
@@ -232,6 +251,7 @@ describe("ActiveWorkout", () => {
         session={session([])}
         onSession={vi.fn()}
         onFinished={vi.fn()}
+        onDiscarded={vi.fn()}
         onFatal={vi.fn()}
       />,
     );

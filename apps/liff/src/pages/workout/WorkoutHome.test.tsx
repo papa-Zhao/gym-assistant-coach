@@ -63,6 +63,28 @@ describe("WorkoutHome", () => {
     });
   });
 
+  it("discarding the active workout returns to home", async () => {
+    let active: unknown = session([]);
+    const calls = fakeApi(({ method, path }) => {
+      if (method === "DELETE" && path === "/workouts/s1") {
+        active = null;
+        return undefined;
+      }
+      if (path === "/workouts/active") return active;
+      if (path === "/workouts/week") return WEEK;
+      if (path === "/templates") return TEMPLATES;
+    });
+    render_();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放棄這次訓練" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "確定放棄" }));
+    expect(
+      await screen.findByRole("heading", { name: "記訓練" }),
+    ).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "DELETE")).toBe(true);
+  });
+
   it("starting a template posts its id; deleting needs a confirm", async () => {
     const calls = fakeApi(({ method, path }) => {
       if (path === "/workouts/active") return null;

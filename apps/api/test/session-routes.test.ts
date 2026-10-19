@@ -129,6 +129,7 @@ describe("workout session routes", () => {
       ["PUT", `/workouts/${ZERO}/cardio`],
       ["DELETE", `/workouts/${ZERO}/cardio/${ZERO}/1`],
       ["POST", `/workouts/${ZERO}/finish`],
+      ["DELETE", `/workouts/${ZERO}`],
       ["GET", "/workouts/week"],
     ] as const) {
       const res = await app.inject({ method, url });
@@ -406,6 +407,36 @@ describe("workout session routes", () => {
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
+  });
+
+  it("discard removes an active session with its records", async () => {
+    await reset();
+    const s = await start();
+    await putSet(s.id, bench.id, 1);
+    const res = await req("DELETE", `/workouts/${s.id}`);
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe("");
+    const active = await req("GET", "/workouts/active");
+    expect(active.json()).toBeNull();
+    // gone for good: a second discard is not found
+    expect((await req("DELETE", `/workouts/${s.id}`)).statusCode).toBe(404);
+  });
+
+  it("discard of a finished or foreign session is 404 and keeps it", async () => {
+    await reset();
+    const done = await start();
+    await putSet(done.id, bench.id, 1);
+    await finish(done.id);
+    const finished = await req("DELETE", `/workouts/${done.id}`);
+    expect(finished.statusCode).toBe(404);
+    expect(finished.json()).toEqual({ error: "not_found" });
+
+    const mine = await start();
+    const foreign = await req("DELETE", `/workouts/${mine.id}`, h2);
+    expect(foreign.statusCode).toBe(404);
+    const active = await req("GET", "/workouts/active");
+    expect(active.json<ActiveSession>().id).toBe(mine.id);
+    expect((await req("DELETE", "/workouts/not-a-uuid")).statusCode).toBe(400);
   });
 
   it("finishing an already finished session is 409 and does not notify again", async () => {

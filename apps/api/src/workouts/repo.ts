@@ -703,6 +703,25 @@ export async function deleteCardio(
     );
 }
 
+/** Deletes the user's in-progress session (items, sets and cardio cascade); finished or foreign sessions are `not_found`. */
+export async function discardSession(
+  db: Db,
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  const rows = await db
+    .delete(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.userId, userId),
+        isNull(workoutSessions.endedAt),
+      ),
+    )
+    .returning({ id: workoutSessions.id });
+  if (rows.length === 0) throw new WorkoutError("not_found");
+}
+
 // ---------- finishing and stats ----------
 
 /** Throws `already_finished` if the session has ended, and `empty_session` (rolled back) when `requireContent` is set and nothing was recorded. `notified` is set by the caller. */

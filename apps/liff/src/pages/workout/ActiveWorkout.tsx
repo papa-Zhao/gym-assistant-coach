@@ -24,6 +24,8 @@ interface ActiveWorkoutProps {
   session: ActiveSession;
   onSession: (session: ActiveSession) => void;
   onFinished: (summary: FinishSummaryData) => void;
+  /** Called after the in-progress workout was deleted. */
+  onDiscarded: () => void;
   /** Called when the session cannot be recovered. */
   onFatal: () => void;
 }
@@ -62,10 +64,12 @@ export function ActiveWorkout({
   session,
   onSession,
   onFinished,
+  onDiscarded,
   onFatal,
 }: ActiveWorkoutProps) {
   const [picking, setPicking] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,6 +121,19 @@ export function ActiveWorkout({
     }
   };
 
+  const discard = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch<undefined>(base, { method: "DELETE" });
+      onDiscarded();
+    } catch (err) {
+      setDiscarding(false);
+      fail(err, "放棄訓練失敗，請再試一次。");
+      setBusy(false);
+    }
+  };
+
   if (picking) {
     return (
       <ExercisePicker
@@ -135,6 +152,31 @@ export function ActiveWorkout({
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
+      {discarding ? (
+        <div className="confirm-row" role="group" aria-label="確認放棄訓練">
+          <span>放棄後，這次的紀錄都會刪除。</span>
+          <button type="button" disabled={busy} onClick={() => void discard()}>
+            確定放棄
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            onClick={() => setDiscarding(false)}
+          >
+            取消
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="text-button"
+          disabled={busy}
+          onClick={() => setDiscarding(true)}
+        >
+          放棄這次訓練
+        </button>
+      )}
       {session.items.length === 0 && (
         <p className="muted">還沒有動作，按下方「＋ 加動作」開始。</p>
       )}
