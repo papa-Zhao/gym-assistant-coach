@@ -6,6 +6,8 @@ export interface Config {
   botServiceAccount: string;
   internalAudience: string;
   corsOrigin: string;
+  botUrl: string;
+  botAudience: string;
 }
 
 const REQUIRED = [
@@ -15,6 +17,8 @@ const REQUIRED = [
   "BOT_SA_EMAIL",
   "INTERNAL_AUDIENCE",
   "CORS_ORIGIN",
+  "BOT_URL",
+  "BOT_AUDIENCE",
 ] as const;
 
 const MIN_SECRET_BYTES = 32;
@@ -46,6 +50,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     );
   }
 
+  const botUrl = get("BOT_URL");
+  if (!isHttpsOrigin(botUrl)) {
+    throw new Error("BOT_URL must be an exact https:// origin with no path");
+  }
+
   const port = env.PORT ? Number(env.PORT) : 8080;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("PORT must be a valid port number");
@@ -59,6 +68,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     botServiceAccount: get("BOT_SA_EMAIL"),
     internalAudience: get("INTERNAL_AUDIENCE"),
     corsOrigin,
+    botUrl,
+    botAudience: get("BOT_AUDIENCE"),
   };
 }
 

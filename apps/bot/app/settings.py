@@ -12,6 +12,9 @@ class Settings:
     internal_audience: str
     liff_id: str
     public_site_url: str
+    # Only the internal notify endpoint needs these; empty means it rejects every call.
+    bot_audience: str = ""
+    api_sa_email: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -22,4 +25,6 @@ class Settings:
             internal_audience=os.environ["INTERNAL_AUDIENCE"],
             liff_id=os.environ["LIFF_ID"],
             public_site_url=os.environ["PUBLIC_SITE_URL"].rstrip("/"),
+            bot_audience=os.environ.get("BOT_AUDIENCE", ""),
+            api_sa_email=os.environ.get("API_SA_EMAIL", ""),
         )

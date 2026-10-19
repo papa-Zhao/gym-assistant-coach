@@ -103,9 +103,11 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 | `consents` | user_id, doc (`terms`/`privacy`), version, agreed_at | |
 | `user_profiles` | user_id, sex, birth_year, height_cm, activity_level, goal (`cut`/`maintain`/`bulk`), target_kcal, target_protein_g, target_carb_g, target_fat_g, targets_overridden | 目標值由 BMR（Mifflin-St Jeor）× 活動係數 ± 目標調整計算；使用者可手動覆寫 |
 | `body_metrics` | user_id, measured_on, weight_kg, body_fat_pct, waist_cm | 每人每天一筆（upsert） |
-| `exercises` | id, name_zh, name_en, muscle_group, equipment, is_custom, owner_user_id | 種子資料 + 使用者自訂 |
+| `exercises` | id, slug, name_zh, name_en, kind (`strength`/`cardio`), muscle_group, equipment, is_custom, owner_user_id, archived_at | 種子資料（中英文、固定 slug）+ 使用者自訂；器材類別由 equipment 推導（機械式／半機械式／自由重量／徒手／有氧器材） |
 | `workout_sessions` | id, user_id, performed_on, started_at, ended_at, note, template_id | |
-| `workout_sets` | session_id, exercise_id, set_index, reps, weight_kg, rpe | |
+| `workout_session_items` | session_id, exercise_id, position, target_sets, target_reps | 本次訓練的動作清單（2026-10-20 新增） |
+| `workout_sets` | session_id, exercise_id, set_index, reps, weight_kg, rpe | 重訓 |
+| `cardio_entries` | session_id, exercise_id, entry_index, duration_min, distance_km, incline_pct, speed_kmh, level | 有氧（2026-10-20 新增） |
 | `workout_templates` / `template_items` | 範本名稱；動作、預設組數、次數 | AI 產生的課表也存成範本 |
 | `foods` | id, source (`tfda`/`custom`/`ai`), name, per_100g kcal/protein/carb/fat, serving_desc | 食藥署資料一次匯入 |
 | `meals` | id, user_id, eaten_on, meal_type (`breakfast`/`lunch`/`dinner`/`snack`), status (`draft`/`confirmed`), source (`photo`/`text`/`manual`/`copy`) | AI 辨識結果先存成 `draft` |
@@ -139,8 +141,10 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 ### 6.4 訓練紀錄（LIFF）
 - 開始訓練 → 選範本或空白 → 加入動作 → 記錄每組次數、重量、RPE。
 - 每個動作自動帶出「上次做這個動作的組數與重量」，並提示漸進式超負荷（例如上次全部組數都達到目標次數 → 建議 +2.5 kg）。
-- 個人最佳紀錄（以估算 1RM 計算）達成時，於聊天室推送恭喜訊息（使用 reply 時機，不額外消耗 push）。
+- 結束訓練時，以 push 訊息把摘要與個人最佳紀錄（以估算 1RM 計算）的恭喜送到聊天室（2026-10-20 決定可消耗 push 額度；push 失敗不影響結束訓練）。
 - 每週每個肌群的組數統計。
+- 有氧（跑步、跑步機爬坡、階梯機、飛輪、划船、橢圓機、跳繩等）記錄時間，以及選填的距離、坡度、速度、等級；不計入 1RM、PR 與訓練量，另外統計有氧分鐘數（2026-10-20 新增）。
+- 動作庫提供中英文名稱，可依器材類別（機械式、半機械式、自由重量、徒手）篩選（2026-10-20 新增）。
 
 ### 6.5 拍照記錄飲食（核心流程）
 1. 使用者在聊天室傳送照片。
@@ -213,7 +217,7 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 
 ### 8.3 成本控制
 - Cloud Run min instances 0；Neon 免費方案（閒置自動休眠）。
-- LINE 官方帳號免費方案的 push 額度很少 → 第 1 期**不做主動推播**，所有回覆都使用 reply。
+- LINE 官方帳號免費方案的 push 額度有限 → 第 1 期原則上使用 reply；**例外**：訓練完成通知使用 push（2026-10-20 決定），額度用完時只會少了通知。
 - 設定 Google Cloud 預算警示（例如每月 US$10、US$30）與 Anthropic 用量上限。
 
 ### 8.4 可觀測性
@@ -299,6 +303,9 @@ PR 1–2 不涉及畫面，所以設計與它們同時進行；**PR 3 開始做�
 - **提醒**：上課前提醒會用到 push 訊息 → 屆時評估 LINE 方案費用。
 - 簡易管理後台（審核教練、處理檢舉）。
 
+### 未來：動作教學影片
+- 透過動作查詢對應的教學影片；以內建動作的固定 `slug` 對應影片來源（例如自製影片或經授權的連結），屆時另行設計資料表與播放方式。
+
 ### 第 3 期：附近餐廳 + AI 推薦
 - 使用者傳送 LINE 位置訊息（或在 LIFF 授權定位）→ Google Places Nearby Search → 依今日剩餘營養素，由 AI 推薦店家與點餐方式。
 - Places 沒有菜單資料 → 提供「拍菜單 → AI 從菜單挑選」（沿用視覺辨識）。
@@ -317,7 +324,7 @@ PR 1–2 不涉及畫面，所以設計與它們同時進行；**PR 3 開始做�
 | 2 | 照片儲存 | **Google Cloud Storage**（取代 R2）：使用服務帳號權限、不需管理金鑰 |
 | 3 | LIFF 前端託管 | **Firebase Hosting**（2026-10-18 決定：與 Cloud Run 同一個 GCP 專案、同一套 WIF 部署） |
 | 4 | 網域 | 第 1 期用託管服務的預設網域；正式上線前購買 |
-| 5 | LINE 官方帳號方案 | 免費方案；第 2 期有推播需求時再評估 |
+| 5 | LINE 官方帳號方案 | 免費方案；訓練完成通知已使用 push（2026-10-20），用量變大或第 2 期有提醒需求時再評估付費方案 |
 | 6 | AI 每日上限 | 依 §7 初始值，上線後調整 |
 | 7 | GitHub repo | `papa-Zhao/gym-assistant-coach`（私人） |
 | 8 | 區域 | 新加坡（Cloud Run `asia-southeast1`、Neon `aws-ap-southeast-1`）。**2026-10-18 已確認**：從台灣呼叫 `api` `/health`（熱啟動）中位數約 0.1 秒 |

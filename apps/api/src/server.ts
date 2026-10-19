@@ -4,6 +4,7 @@ import postgres from "postgres";
 import { buildApp } from "./app.js";
 import { createLineVerifier } from "./auth/line.js";
 import { loadConfig } from "./config.js";
+import { createBotNotifier } from "./notify/bot.js";
 import type { AppDeps, VerifyServiceToken } from "./deps.js";
 
 // Fail fast (before listening) on bad config. Messages name variables only.
@@ -36,6 +37,7 @@ const deps: AppDeps = {
   verifyServiceToken,
   botServiceAccount: config.botServiceAccount,
   verifyLineIdToken: createLineVerifier(config.lineLoginChannelId),
+  notifyWorkoutFinished: createBotNotifier(config.botUrl, config.botAudience),
   sessionSecret: config.sessionSecret,
   corsOrigin: config.corsOrigin,
   now: () => new Date(),

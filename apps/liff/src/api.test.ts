@@ -66,6 +66,13 @@ describe("apiFetch", () => {
     });
   });
 
+  it("returns undefined for a 204 without parsing a body", async () => {
+    setup(() => new Response(null, { status: 204 }));
+    await expect(
+      apiFetch("/templates/t1", { method: "DELETE" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("401 triggers one re-login and retry", async () => {
     setup((_, auth) =>
       auth === "Bearer s2"

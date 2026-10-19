@@ -37,6 +37,7 @@ describe("auth", () => {
         if (tok === "unknown") return { sub: U_UNKNOWN, name: "Zed" };
         throw new Error("bad");
       },
+      notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
       now: () => new Date("2026-10-19T04:00:00Z"),
@@ -153,6 +154,23 @@ describe("auth", () => {
       .map((m) => m.trim());
     expect(methods).toContain("PUT");
   });
+
+  it("CORS preflight allows DELETE for the LIFF origin", async () => {
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/templates/x",
+      headers: {
+        origin: ORIGIN,
+        "access-control-request-method": "DELETE",
+        "access-control-request-headers": "authorization",
+      },
+    });
+    expect(res.headers["access-control-allow-origin"]).toBe(ORIGIN);
+    const methods = String(res.headers["access-control-allow-methods"])
+      .split(",")
+      .map((m) => m.trim());
+    expect(methods).toContain("DELETE");
+  });
 });
 
 describe("error handling", () => {
@@ -172,6 +190,7 @@ describe("error handling", () => {
           if (throwing) throw new Error(LEAK);
           return { sub: "Uabc", name: null };
         },
+        notifyWorkoutFinished: async () => {},
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,
         now: () => new Date("2026-10-19T04:00:00Z"),

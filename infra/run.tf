@@ -6,8 +6,10 @@ locals {
 
   # Fixed URL formats avoid a self-reference on the Cloud Run services.
   api_url         = "https://api-${data.google_project.this.number}.${var.region}.run.app"
+  bot_url         = "https://bot-${data.google_project.this.number}.${var.region}.run.app"
   public_site_url = "https://${var.project_id}-liff.web.app"
   internal_aud    = "gac-api-internal"
+  bot_aud         = "gac-bot-internal"
 
   # Plain values per service (secret_id values go through local.service_secret_env).
   service_env = {
@@ -16,12 +18,16 @@ locals {
       BOT_SA_EMAIL          = google_service_account.bot_runtime.email
       LINE_LOGIN_CHANNEL_ID = var.line_login_channel_id
       CORS_ORIGIN           = local.public_site_url
+      BOT_URL               = local.bot_url
+      BOT_AUDIENCE          = local.bot_aud
     }
     bot = {
       API_URL           = local.api_url
       INTERNAL_AUDIENCE = local.internal_aud
       LIFF_ID           = var.liff_id
       PUBLIC_SITE_URL   = local.public_site_url
+      BOT_AUDIENCE      = local.bot_aud
+      API_SA_EMAIL      = google_service_account.api_runtime.email
     }
   }
 

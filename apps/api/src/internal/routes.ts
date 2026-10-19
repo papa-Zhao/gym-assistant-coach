@@ -10,6 +10,8 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
+import { todayWorkoutSummary } from "../workouts/repo";
+import { formatWorkoutSummary } from "../workouts/summary";
 import { previousMetric, recordMetric } from "../metrics/repo";
 import { getProfile } from "../profile/repo";
 import {
@@ -112,12 +114,16 @@ export const internalRoutes =
       async (req): Promise<TodayResponse> => {
         const user = await findByLineUserId(db, req.body.lineUserId);
         const profile = user ? await getProfile(db, user.id) : null;
+        const date = taipeiDate(now());
+        const workout = user
+          ? await todayWorkoutSummary(db, user.id, date)
+          : null;
         return {
           hasProfile: profile !== null,
-          date: taipeiDate(now()),
+          date,
           targets: profile?.targets ?? null,
           consumed: { kcal: 0, proteinG: 0, carbG: 0, fatG: 0 },
-          workoutSummary: null,
+          workoutSummary: workout ? formatWorkoutSummary(workout) : null,
           weightKg: profile?.weightKg ?? null,
           streakDays: 0,
         };

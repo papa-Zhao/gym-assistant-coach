@@ -22,6 +22,20 @@
       "when": 1792402472903,
       "tag": "0002_profiles_body_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792433624133,
+      "tag": "0003_workouts",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792433624438,
+      "tag": "0004_seed_exercises",
+      "breakpoints": true
     }
   ]
 }

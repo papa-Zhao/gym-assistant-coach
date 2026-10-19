@@ -14,9 +14,13 @@ describe("App", () => {
   it("renders the page for the path when ready", async () => {
     configureApi({
       apiUrl: "https://api.test",
-      fetchImpl: (async () =>
+      fetchImpl: (async (url: string) =>
         new Response(
-          JSON.stringify({ from: "", to: "", points: [] }),
+          JSON.stringify(
+            url.endsWith("/workouts/week")
+              ? { from: "", to: "", sessions: 0 }
+              : { from: "", to: "", points: [] },
+          ),
         )) as unknown as typeof fetch,
       relogin: async () => ({ kind: "error" }),
     });
@@ -33,7 +37,21 @@ describe("App", () => {
     expect(await screen.findByText("還沒有紀錄")).toBeInTheDocument();
   });
 
-  it("renders the workout and settings pages", () => {
+  it("renders the workout and settings pages", async () => {
+    configureApi({
+      apiUrl: "https://api.test",
+      fetchImpl: (async (url: string) =>
+        new Response(
+          JSON.stringify(
+            url.endsWith("/workouts/week")
+              ? { sessions: 0, setsByMuscle: {}, cardioMinutes: 0 }
+              : url.endsWith("/templates")
+                ? []
+                : null,
+          ),
+        )) as unknown as typeof fetch,
+      relogin: async () => ({ kind: "error" }),
+    });
     const { unmount } = render(
       <App
         {...base}
@@ -41,7 +59,9 @@ describe("App", () => {
         pathname="/workout"
       />,
     );
-    expect(screen.getByRole("heading", { name: "記訓練" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "記訓練" }),
+    ).toBeInTheDocument();
     unmount();
     render(
       <App

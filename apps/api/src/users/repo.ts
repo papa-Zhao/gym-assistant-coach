@@ -102,3 +102,15 @@ export async function findById(
     .where(eq(users.id, userId));
   return row ?? null;
 }
+
+/** The LINE user id for an internal user id, or null. */
+export async function findLineUserId(
+  db: Db,
+  userId: string,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ lineUserId: users.lineUserId })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row?.lineUserId ?? null;
+}

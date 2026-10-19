@@ -3,7 +3,15 @@ import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
 import { CONSENT_VERSION } from "@gac/shared";
 import { saveProfile } from "../src/profile/repo";
-import { findByLineUserId, type Db } from "../src/users/repo";
+import { findByLineUserId, syncUser, type Db } from "../src/users/repo";
+import {
+  finishSession,
+  listExercises,
+  startSession,
+  upsertCardio,
+  upsertSet,
+} from "../src/workouts/repo";
+import { formatWorkoutSummary } from "../src/workouts/summary";
 import { createTestDb } from "./db";
 
 const BOT = "bot-runtime@x.iam.gserviceaccount.com";
@@ -30,6 +38,7 @@ describe("/internal/users", () => {
       },
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: LINE_ID, name: null }),
+      notifyWorkoutFinished: async () => {},
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -179,6 +188,63 @@ describe("/internal/users", () => {
     } finally {
       nowIso = "2026-10-19T04:00:00Z";
     }
+  });
+
+  it("today summary shows workout after finish", async () => {
+    const id = `U${"f".repeat(32)}`;
+    const { userId } = await syncUser(db, id, null);
+    const today = () => post("/internal/users/today", { lineUserId: id });
+    expect((await today()).json().workoutSummary).toBeNull();
+    const all = await listExercises(db, userId);
+    const bench = all.find((e) => e.slug === "barbell-bench-press");
+    const run = all.find((e) => e.kind === "cardio");
+    if (!bench || !run) throw new Error("missing seed");
+    const s = await startSession(db, userId, "2026-10-19");
+    await upsertSet(db, userId, s.id, bench.id, {
+      setIndex: 1,
+      weightKg: 100,
+      reps: 10,
+    });
+    await upsertSet(db, userId, s.id, bench.id, {
+      setIndex: 2,
+      weightKg: 100,
+      reps: 10,
+    });
+    await upsertCardio(db, userId, s.id, run.id, {
+      entryIndex: 1,
+      durationMin: 20,
+    });
+    // still in progress: not shown
+    expect((await today()).json().workoutSummary).toBeNull();
+    await finishSession(db, userId, s.id);
+    expect((await today()).json().workoutSummary).toBe(
+      "訓練・2 個動作・2,000 kg・有氧 20 分鐘",
+    );
+  });
+
+  it("formats workout summaries", () => {
+    const base = {
+      sessions: 1,
+      templateName: "推日",
+      exerciseCount: 4,
+      setCount: 12,
+      volumeKg: 9840,
+      cardioMinutes: 0,
+    };
+    expect(formatWorkoutSummary(base)).toBe("推日・4 個動作・9,840 kg");
+    expect(formatWorkoutSummary({ ...base, cardioMinutes: 15 })).toBe(
+      "推日・4 個動作・9,840 kg・有氧 15 分鐘",
+    );
+    expect(
+      formatWorkoutSummary({
+        ...base,
+        templateName: null,
+        exerciseCount: 1,
+        setCount: 0,
+        volumeKg: 0,
+        cardioMinutes: 30,
+      }),
+    ).toBe("訓練・1 個動作・有氧 30 分鐘");
   });
 
   it("GET /health still works without auth", async () => {

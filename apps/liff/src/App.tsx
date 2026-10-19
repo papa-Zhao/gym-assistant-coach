@@ -2,10 +2,10 @@ import { useState } from "react";
 import type { AuthState } from "./auth";
 import { route } from "./router";
 import { BodyMetrics } from "./pages/BodyMetrics";
-import { Placeholder } from "./pages/Placeholder";
 import { Profile } from "./pages/Profile";
 import { Records } from "./pages/Records";
 import { Settings } from "./pages/Settings";
+import { WorkoutHome } from "./pages/workout/WorkoutHome";
 
 interface AppProps {
   state: AuthState;
@@ -43,7 +43,9 @@ export function App({ state, pathname, today, onClose }: AppProps) {
         case "body":
           return <BodyMetrics onFatal={() => setFailed(true)} />;
         case "workout":
-          return <Placeholder title="記訓練" onClose={onClose} />;
+          return (
+            <WorkoutHome onFatal={() => setFailed(true)} onClose={onClose} />
+          );
       }
       break;
     case "consent_required":
