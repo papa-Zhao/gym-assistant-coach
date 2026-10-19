@@ -120,6 +120,8 @@ export function ActiveWorkout({
   if (picking) {
     return (
       <ExercisePicker
+        busy={busy}
+        error={error}
         onPick={(ex) => void addExercise(ex)}
         onClose={() => setPicking(false)}
         onFatal={onFatal}
@@ -254,16 +256,9 @@ function prefill(item: SessionItem & { sets: WorkoutSet[] }): SetValues {
     return { weight: toText(done.weightKg), reps: toText(done.reps), rpe: "" };
   }
   const first = item.last?.sets[0];
-  if (item.hint) {
-    return {
-      weight: toText(item.hint.suggestWeightKg),
-      reps: toText(item.targetReps ?? first?.reps),
-      rpe: "",
-    };
-  }
   return {
-    weight: toText(first?.weightKg),
-    reps: toText(first?.reps),
+    weight: toText(item.hint?.suggestWeightKg ?? first?.weightKg),
+    reps: toText(item.targetReps ?? first?.reps),
     rpe: "",
   };
 }

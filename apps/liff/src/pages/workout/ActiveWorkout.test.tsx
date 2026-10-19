@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { configureApi } from "../../api";
 import { ActiveWorkout } from "./ActiveWorkout";
 import {
   BENCH,
@@ -199,5 +200,63 @@ describe("ActiveWorkout", () => {
       path: "/workouts/s1/items",
       body: { exerciseId: "ex-bench" },
     });
+  });
+
+  it("failed add shows error in picker", async () => {
+    setup(session([]), ({ method }) =>
+      method === "POST" ? new Response("{}", { status: 500 }) : [BENCH],
+    );
+    fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
+    fireEvent.click(await screen.findByRole("button", { name: /槓鈴臥推/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("儲存失敗");
+  });
+
+  it("rows are disabled while adding", async () => {
+    const posts: string[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    configureApi({
+      apiUrl: "https://api.test",
+      fetchImpl: (async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          posts.push(String(init.body));
+          await gate;
+          return new Response(JSON.stringify(session([strengthItem()])));
+        }
+        return new Response(JSON.stringify([BENCH]));
+      }) as unknown as typeof fetch,
+      relogin: async () => ({ kind: "error" }),
+    });
+    render(
+      <ActiveWorkout
+        session={session([])}
+        onSession={vi.fn()}
+        onFinished={vi.fn()}
+        onFatal={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
+    const row = await screen.findByRole("button", { name: /槓鈴臥推/ });
+    fireEvent.click(row);
+    await waitFor(() => expect(row).toBeDisabled());
+    fireEvent.click(row);
+    release();
+    await waitFor(() => expect(posts).toHaveLength(1));
+  });
+
+  it("template target reps prefill without hint", () => {
+    setup(
+      session([
+        strengthItem({
+          targetReps: 10,
+          last: {
+            date: "2026-10-13",
+            sets: [{ setIndex: 1, weightKg: 60, reps: 8 }],
+          },
+        }),
+      ]),
+    );
+    expect(screen.getByLabelText("第 1 組次數")).toHaveValue("10");
+    expect(screen.getByLabelText("第 1 組重量")).toHaveValue("60");
   });
 });

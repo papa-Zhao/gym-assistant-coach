@@ -22,6 +22,10 @@ interface ExercisePickerProps {
   onClose: () => void;
   /** Called when the session cannot be recovered. */
   onFatal: () => void;
+  /** An add is in flight: rows and submit are disabled. */
+  busy?: boolean;
+  /** Message from a failed add. */
+  error?: string | null;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -39,6 +43,8 @@ export function ExercisePicker({
   onPick,
   onClose,
   onFatal,
+  busy = false,
+  error = null,
 }: ExercisePickerProps) {
   const [kind, setKind] = useState<ExerciseKind>("strength");
   const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
@@ -95,6 +101,8 @@ export function ExercisePicker({
         onCreated={onPick}
         onBack={() => setCustom(false)}
         onFatal={onFatal}
+        busy={busy}
+        error={error}
       />
     );
   }
@@ -169,6 +177,11 @@ export function ExercisePicker({
           </div>
         </>
       )}
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       <section className="card list" aria-label="動作列表">
         {failed ? (
           <p className="error-text">載入動作失敗，請再試一次。</p>
@@ -182,6 +195,7 @@ export function ExercisePicker({
               key={ex.id}
               type="button"
               className="row"
+              disabled={busy}
               onClick={() => onPick(ex)}
             >
               <span>
@@ -211,12 +225,20 @@ export function ExercisePicker({
 }
 
 interface CustomFormProps {
+  busy: boolean;
+  error: string | null;
   onCreated: (exercise: Exercise) => void;
   onBack: () => void;
   onFatal: () => void;
 }
 
-function CustomExerciseForm({ onCreated, onBack, onFatal }: CustomFormProps) {
+function CustomExerciseForm({
+  onCreated,
+  onBack,
+  onFatal,
+  busy: adding,
+  error: addError,
+}: CustomFormProps) {
   const [nameZh, setNameZh] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [kind, setKind] = useState<ExerciseKind>("strength");
@@ -251,6 +273,7 @@ function CustomExerciseForm({ onCreated, onBack, onFatal }: CustomFormProps) {
         }),
       });
       onCreated(created);
+      setBusy(false);
     } catch (err) {
       if (isAuthExpired(err)) onFatal();
       else setError("無法新增，請檢查欄位後再試一次。");
@@ -317,12 +340,12 @@ function CustomExerciseForm({ onCreated, onBack, onFatal }: CustomFormProps) {
             ))}
           </select>
         </label>
-        {error && (
+        {(error ?? addError) && (
           <p className="error-text" role="alert">
-            {error}
+            {error ?? addError}
           </p>
         )}
-        <button type="submit" disabled={!valid || busy}>
+        <button type="submit" disabled={!valid || busy || adding}>
           新增並加入訓練
         </button>
         <button type="button" className="secondary" onClick={onBack}>
