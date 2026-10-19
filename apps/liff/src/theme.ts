@@ -183,7 +183,7 @@ button.tile strong { font-size: var(--font-size-heading); }
 a.card.link { display: block; color: inherit; text-decoration: none; }
 .card.soon { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; min-height: ${minTouchTarget}px; font-weight: 400; color: var(--color-text); text-align: left; }
 .card + a.card, a.card + .card, .tiles + .card, .card + p.muted, p.muted + .card { margin-top: var(--space-4); }
-.workout { padding-bottom: calc(${minTouchTarget}px * 2 + var(--space-8)); }
+.workout { padding-bottom: calc(${minTouchTarget}px * 2 + var(--space-8) + env(safe-area-inset-bottom)); }
 .workout-head { display: flex; align-items: baseline; justify-content: space-between; }
 .workout-head h1 { margin: 0 0 var(--space-3); }
 .elapsed { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
@@ -226,6 +226,7 @@ button.text-button { background: transparent; color: var(--color-primary); }
   display: flex;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
 }
