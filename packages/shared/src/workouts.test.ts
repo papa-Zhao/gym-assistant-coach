@@ -54,6 +54,18 @@ describe("workouts", () => {
     ).toBeNull();
   });
 
+  it("overloadHint bodyweight history gives null", () => {
+    expect(
+      overloadHint(
+        [
+          { weightKg: 0, reps: 10 },
+          { weightKg: 0, reps: 10 },
+        ],
+        10,
+      ),
+    ).toBeNull();
+  });
+
   it("overloadHint blank workout uses first set reps as target", () => {
     expect(
       overloadHint(

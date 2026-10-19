@@ -156,6 +156,7 @@ export function overloadHint(
   const target = targetReps ?? first.reps;
   if (!last.every((s) => s.reps >= target)) return null;
   const top = Math.max(...last.map((s) => s.weightKg));
+  if (top === 0) return null; // bodyweight history: no kg to add to
   return { suggestWeightKg: top + OVERLOAD_STEP_KG };
 }
 
