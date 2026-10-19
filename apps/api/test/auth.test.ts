@@ -136,6 +136,23 @@ describe("auth", () => {
     const evil = await preflight("https://evil.example");
     expect(evil.headers["access-control-allow-origin"]).toBeUndefined();
   });
+
+  it("CORS preflight allows PUT with authorization for the LIFF origin", async () => {
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/profile",
+      headers: {
+        origin: ORIGIN,
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(res.headers["access-control-allow-origin"]).toBe(ORIGIN);
+    const methods = String(res.headers["access-control-allow-methods"])
+      .split(",")
+      .map((m) => m.trim());
+    expect(methods).toContain("PUT");
+  });
 });
 
 describe("error handling", () => {
