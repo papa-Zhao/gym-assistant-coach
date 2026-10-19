@@ -9,6 +9,15 @@ variables {
 run "core" {
   command = plan
 
+  override_resource {
+    target          = google_service_account.github_deployer
+    override_during = plan
+    values = {
+      email = "deployer@test-project.iam.gserviceaccount.com"
+      name  = "projects/test-project/serviceAccounts/deployer@test-project.iam.gserviceaccount.com"
+    }
+  }
+
   assert {
     condition     = google_storage_bucket.meal_photos.public_access_prevention == "enforced"
     error_message = "Photo bucket must enforce public access prevention."
@@ -59,6 +68,14 @@ run "core" {
   assert {
     condition     = google_iam_workload_identity_pool_provider.github.attribute_condition == "assertion.repository == \"papa-Zhao/gym-assistant-coach\" && assertion.ref == \"refs/heads/main\""
     error_message = "WIF must be restricted to the main branch of the repo."
+  }
+
+  assert {
+    condition = (
+      google_secret_manager_secret_iam_member.deployer_line_channel_access_token.role == "roles/secretmanager.secretAccessor" &&
+      google_secret_manager_secret_iam_member.deployer_line_channel_access_token.member == "serviceAccount:deployer@test-project.iam.gserviceaccount.com"
+    )
+    error_message = "Deployer must be able to read the LINE channel access token."
   }
 }
 
