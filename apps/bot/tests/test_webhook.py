@@ -3,12 +3,13 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api_client import ApiError, SyncResult
+from app.api_client import ApiError, Macros, SyncResult, TodayResult
 from app.handlers import create_app
 from app.settings import CONSENT_VERSION, Settings
 
@@ -25,8 +26,14 @@ SETTINGS = Settings(
 
 
 class FakeApi:
-    def __init__(self, consented: bool = False, fail_status: int | None = None) -> None:
+    def __init__(
+        self,
+        consented: bool = False,
+        fail_status: int | None = None,
+        today: TodayResult | None = None,
+    ) -> None:
         self.consented = consented
+        self.today_result = today
         self.fail_status = fail_status
         self.calls: list[tuple[Any, ...]] = []
 
@@ -46,6 +53,12 @@ class FakeApi:
     def unfollow(self, line_user_id: str) -> None:
         self.calls.append(("unfollow", line_user_id))
         self._maybe_fail()
+
+    def today(self, line_user_id: str) -> TodayResult:
+        self.calls.append(("today", line_user_id))
+        self._maybe_fail()
+        assert self.today_result is not None
+        return self.today_result
 
 
 class FakeLine:
@@ -99,6 +112,35 @@ def text_event(text: str = "你好") -> dict[str, Any]:
 
 def consent_postback(version: str = CONSENT_VERSION) -> dict[str, Any]:
     return event("postback", postback={"data": f"action=consent&version={version}"})
+
+
+def menu_postback(data: str) -> dict[str, Any]:
+    return event("postback", postback={"data": data})
+
+
+NO_PROFILE = TodayResult(
+    has_profile=False,
+    date="2026-10-19",
+    targets=None,
+    consumed=Macros(0, 0, 0, 0),
+    workout_summary=None,
+    weight_kg=None,
+    streak_days=0,
+)
+WITH_PROFILE = TodayResult(
+    has_profile=True,
+    date="2026-10-19",
+    targets=Macros(2200, 140, 250, 60),
+    consumed=Macros(1500, 90, 160, 40),
+    workout_summary=None,
+    weight_kg=72.4,
+    streak_days=3,
+)
+
+
+def menu_setup(today: TodayResult | None = None, consented: bool = True):
+    api, line = FakeApi(consented=consented, today=today), FakeLine()
+    return TestClient(create_app(SETTINGS, api, line)), api, line
 
 
 @pytest.fixture
@@ -253,3 +295,71 @@ def test_messages_are_valid_for_the_line_sdk() -> None:
         messages.placeholder_reply(),
     ):
         assert _to_sdk(message).to_dict()["type"] == message["type"]
+
+
+def test_today_without_profile_replies_profile_link() -> None:
+    client, api, line = menu_setup(NO_PROFILE)
+    post(client, [menu_postback("action=today")])
+    assert [c[0] for c in api.calls] == ["sync", "today"]
+    dumped = json.dumps(line.replies[0][1], ensure_ascii=False)
+    assert "先完成個人檔案，我才能幫你算每天的目標。" in dumped
+    assert "填寫個人檔案" in dumped
+    assert "https://liff.line.me/1234-abcd/profile" in dumped
+
+
+def test_today_with_profile_replies_flex_with_targets() -> None:
+    client, api, line = menu_setup(WITH_PROFILE)
+    post(client, [menu_postback("action=today")])
+    msg = line.replies[0][1][0]
+    assert msg["type"] == "flex"
+    assert msg["altText"] == "今日總覽"
+    dumped = json.dumps(msg, ensure_ascii=False)
+    assert "1500 / 2200 kcal" in dumped
+    assert "還能吃 700 kcal" in dumped
+    assert "10 月 19 日・星期一" in dumped
+    assert "今天還沒有訓練紀錄" in dumped
+    assert "體重 72.4 kg" in dumped
+    assert "已經連續記錄 3 天" in dumped
+    assert "https://liff.line.me/1234-abcd/records" in dumped
+
+
+def test_photo_and_ask_reply_coming_soon() -> None:
+    client, _, line = menu_setup()
+    post(client, [menu_postback("action=photo"), menu_postback("action=ask")])
+    assert line.replies[0][1] == [{"type": "text", "text": "拍照記錄飲食即將開放，敬請期待！"}]
+    assert line.replies[1][1] == [{"type": "text", "text": "問 AI 功能即將開放，敬請期待！"}]
+
+
+def test_menu_before_consent_replies_welcome() -> None:
+    client, api, line = menu_setup(WITH_PROFILE, consented=False)
+    post(client, [menu_postback("action=today")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    "data",
+    ["action=nope", "action=today&action=photo", "action=today&x=1", "x=today", "action=", ""],
+)
+def test_unknown_action_is_ignored(data) -> None:
+    client, api, line = menu_setup(WITH_PROFILE)
+    res = post(client, [menu_postback(data)])
+    assert res.status_code == 200
+    assert api.calls == []
+    assert line.replies == []
+
+
+def test_today_summary_is_valid_flex() -> None:
+    from dataclasses import replace
+
+    from linebot.v3.messaging import FlexMessage
+
+    from app import messages
+
+    over = replace(WITH_PROFILE, consumed=Macros(3000, 0, 999, 40))
+    for t in (WITH_PROFILE, over):
+        msg = messages.today_summary(t, "1234-abcd")
+        FlexMessage.from_dict(msg)
+        widths = [m for m in re.findall(r'"width": "(\d+)%"', json.dumps(msg))]
+        assert widths and all(1 <= int(w) <= 100 for w in widths)
+    assert '"width": "100%"' in json.dumps(messages.today_summary(over, "x"))

@@ -39,6 +39,7 @@ describe("auth", () => {
       },
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
+      now: () => new Date("2026-10-19T04:00:00Z"),
     };
     app = buildApp(deps);
   });
@@ -156,6 +157,7 @@ describe("error handling", () => {
         },
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,
+        now: () => new Date("2026-10-19T04:00:00Z"),
       },
       { logger: { level: "info", stream } },
     );

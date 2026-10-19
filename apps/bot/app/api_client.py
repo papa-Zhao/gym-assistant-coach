@@ -14,6 +14,34 @@ class SyncResult:
     consented: bool
 
 
+@dataclass(frozen=True)
+class Macros:
+    kcal: int
+    protein_g: int
+    carb_g: int
+    fat_g: int
+
+
+@dataclass(frozen=True)
+class TodayResult:
+    has_profile: bool
+    date: str
+    targets: Macros | None
+    consumed: Macros
+    workout_summary: str | None
+    weight_kg: float | None
+    streak_days: int
+
+
+def _macros(data: dict) -> Macros:
+    return Macros(
+        kcal=round(data["kcal"]),
+        protein_g=round(data["proteinG"]),
+        carb_g=round(data["carbG"]),
+        fat_g=round(data["fatG"]),
+    )
+
+
 class ApiError(Exception):
     """The api answered with a non-2xx status. Carries the status only, never the body."""
 
@@ -28,6 +56,8 @@ class ApiClient(Protocol):
     def consent(self, line_user_id: str, version: str) -> None: ...
 
     def unfollow(self, line_user_id: str) -> None: ...
+
+    def today(self, line_user_id: str) -> TodayResult: ...
 
 
 class HttpApiClient:
@@ -59,3 +89,17 @@ class HttpApiClient:
 
     def unfollow(self, line_user_id: str) -> None:
         self._post("/internal/users/unfollow", {"lineUserId": line_user_id})
+
+    def today(self, line_user_id: str) -> TodayResult:
+        data = self._post("/internal/users/today", {"lineUserId": line_user_id}).json()
+        targets = data.get("targets")
+        weight = data.get("weightKg")
+        return TodayResult(
+            has_profile=bool(data["hasProfile"]),
+            date=data["date"],
+            targets=_macros(targets) if targets else None,
+            consumed=_macros(data["consumed"]),
+            workout_summary=data.get("workoutSummary"),
+            weight_kg=float(weight) if weight is not None else None,
+            streak_days=int(data["streakDays"]),
+        )

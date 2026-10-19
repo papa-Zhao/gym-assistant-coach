@@ -4,6 +4,7 @@ import type { HealthResponse } from "@gac/shared";
 import type { AppDeps } from "./deps.js";
 import { apiErrorHandler } from "./http.js";
 import { authRoutes } from "./auth/routes.js";
+import { profileRoutes } from "./profile/routes.js";
 import { internalRoutes } from "./internal/routes.js";
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
@@ -19,6 +20,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
     origin: (origin, cb) => cb(null, origin === deps.corsOrigin),
   });
   app.register(authRoutes(deps));
+  app.register(profileRoutes(deps));
   app.register(internalRoutes(deps), { prefix: "/internal" });
 
   return app;

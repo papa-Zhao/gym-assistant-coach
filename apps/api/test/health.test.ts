@@ -13,6 +13,7 @@ const deps: AppDeps = {
   verifyLineIdToken: notUsed,
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",
+  now: () => new Date("2026-10-19T04:00:00Z"),
 };
 
 describe("GET /health", () => {

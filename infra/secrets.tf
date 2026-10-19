@@ -94,3 +94,9 @@ resource "google_secret_manager_secret_iam_member" "bot_line_channel_access_toke
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.bot_runtime.email}"
 }
+
+resource "google_secret_manager_secret_iam_member" "deployer_line_channel_access_token" {
+  secret_id = google_secret_manager_secret.line_channel_access_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.github_deployer.email}"
+}

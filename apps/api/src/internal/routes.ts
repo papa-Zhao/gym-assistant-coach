@@ -1,7 +1,14 @@
+import { taipeiDate, type TodayResponse } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
-import { markUnfollowed, recordConsent, syncUser } from "../users/repo";
+import { getProfile } from "../profile/repo";
+import {
+  findByLineUserId,
+  markUnfollowed,
+  recordConsent,
+  syncUser,
+} from "../users/repo";
 
 const lineUserId = { type: "string", pattern: "^U[0-9a-f]{32}$" } as const;
 
@@ -38,7 +45,7 @@ const unfollowSchema = {
 export const internalRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
-    const { db, verifyServiceToken, botServiceAccount } = deps;
+    const { db, verifyServiceToken, botServiceAccount, now } = deps;
 
     app.addHook(
       "onRequest",
@@ -74,6 +81,24 @@ export const internalRoutes =
       async (req, reply) => {
         await markUnfollowed(db, req.body.lineUserId);
         return reply.code(204).send();
+      },
+    );
+
+    app.post<{ Body: { lineUserId: string } }>(
+      "/users/today",
+      { schema: unfollowSchema },
+      async (req): Promise<TodayResponse> => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        const profile = user ? await getProfile(db, user.id) : null;
+        return {
+          hasProfile: profile !== null,
+          date: taipeiDate(now()),
+          targets: profile?.targets ?? null,
+          consumed: { kcal: 0, proteinG: 0, carbG: 0, fatG: 0 },
+          workoutSummary: null,
+          weightKg: profile?.weightKg ?? null,
+          streakDays: 0,
+        };
       },
     );
   };

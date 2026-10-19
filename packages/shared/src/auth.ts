@@ -20,5 +20,10 @@ export interface MeResponse {
 }
 
 export interface ApiError {
-  error: "consent_required" | "unauthorized" | "bad_request" | "internal";
+  error:
+    | "consent_required"
+    | "unauthorized"
+    | "bad_request"
+    | "conflict"
+    | "internal";
 }

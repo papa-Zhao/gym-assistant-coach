@@ -15,4 +15,6 @@ export interface AppDeps {
   verifyLineIdToken: VerifyLineIdToken;
   sessionSecret: Uint8Array;
   corsOrigin: string;
+  /** Current time; injectable so tests can pin the Taipei date. */
+  now: () => Date;
 }
