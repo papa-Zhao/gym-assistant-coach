@@ -9,7 +9,11 @@
 - `packages/shared` 放純函式：估算 1RM（Epley 公式）、漸進超負荷建議、本週範圍（台北時區的週一到週日）、訓練量。
 - `api` 新增 7 張表（spec §5 的 5 張，加上「本次訓練的動作清單」與「有氧紀錄」），以及動作庫種子資料、訓練 API。
 - LIFF 實作開始畫面、訓練進行中畫面、結束摘要。
-- 個人最佳紀錄的恭喜訊息：LIFF 結束訓練時用 `liff.sendMessages` 以使用者身分送出固定文字「完成今天的訓練」。這會觸發 webhook 並取得 reply token，bot 再用這個 reply token 回覆摘要與恭喜，不消耗 push 額度（spec §6.4）。
+- 訓練完成通知（含個人最佳紀錄恭喜）用 **push 訊息**（2026-10-20 使用者決定可消耗 push 額度）：
+  - LIFF 呼叫 `api` 的 finish 後，`api` 以自己的服務帳號取得 Google ID token，呼叫 `bot` 的 `/internal/notify/workout-finished`
+  - `bot` 驗證 token 後 push Flex 給使用者
+  - 只有 `bot` 持有 LINE token，維持原本的職責分工
+  - 通知是盡力而為：push 失敗（例如月額度用完）時，結束訓練仍成功，摘要照樣顯示在 LIFF
 
 **Tech Stack:** 沿用現有技術，不新增套件。有兩個新的 migration（0003 建表、0004 動作庫種子）。
 
@@ -65,7 +69,7 @@
 1. **中途關閉 LIFF 再打開**：要回到同一個進行中的訓練，已記錄的組都還在。由 Task 4、Task 6 測試涵蓋。
 2. **第一次做某個動作**：不顯示「上次」、不建議加重、不算 PR，畫面也不能出錯。由 Task 1、Task 4 測試涵蓋。
 3. **自體重量（重量 0）與有氧動作**：可以記錄，但不參與 1RM、PR 與訓練量；有氧只計入有氧分鐘數。由 Task 1、Task 4 測試涵蓋。
-4. **在 LINE 以外的瀏覽器開啟，`sendMessages` 無法使用**：結束訓練仍要成功，恭喜改顯示在 LIFF 畫面上。由 Task 6 測試涵蓋。
+4. **push 失敗（額度用完、bot 暫時無法連線、逾時）**：結束訓練仍要成功並回傳摘要，`notified` 為 false；不得重試到使用者重複收到。由 Task 4、Task 5 測試涵蓋。
 5. **刪除範本或自訂動作**：只能刪除自己的；刪除已用於歷史紀錄的自訂動作時，不能破壞歷史資料，改成封存。由 Task 3 測試涵蓋。
 
 ---
@@ -79,7 +83,9 @@
 | `apps/api/src/workouts/repo.ts` | 訓練、組、範本的存取 |
 | `apps/api/src/workouts/exercise-routes.ts`、`template-routes.ts`、`session-routes.ts` | LIFF 用的 API |
 | `apps/api/src/internal/routes.ts`（修改） | 今日總覽的訓練摘要、訓練完成摘要 |
-| `apps/bot/app/handlers.py`、`messages.py`、`api_client.py`（修改） | 「完成今天的訓練」的回覆 |
+| `apps/api/src/notify/bot.ts` | api→bot 的通知 client（Google ID token） |
+| `apps/bot/app/internal.py`、`messages.py`、`line_replier.py`（修改） | 驗證 api 的 token 並 push 訓練完成 Flex |
+| `infra/run.tf`（修改） | api 與 bot 互相呼叫所需的環境變數 |
 | `apps/liff/src/pages/workout/*` | 開始畫面、訓練進行中、動作選擇器、結束摘要 |
 | `apps/liff/src/pages/Records.tsx`（修改） | 訓練卡片改為可用 |
 
@@ -167,7 +173,7 @@
     - `ended_at timestamptz`
     - `note text`
     - `template_id uuid`，references templates，on delete set null
-    - `celebrated_at timestamptz`
+    - `notified_at timestamptz`：push 成功後寫入，避免重複通知
     - 部分唯一索引：`(user_id)`，`where ended_at is null`，保證只有一個進行中的訓練
   - `workout_session_items`（spec 沒有，本計畫新增）：
     - `session_id uuid`，cascade
@@ -221,7 +227,7 @@
   - 範本：`listTemplates`、`createTemplateFromSession(db, userId, sessionId, name)`、`deleteTemplate`
   - 訓練進行中：`getActiveSession(db, userId, today)`、`startSession(db, userId, today, templateId?)`、`addItem`、`upsertSet`、`deleteSet`、`upsertCardio`、`deleteCardio`
   - `upsertSet` 只接受重訓動作，`upsertCardio` 只接受有氧動作；用錯種類時丟出錯誤，由 route 回 400
-  - 結束與統計：`finishSession(db, userId, sessionId) → FinishSummary`、`weekStats(db, userId, from, to)`、`latestUncelebrated(db, userId)`、`markCelebrated`、`todayWorkoutSummary(db, userId, today)`
+  - 結束與統計：`finishSession(db, userId, sessionId) → FinishSummary`、`weekStats(db, userId, from, to)`、`markNotified(db, sessionId)`、`todayWorkoutSummary(db, userId, today)`
   - `getActiveSession` 的每個 item 都附上次的組與建議：
     - 上次 = 同一動作最近一次已完成訓練的組
     - 建議 = `overloadHint`
@@ -243,7 +249,6 @@
   - `upsert set overwrites same index`
   - `finish computes volume and PRs, first-time not PR, bodyweight ignored`
   - `week stats counts completed sets by primary muscle within Mon–Sun`
-  - `latestUncelebrated then markCelebrated`
   - `data is isolated per user`
 - [ ] **Step 3: 執行** `npm test -w @gac/api`。Expected：FAIL。
 - [ ] **Step 4: 實作。**
@@ -315,15 +320,20 @@
     - 值必須在 `CARDIO_LIMITS` 範圍內；對重訓動作呼叫時回 400
   - `DELETE /workouts/:id/cardio/:exerciseId/:entryIndex` → `ActiveSession`
   - `POST /workouts/:id/finish` → `FinishSummary`
-    - 回傳 `{ sessionId, volumeKg, exerciseCount, setCount, cardioMinutes, prs: [{ exerciseId, nameZh, nameEn, e1rm, weightKg, reps }] }`
+    - 回傳 `{ sessionId, volumeKg, exerciseCount, setCount, cardioMinutes, prs: [{ exerciseId, nameZh, nameEn, e1rm, weightKg, reps }], notified: boolean }`
     - 至少要有一組重訓或一筆有氧，否則回 409 `conflict`
   - `GET /workouts/week` → `WeekStats`：`{ from, to, sessions, setsByMuscle: Record<MuscleGroup, number>, cardioMinutes }`
   - 不是自己的訓練一律回 404
+- 通知：
+  - `AppDeps` 新增 `notifyWorkoutFinished: (lineUserId: string, summary: FinishSummary, templateName: string | null) => Promise<void>`
+  - finish 在交易提交後呼叫它，並設 5 秒逾時；成功就 `markNotified` 並回 `notified: true`，失敗或逾時就回 `notified: false`，只記錄錯誤名稱
+  - 已通知過的訓練不會再通知（finish 已結束的訓練回 409）
+  - 正式實作 `createBotNotifier(botUrl, audience)`（`apps/api/src/notify/bot.ts`）：
+    - 用 `google-auth-library` 的 `GoogleAuth().getIdTokenClient(audience)` 取得 ID token
+    - `POST {botUrl}/internal/notify/workout-finished`，body `{ lineUserId, summary, templateName }`
+    - 非 2xx 一律 reject
+  - `loadConfig` 新增必填 `BOT_URL`（https）與 `BOT_AUDIENCE`；`.github/workflows/ci.yml` 的 images job 要補上假值，否則容器啟動失敗
 - bot（需服務 token）：
-  - `POST /internal/workouts/celebrate`
-    - body：`{ lineUserId }`
-    - 回傳最近一次今天完成、而且還沒恭喜過的訓練摘要（含 PR），並標記為已恭喜
-    - 沒有的話回 `{ summary: null }`
   - 修改 `/internal/users/today`：`workoutSummary` 改為今天已完成訓練的摘要
     - 格式：`"{範本名稱或「訓練」}・{n} 個動作・{volume} kg"`；有有氧時再加「・有氧 {m} 分鐘」；只有有氧時省略訓練量
     - 今天沒有訓練時為 null
@@ -339,51 +349,60 @@
   - `week stats after finish`
   - `cardio entry recorded, out-of-range is 400, wrong kind is 400`
   - `finish with only cardio succeeds and reports cardio minutes`
-  - `celebrate returns summary once then null`
+  - `finish notifies bot with summary and sets notified true`
+  - `notifier failure or timeout still finishes with notified false`
+  - `finishing an already finished session is 409 and does not notify again`
+  - `createBotNotifier posts with ID token and rejects non-2xx`（fetch 與 token client 用假的）
+  - `loadConfig requires BOT_URL and BOT_AUDIENCE`
   - `today summary shows workout after finish`
 - [ ] **Step 2: 執行測試**。Expected：FAIL。
 - [ ] **Step 3: 實作。**
 - [ ] **Step 4: 執行** `npm test && npm run typecheck`，以及 lint。Expected：PASS。
 - [ ] **Step 5: Commit** `feat(api): add workout session endpoints and summaries`
 
-### Task 5: bot「完成今天的訓練」回覆
+### Task 5: bot 訓練完成推播
 
 **Files:**
 
-- Modify: `apps/bot/app/handlers.py`、`messages.py`、`api_client.py`
-- Test: `apps/bot/tests/test_webhook.py`（新增案例）
+- Create: `apps/bot/app/internal.py`、`apps/bot/tests/test_internal.py`
+- Modify: `apps/bot/app/handlers.py`（掛上 internal router）、`settings.py`、`messages.py`、`line_replier.py`
 
 **Interfaces:**
 
-- Consumes: Task 4 的 `/internal/workouts/celebrate`
+- Consumes: Task 4 的通知請求
 - Produces:
-  - 已同意的使用者傳來的文字，在 NFKC 正規化並去掉頭尾空白後，**完全等於**「完成今天的訓練」時，呼叫 `celebrate`
-    - 有摘要時，回覆 Flex `workout_done`
-    - 沒有摘要時，回覆「今天還沒有完成的訓練紀錄喔。」
-  - `messages.workout_done(summary, liff_id)`：
+  - `POST /internal/notify/workout-finished`
+    - 驗證 `Authorization: Bearer <Google ID token>`：用 `google.oauth2.id_token.verify_oauth2_token(token, Request(), audience=BOT_AUDIENCE)`，且 `email == API_SA_EMAIL`、`email_verified` 為 true；不符合回 401，不讀 body
+    - body：`{ lineUserId, summary, templateName }`；`lineUserId` 必須符合 `^U[0-9a-f]{32}$`，否則回 400
+    - 呼叫 `LineReplier.push(line_user_id, [workout_done(...)])`；成功回 204，LINE 回錯誤（例如額度用完）回 502
+    - 不記錄 id、token 或內容，只記錄狀態碼
+  - `Settings` 新增 `BOT_AUDIENCE`、`API_SA_EMAIL`（與其他設定一樣延遲載入，`/health` 不需要）
+  - `LineReplier.push(user_id, messages)`：用 `MessagingApi.push_message`
+  - `messages.workout_done(summary, template_name, liff_id)`：
     - 標題「今天辛苦了！」
     - 內文：動作數、組數、總訓練量；有有氧時加「有氧 {m} 分鐘」
     - 每個 PR 一行，例如「新紀錄：槓鈴深蹲 估算 1RM 116.7 kg（100 kg × 5）」，用 accent-soft 色塊標示
     - 按鈕「看今天的總覽」：postback `action=today`
     - `altText`：「訓練完成」
-  - 這個文字不是身體數據指令，也不是一般訊息，要在身體數據指令之前判斷。
 
 - [ ] **Step 1: 寫失敗的測試**：
-  - `test_workout_done_text_replies_summary_with_prs`
-  - `test_workout_done_without_summary`
-  - `test_workout_done_before_consent_replies_welcome`
-  - `test_workout_done_flex_is_valid_for_sdk`（用 `_to_sdk` 驗證）
+  - `test_notify_without_token_is_401_and_does_not_push`
+  - `test_notify_with_wrong_service_account_is_401`
+  - `test_notify_pushes_workout_done_flex`
+  - `test_notify_push_failure_returns_502`
+  - `test_notify_rejects_bad_line_user_id`
+  - `test_workout_done_flex_is_valid_for_sdk`（用 `_to_sdk` 驗證，含 PR 與只有有氧兩種情況）
 - [ ] **Step 2: 執行測試**。Expected：FAIL。
 - [ ] **Step 3: 實作。**
 - [ ] **Step 4: 執行** `uv run pytest -q && uv run ruff check . && uv run ruff format --check .`。Expected：PASS。
-- [ ] **Step 5: Commit** `feat(bot): celebrate finished workouts`
+- [ ] **Step 5: Commit** `feat(bot): push workout finished notifications`
 
 ### Task 6: LIFF 訓練畫面
 
 **Files:**
 
 - Create: `apps/liff/src/pages/workout/WorkoutHome.tsx`、`ActiveWorkout.tsx`、`ExercisePicker.tsx`、`FinishSummary.tsx`（各有測試）
-- Modify: `apps/liff/src/App.tsx`（`/workout`）、`apps/liff/src/auth.ts`（在 `LiffLike` 加上 `sendMessages`）、`apps/liff/src/pages/Records.tsx`（訓練卡片）
+- Modify: `apps/liff/src/App.tsx`（`/workout`）、`apps/liff/src/pages/Records.tsx`（訓練卡片）
 
 **Interfaces（依 §10.1 設計稿 Liff-Workout）：**
 
@@ -414,9 +433,8 @@
   - 總訓練量、動作數、組數
   - 有 PR 時用 accent-soft 卡逐一列出
   - 「存成範本」：輸入名稱 →「已存成範本」
-  - 結束後呼叫 `liff.sendMessages([{ type: "text", text: "完成今天的訓練" }])`
-    - 成功：顯示「已傳到聊天室」與「回到聊天室」（`closeWindow`）
-    - 失敗或不在 LINE 內：只顯示畫面上的摘要，不顯示錯誤
+  - `notified` 為 true 時顯示「已傳到聊天室」；false 時不顯示錯誤，只顯示畫面上的摘要
+  - 按鈕「回到聊天室」（`closeWindow`）
 - **Records 頁**：訓練卡片改為可用。顯示「本週訓練 N 次」，連到 `/workout`。
 
 - [ ] **Step 1: 寫失敗的測試**（fetch 與 liff 都用假的）：
@@ -428,7 +446,7 @@
   - `picker filters by kind, muscle and equipment category; English search; adds exercise; custom exercise form`
   - `cardio card records duration and optional fields`
   - `finish requires confirm and shows PRs`
-  - `finish sends chat message; failure still shows summary`
+  - `finish shows 已傳到聊天室 only when notified`
   - `save as template`
   - `records training card links to /workout`
 - [ ] **Step 2: 執行** `npm test -w @gac/liff`。Expected：FAIL。
@@ -436,14 +454,33 @@
 - [ ] **Step 4: 執行** `npm test -w @gac/liff && npm run build -w @gac/liff && npm run typecheck`，以及 lint。Expected：PASS。
 - [ ] **Step 5: Commit** `feat(liff): record workouts`
 
-### Task 7: 上線（營運步驟，每一步對外動作都先經使用者確認）
+### Task 7: 基礎設施（api 與 bot 互相呼叫）
 
-- [ ] **Step 1: 使用者在 LINE Developers 的 LIFF app 加上 `chat_message.write` scope。** 這是使用者自己操作的步驟；沒有這個 scope，`sendMessages` 會失敗，但結束訓練仍可完成。
+**Files:**
+
+- Modify: `infra/run.tf`、`infra/tests/core.tftest.hcl`
+
+**Interfaces:**
+
+- `local.bot_url = "https://bot-${data.google_project.this.number}.${var.region}.run.app"`（和 `api_url` 相同的固定網址格式）
+- api 新增 env：`BOT_URL = local.bot_url`、`BOT_AUDIENCE = "gac-bot-internal"`
+- bot 新增 env：`BOT_AUDIENCE = "gac-bot-internal"`、`API_SA_EMAIL = api-runtime 服務帳號的 email`
+- 不需要新的 IAM：bot 是公開服務，驗證在程式內進行（與 api 的內部端點相同）
+
+- [ ] **Step 1: 寫失敗的 terraform test**：api 有 `BOT_URL`（以 `https://bot-` 開頭）與 `BOT_AUDIENCE`；bot 有 `API_SA_EMAIL` 與 `BOT_AUDIENCE`
+- [ ] **Step 2: 執行** `terraform test`（scratch `TF_DATA_DIR`、`init -backend=false`）。Expected：FAIL。
+- [ ] **Step 3: 實作。**
+- [ ] **Step 4: 執行** `terraform fmt -check -recursive && terraform validate && terraform test`。Expected：PASS。
+- [ ] **Step 5: Commit** `feat(infra): wire api to bot notifications`
+
+### Task 8: 上線（營運步驟，每一步對外動作都先經使用者確認）
+
+- [ ] **Step 1: 合併前先 `terraform apply`。** 新版 api 啟動時需要 `BOT_URL`、`BOT_AUDIENCE`，所以必須先套用；舊版程式會忽略多出來的環境變數。先 plan 給使用者看，同意後才 apply。
 - [ ] **Step 2: 開 PR、等 CI 綠燈。** 經使用者同意後合併；部署會跑 migration 0003 與 0004。
 - [ ] **Step 3: 部署後從外部確認。** `OPTIONS /templates/x` 的 DELETE 預檢通過；`/workout` 頁回 200。
 - [ ] **Step 4: 手機驗收：**
   1. 空白開始，加兩個動作，各記兩組，結束
-  2. 聊天室收到「今天辛苦了！」
+  2. 聊天室收到 push 的「今天辛苦了！」
   3. 存成範本
   4. 再用範本開始一次，看到「上次」與建議；加重後結束，收到 PR 恭喜
   5. 今日總覽顯示訓練摘要
