@@ -24,6 +24,7 @@ export interface ApiError {
     | "consent_required"
     | "unauthorized"
     | "bad_request"
+    | "not_found"
     | "conflict"
     | "internal";
 }

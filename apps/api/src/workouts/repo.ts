@@ -1,4 +1,5 @@
 import {
+  EQUIPMENT,
   MUSCLE_GROUPS,
   bestE1RM,
   equipmentCategory,
@@ -8,6 +9,7 @@ import {
   type ActiveSession,
   type CardioEntry,
   type Equipment,
+  type EquipmentCategory,
   type Exercise,
   type ExerciseKind,
   type FinishSummary,
@@ -43,7 +45,11 @@ import {
 import type { Db } from "../users/repo";
 
 export type WorkoutErrorCode =
-  "not_found" | "already_finished" | "session_finished" | "wrong_kind";
+  | "not_found"
+  | "already_finished"
+  | "session_finished"
+  | "wrong_kind"
+  | "not_finished";
 
 /** Typed failure so routes can map it to 404 / 409 / 400. */
 export class WorkoutError extends Error {
@@ -81,7 +87,12 @@ const visibleTo = (userId: string) =>
 export async function listExercises(
   db: Db,
   userId: string,
-  opts: { q?: string; muscle?: MuscleGroup } = {},
+  opts: {
+    q?: string;
+    muscle?: MuscleGroup;
+    category?: EquipmentCategory;
+    kind?: ExerciseKind;
+  } = {},
 ): Promise<Exercise[]> {
   const conds = [visibleTo(userId), isNull(exercises.archivedAt)];
   const q = opts.q?.trim();
@@ -95,6 +106,16 @@ export async function listExercises(
     );
   }
   if (opts.muscle) conds.push(eq(exercises.muscleGroup, opts.muscle));
+  if (opts.kind) conds.push(eq(exercises.kind, opts.kind));
+  if (opts.category) {
+    const category = opts.category;
+    conds.push(
+      inArray(
+        exercises.equipment,
+        EQUIPMENT.filter((e) => equipmentCategory(e) === category),
+      ),
+    );
+  }
   const rows = await db
     .select()
     .from(exercises)
@@ -246,9 +267,13 @@ export async function createTemplateFromSession(
   userId: string,
   sessionId: string,
   name: string,
+  opts: { requireFinished?: boolean } = {},
 ): Promise<Template> {
   const id = await db.transaction(async (tx) => {
-    await requireSession(tx, userId, sessionId);
+    const session = await requireSession(tx, userId, sessionId);
+    if (opts.requireFinished && session.endedAt === null) {
+      throw new WorkoutError("not_finished");
+    }
     const items = await tx
       .select({ item: workoutSessionItems, kind: exercises.kind })
       .from(workoutSessionItems)

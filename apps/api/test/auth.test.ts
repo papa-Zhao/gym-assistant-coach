@@ -153,6 +153,23 @@ describe("auth", () => {
       .map((m) => m.trim());
     expect(methods).toContain("PUT");
   });
+
+  it("CORS preflight allows DELETE for the LIFF origin", async () => {
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/templates/x",
+      headers: {
+        origin: ORIGIN,
+        "access-control-request-method": "DELETE",
+        "access-control-request-headers": "authorization",
+      },
+    });
+    expect(res.headers["access-control-allow-origin"]).toBe(ORIGIN);
+    const methods = String(res.headers["access-control-allow-methods"])
+      .split(",")
+      .map((m) => m.trim());
+    expect(methods).toContain("DELETE");
+  });
 });
 
 describe("error handling", () => {
