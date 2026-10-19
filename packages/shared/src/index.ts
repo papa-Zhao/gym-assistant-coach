@@ -10,3 +10,5 @@ export interface HealthResponse {
 
 export * from "./tokens";
 export * from "./auth";
+export * from "./targets";
+export * from "./profile";
