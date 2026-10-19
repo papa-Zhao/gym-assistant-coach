@@ -82,6 +82,15 @@ run "core" {
 run "service_env" {
   command = plan
 
+  override_resource {
+    target          = google_service_account.api_runtime
+    override_during = plan
+    values = {
+      email = "api-runtime@test-project.iam.gserviceaccount.com"
+      name  = "projects/test-project/serviceAccounts/api-runtime@test-project.iam.gserviceaccount.com"
+    }
+  }
+
   assert {
     condition = anytrue([
       for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
@@ -120,5 +129,37 @@ run "service_env" {
       e.name == "CORS_ORIGIN" && e.value == "https://test-project-liff.web.app"
     ])
     error_message = "api CORS_ORIGIN must be the LIFF site origin without a trailing slash."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "BOT_URL" && startswith(e.value, "https://bot-")
+    ])
+    error_message = "api BOT_URL must start with https://bot-."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "BOT_AUDIENCE" && e.value == "gac-bot-internal"
+    ])
+    error_message = "api must set BOT_AUDIENCE to gac-bot-internal."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["bot"].template[0].containers[0].env :
+      e.name == "BOT_AUDIENCE" && e.value == "gac-bot-internal"
+    ])
+    error_message = "bot must set BOT_AUDIENCE to gac-bot-internal."
+  }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["bot"].template[0].containers[0].env :
+      e.name == "API_SA_EMAIL" && e.value == "api-runtime@test-project.iam.gserviceaccount.com"
+    ])
+    error_message = "bot API_SA_EMAIL must be the api runtime service account email."
   }
 }
