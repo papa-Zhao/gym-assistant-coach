@@ -686,12 +686,22 @@ export async function finishSession(
   sessionId: string,
 ): Promise<FinishSummary> {
   return db.transaction(async (tx) => {
-    const session = await requireSession(tx, userId, sessionId);
-    if (session.endedAt !== null) throw new WorkoutError("already_finished");
-    await tx
+    // Atomic claim: only one concurrent finish can flip ended_at.
+    const claimed = await tx
       .update(workoutSessions)
       .set({ endedAt: new Date() })
-      .where(eq(workoutSessions.id, sessionId));
+      .where(
+        and(
+          eq(workoutSessions.id, sessionId),
+          eq(workoutSessions.userId, userId),
+          isNull(workoutSessions.endedAt),
+        ),
+      )
+      .returning({ id: workoutSessions.id });
+    if (claimed.length === 0) {
+      await requireSession(tx, userId, sessionId); // not_found if foreign
+      throw new WorkoutError("already_finished");
+    }
 
     const mine = await tx
       .select({ set: workoutSets, ex: exercises })
@@ -829,6 +839,8 @@ export async function markNotified(db: Db, sessionId: string): Promise<void> {
 
 export interface TodayWorkoutSummary {
   sessions: number;
+  templateName: string | null;
+  exerciseCount: number;
   setCount: number;
   volumeKg: number;
   cardioMinutes: number;
@@ -841,30 +853,52 @@ export async function todayWorkoutSummary(
   today: string,
 ): Promise<TodayWorkoutSummary | null> {
   const sessions = await db
-    .select({ id: workoutSessions.id })
+    .select({
+      id: workoutSessions.id,
+      templateName: workoutTemplates.name,
+    })
     .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
     .where(
       and(
         eq(workoutSessions.userId, userId),
         eq(workoutSessions.performedOn, today),
         isNotNull(workoutSessions.endedAt),
       ),
-    );
+    )
+    .orderBy(desc(workoutSessions.endedAt));
   if (sessions.length === 0) return null;
   const ids = sessions.map((s) => s.id);
   const sets = await db
-    .select({ weightKg: workoutSets.weightKg, reps: workoutSets.reps })
+    .select({
+      exerciseId: workoutSets.exerciseId,
+      weightKg: workoutSets.weightKg,
+      reps: workoutSets.reps,
+    })
     .from(workoutSets)
     .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
     .where(
       and(inArray(workoutSets.sessionId, ids), eq(exercises.kind, "strength")),
     );
   const cardio = await db
-    .select({ d: cardioEntries.durationMin })
+    .select({
+      exerciseId: cardioEntries.exerciseId,
+      d: cardioEntries.durationMin,
+    })
     .from(cardioEntries)
     .where(inArray(cardioEntries.sessionId, ids));
+  const names = new Set(sessions.map((s) => s.templateName));
   return {
     sessions: sessions.length,
+    // Latest session's template, or null when the day mixed templates.
+    templateName: names.size === 1 ? (sessions[0]?.templateName ?? null) : null,
+    exerciseCount: new Set([
+      ...sets.map((s) => s.exerciseId),
+      ...cardio.map((c) => c.exerciseId),
+    ]).size,
     setCount: sets.length,
     volumeKg: volume(
       sets.map((s) => ({ weightKg: Number(s.weightKg), reps: s.reps })),

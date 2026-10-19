@@ -409,6 +409,8 @@ describe("workouts repo", () => {
     const today = await todayWorkoutSummary(db, userId, "2026-10-19");
     expect(today).toEqual({
       sessions: 1,
+      templateName: null,
+      exerciseCount: 2,
       setCount: 3,
       volumeKg: 1360,
       cardioMinutes: 0,
@@ -464,5 +466,44 @@ describe("workouts repo", () => {
     expect(item?.last).toBeNull();
     await deleteTemplate(db, userId, tpl.id);
     expect(await listTemplates(db, userId)).toEqual([]);
+  });
+
+  it("finishing twice throws on the second call and today summary names the template", async () => {
+    const { db, userId, slug } = await setup();
+    const bench = slug("barbell-bench-press");
+    const s = await startSession(db, userId, "2026-10-19");
+    await upsertSet(db, userId, s.id, bench.id, {
+      setIndex: 1,
+      weightKg: 60,
+      reps: 8,
+    });
+    const tpl = await createTemplateFromSession(db, userId, s.id, "推日");
+    await finishSession(db, userId, s.id);
+    await expect(finishSession(db, userId, s.id)).rejects.toMatchObject({
+      code: "already_finished",
+    });
+    const t1 = await startSession(db, userId, "2026-10-19", tpl.id);
+    await upsertCardio(db, userId, t1.id, slug("jump-rope").id, {
+      entryIndex: 1,
+      durationMin: 5,
+    });
+    await finishSession(db, userId, t1.id);
+    // mixed (blank + template) sessions on one day
+    expect(await todayWorkoutSummary(db, userId, "2026-10-19")).toMatchObject({
+      sessions: 2,
+      templateName: null,
+      exerciseCount: 2,
+    });
+    const t2 = await startSession(db, userId, "2026-10-20", tpl.id);
+    await upsertSet(db, userId, t2.id, bench.id, {
+      setIndex: 1,
+      weightKg: 60,
+      reps: 8,
+    });
+    await finishSession(db, userId, t2.id);
+    expect(await todayWorkoutSummary(db, userId, "2026-10-20")).toMatchObject({
+      templateName: "推日",
+      exerciseCount: 1,
+    });
   });
 });
