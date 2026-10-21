@@ -1,8 +1,12 @@
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SEED = fileURLToPath(
-  new URL("../../../db/migrations/0004_seed_exercises.sql", import.meta.url),
+// Not `new URL(path, import.meta.url)`: Vite rewrites that form into an asset
+// URL under vitest, which fileURLToPath rejects.
+const SEED = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../db/migrations/0004_seed_exercises.sql",
 );
 
 /** Built-in exercises from the seed migration. Dev tooling and tests only. */

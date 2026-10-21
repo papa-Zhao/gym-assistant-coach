@@ -1,8 +1,9 @@
-import type { MuscleGroup } from "@gac/shared";
+import { MUSCLE_GROUPS, type MuscleGroup } from "@gac/shared";
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ExerciseIllustration } from "./ExerciseIllustration";
-import { POSES, poseFor } from "./poses";
+import { parseSeed } from "../../scripts/seed";
+import { FALLBACK_BY_MUSCLE, POSES, poseFor } from "./poses";
 import type { Pose } from "./types";
 
 const strength = (slug: string | null, muscleGroup: MuscleGroup = "chest") => ({
@@ -166,6 +167,38 @@ describe("ExerciseIllustration", () => {
       "jump-rope",
     ];
     for (const slug of slugs) expect(POSES[slug], slug).toBeDefined();
+  });
+
+  it("every seeded exercise has a pose", () => {
+    const seeded = parseSeed().map((e) => e.slug);
+    expect(seeded).toHaveLength(57);
+    for (const slug of seeded) expect(POSES[slug], slug).toBeDefined();
+  });
+
+  it("POSES has no slug outside the seed", () => {
+    const seeded = new Set(parseSeed().map((e) => e.slug));
+    for (const slug of Object.keys(POSES))
+      expect(seeded.has(slug), slug).toBe(true);
+  });
+
+  it("every muscle group fallback points at an existing pose", () => {
+    for (const group of MUSCLE_GROUPS)
+      expect(POSES[FALLBACK_BY_MUSCLE[group]], group).toBeDefined();
+  });
+
+  it("each muscle group borrows its representative exercise", () => {
+    expect(FALLBACK_BY_MUSCLE).toEqual({
+      chest: "barbell-bench-press",
+      back: "lat-pulldown",
+      shoulders: "overhead-press",
+      biceps: "dumbbell-curl",
+      triceps: "triceps-pushdown",
+      quads: "barbell-back-squat",
+      hamstrings: "romanian-deadlift",
+      glutes: "barbell-hip-thrust",
+      calves: "standing-calf-raise",
+      core: "plank",
+    });
   });
 
   it("pose paths use only allowed commands", () => {
