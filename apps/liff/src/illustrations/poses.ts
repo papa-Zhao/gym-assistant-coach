@@ -374,9 +374,9 @@ export const POSES: Record<string, Pose> = {
   },
   "goblet-squat": {
     equipment: ["M8 100 L108 100"],
-    load: ["M64 50 L64 62 M59.5 50 L68.5 50 M59.5 62 L68.5 62"],
-    head: [54, 44],
-    body: "M50 51 L40 78 M40 78 L63 73 L60 96 M48.2 55.7 L55 69 L62 57",
+    load: ["M68 40 L68 52 M63.5 40 L72.5 40 M63.5 52 L72.5 52"],
+    head: [48, 43],
+    body: "M46 50 L40 78 M40 78 L63 73 L60 96 M45.2 54 L57 63 L64 52",
     arrow: "M92 86 L92 66 M86 72 L92 66 L98 72",
   },
   "bodyweight-squat": {
@@ -412,10 +412,10 @@ export const POSES: Record<string, Pose> = {
   "seated-leg-curl": {
     equipment: [
       "M32 50 L32 102",
-      "M32 80 L66 80",
-      "M50 80 L50 102",
+      "M32 80 L58 80",
+      "M44 80 L44 102",
       "M56 66 L76 66",
-      "M51.5 91.5 A3 3 0 1 0 57.5 91.5 A3 3 0 1 0 51.5 91.5",
+      "M52 92 A3 3 0 1 0 58 92 A3 3 0 1 0 52 92",
     ],
     head: [42, 39],
     body: "M42 46 L44 74 M44 74 L68 74 L60 95 M43 51 L37 64 L35 78",
@@ -423,8 +423,8 @@ export const POSES: Record<string, Pose> = {
   },
   "lying-leg-curl": {
     equipment: [
-      "M30 77 L92 77",
-      "M40 77 L40 102",
+      "M38 77 L92 77",
+      "M44 77 L44 102",
       "M84 77 L84 102",
       "M18 97 L30 97",
       "M81.5 47.5 A3 3 0 1 0 87.5 47.5 A3 3 0 1 0 81.5 47.5",
@@ -435,16 +435,16 @@ export const POSES: Record<string, Pose> = {
   },
   "romanian-deadlift": {
     equipment: [],
-    load: ["M49.5 76 L74.5 76", "M52.5 68 L52.5 84", "M71.5 68 L71.5 84"],
-    head: [71, 36.5],
-    body: "M64 42 L40 56 M40 56 L44 78 L42 100 M61.4 43.5 L62 59 L62 74",
+    load: ["M54 72 L74 72", "M57.5 65 L57.5 79", "M70.5 65 L70.5 79"],
+    head: [67, 34],
+    body: "M61 39 L40 57 M40 57 L51 78 L50 100 M58.3 41.3 L61.4 56.8 L64 72",
     arrow: "M96 72 L96 50 M90 56 L96 50 L102 56",
   },
   "dumbbell-romanian-deadlift": {
     equipment: [],
-    load: ["M55 76 L69 76 M55 71.5 L55 80.5 M69 71.5 L69 80.5"],
-    head: [71, 36.5],
-    body: "M64 42 L40 56 M40 56 L44 78 L42 100 M61.4 43.5 L62 59 L62 74",
+    load: ["M58 72 L72 72 M58 67.5 L58 76.5 M72 67.5 L72 76.5"],
+    head: [67, 34],
+    body: "M61 39 L40 57 M40 57 L51 78 L50 100 M58.3 41.3 L61.4 56.8 L64 72",
     arrow: "M96 72 L96 50 M90 56 L96 50 L102 56",
   },
   "barbell-hip-thrust": {
@@ -454,9 +454,9 @@ export const POSES: Record<string, Pose> = {
       "M32 76 L32 92",
       "M8 92 L108 92",
     ],
-    load: ["M51.5 51 L76.5 51", "M54.5 45 L54.5 57", "M73.5 45 L73.5 57"],
+    load: ["M56 53 L81 53", "M59 48 L59 58", "M78 48 L78 58"],
     head: [25, 66],
-    body: "M32 70 L60 64 M60 64 L83 66 L84 89 M38 68.5 L47.5 57.5 L59 50",
+    body: "M32 70 L60 64 M60 64 L83 66 L84 89 M37 68.9 L45 57 L58 52.5",
     arrow: "M100 64 L100 42 M94 48 L100 42 L106 48",
   },
   "glute-bridge": {
@@ -468,11 +468,11 @@ export const POSES: Record<string, Pose> = {
   "kettlebell-swing": {
     equipment: [],
     load: [
-      "M77.5 44 A5.5 5.5 0 1 0 88.5 44 A5.5 5.5 0 1 0 77.5 44",
-      "M74 39 L80 37",
+      "M75.5 48 A5 5 0 1 0 85.5 48 A5 5 0 1 0 75.5 48",
+      "M72 43.5 L77 44.5",
     ],
-    head: [44, 24],
-    body: "M44 31 L44 59 M44 59 L47 81 L47 103 M44 59 L41 81 L39 103 M44 37 L58 41 L72 43",
+    head: [41, 24],
+    body: "M42 31 L46 59 M46 59 L50 81 L48 103 M46 59 L43 81 L42 103 M42.6 36 L57 41 L72 43.5",
     arrow: "M84 76 L98 62 M98 70.5 L98 62 L89.5 62",
   },
   "cable-kickback": {
@@ -504,9 +504,9 @@ export const POSES: Record<string, Pose> = {
   },
   "smith-machine-calf-raise": {
     equipment: ["M10 6 L10 106", "M106 6 L106 106", "M40 106 L76 106"],
-    load: ["M10 31 L106 31"],
+    load: ["M10 33 L106 33"],
     head: [58, 22],
-    body: "M58 29 L58 57 M58 57 L53 80 L52 100 M58 57 L63 80 L64 100 M52 38 L40 46 L38 32 M64 38 L76 46 L78 32",
+    body: "M58 29 L58 57 M58 57 L53 80 L52 100 M58 57 L63 80 L64 100 M52 39 L40 47 L38 33 M64 39 L76 47 L78 33",
     arrow: "M92 96 L92 74 M86 80 L92 74 L98 80",
   },
   "bodyweight-calf-raise": {
