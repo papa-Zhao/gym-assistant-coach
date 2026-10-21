@@ -254,6 +254,22 @@ button.text-button { background: transparent; color: var(--color-primary); }
   border-radius: var(--radius-sm);
   background: var(--color-primary-soft);
 }
+.rest-pinned {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-3) var(--space-4) 0;
+  background: var(--color-bg);
+}
+.rest-pinned .rest-timer { margin-bottom: 0; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .rest-label { font-variant-numeric: tabular-nums; }
 .rest-actions { display: flex; gap: var(--space-2); }
 .picker-list .row { align-items: flex-start; gap: var(--space-2); }

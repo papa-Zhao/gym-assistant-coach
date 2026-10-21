@@ -18,13 +18,19 @@ export function formatRest(totalSec: number): string {
 interface RestTimerProps {
   /** Latest completedAt (epoch ms) across the session's strength sets. */
   lastCompletedAt: number;
+  /** The completedAt whose countdown the user skipped, if any. */
+  skippedFor: number | null;
+  onSkip: (lastCompletedAt: number) => void;
 }
 
 /** Counts down from the last completed set; re-derived from the server data. */
-export function RestTimer({ lastCompletedAt }: RestTimerProps) {
+export function RestTimer({
+  lastCompletedAt,
+  skippedFor,
+  onSkip,
+}: RestTimerProps) {
   const [now, setNow] = useState(() => Date.now());
   const [target, setTarget] = useState(getRestSec);
-  const [skippedFor, setSkippedFor] = useState<number | null>(null);
   const wasResting = useRef(false);
 
   useEffect(() => {
@@ -65,9 +71,11 @@ export function RestTimer({ lastCompletedAt }: RestTimerProps) {
 
   return (
     <div className="rest-timer" role="group" aria-label="休息計時">
-      <strong className="rest-label" role="status">
-        {label}
-      </strong>
+      <strong className="rest-label">{label}</strong>
+      {/* Announce only the end of the rest, not every tick. */}
+      <span className="sr-only" role="status">
+        {!resting && -remainingMs < END_NOTICE_MS ? "休息結束" : ""}
+      </span>
       <div className="rest-actions">
         <button
           type="button"
@@ -88,7 +96,7 @@ export function RestTimer({ lastCompletedAt }: RestTimerProps) {
         <button
           type="button"
           className="secondary mini"
-          onClick={() => setSkippedFor(lastCompletedAt)}
+          onClick={() => onSkip(lastCompletedAt)}
         >
           跳過
         </button>

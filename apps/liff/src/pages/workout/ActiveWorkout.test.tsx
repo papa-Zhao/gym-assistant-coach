@@ -455,6 +455,21 @@ describe("ActiveWorkout", () => {
     unmount();
   });
 
+  it("rest timer stays visible while picking and a skip survives the picker", async () => {
+    vi.useFakeTimers({ now: NOW });
+    setup(session([strengthItem({ sets: [doneSet(10)] })]), () => [BENCH]);
+    fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
+    expect(screen.getByText("休息 1:20")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
+    fireEvent.click(screen.getByRole("button", { name: "跳過" }));
+    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
+    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
+    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    await act(async () => {});
+  });
+
   it("next set sends restSec; first set does not", async () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
     const { calls } = setup(
@@ -531,7 +546,7 @@ describe("ActiveWorkout", () => {
     act(() => {
       vi.advanceTimersByTime(2000);
     });
-    expect(screen.getByText("休息結束")).toBeInTheDocument();
+    expect(screen.getAllByText("休息結束")[0]).toBeInTheDocument();
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(vibrate).toHaveBeenCalledWith(200);
     act(() => {
@@ -547,6 +562,6 @@ describe("ActiveWorkout", () => {
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(screen.getByText("休息結束")).toBeInTheDocument();
+    expect(screen.getAllByText("休息結束")[0]).toBeInTheDocument();
   });
 });

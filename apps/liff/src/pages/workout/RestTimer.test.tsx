@@ -18,14 +18,18 @@ describe("RestTimer", () => {
   it("clamps the target to 30–300 seconds", () => {
     vi.useFakeTimers({ now: NOW });
     window.localStorage.setItem("gac.restSec", "30");
-    render(<RestTimer lastCompletedAt={NOW} />);
+    render(
+      <RestTimer lastCompletedAt={NOW} skippedFor={null} onSkip={vi.fn()} />,
+    );
     expect(screen.getByRole("button", { name: "−15 秒" })).toBeDisabled();
     expect(screen.getByText("休息 0:30")).toBeInTheDocument();
   });
 
   it("clears its interval on unmount", () => {
     vi.useFakeTimers({ now: NOW });
-    const { unmount } = render(<RestTimer lastCompletedAt={NOW} />);
+    const { unmount } = render(
+      <RestTimer lastCompletedAt={NOW} skippedFor={null} onSkip={vi.fn()} />,
+    );
     act(() => {
       vi.advanceTimersByTime(2000);
     });
@@ -37,9 +41,30 @@ describe("RestTimer", () => {
   it("keeps the target raised past 300 disabled", () => {
     vi.useFakeTimers({ now: NOW });
     window.localStorage.setItem("gac.restSec", "300");
-    render(<RestTimer lastCompletedAt={NOW} />);
+    render(
+      <RestTimer lastCompletedAt={NOW} skippedFor={null} onSkip={vi.fn()} />,
+    );
     expect(screen.getByRole("button", { name: "+15 秒" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "−15 秒" }));
     expect(screen.getByText("休息 4:45")).toBeInTheDocument();
+  });
+
+  it("only the end of the rest is announced, not each tick", () => {
+    vi.useFakeTimers({ now: NOW });
+    window.localStorage.setItem("gac.restSec", "30");
+    render(
+      <RestTimer
+        lastCompletedAt={NOW - 28_000}
+        skippedFor={null}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("休息 0:02")).not.toHaveAttribute("role");
+    const live = screen.getByRole("status");
+    expect(live).toHaveTextContent("");
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("休息結束");
   });
 });

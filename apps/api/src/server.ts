@@ -43,7 +43,7 @@ const deps: AppDeps = {
   corsOrigin: config.corsOrigin,
   now: () => new Date(),
 };
-const app = buildApp(deps, { logger: true });
+const app = buildApp(deps, { logger: true, disableRequestLogging: true });
 
 try {
   await app.listen({ port: config.port, host: "0.0.0.0" });

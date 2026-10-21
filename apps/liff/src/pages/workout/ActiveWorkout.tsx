@@ -85,6 +85,7 @@ export function ActiveWorkout({
   onFatal,
 }: ActiveWorkoutProps) {
   const [picking, setPicking] = useState(false);
+  const [skippedFor, setSkippedFor] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -169,15 +170,27 @@ export function ActiveWorkout({
 
   const lastCompletedAt = latestCompletedAt(session);
 
+  const restTimer = lastCompletedAt !== null && (
+    <RestTimer
+      lastCompletedAt={lastCompletedAt}
+      skippedFor={skippedFor}
+      onSkip={setSkippedFor}
+    />
+  );
+
+  // The picker keeps the rest timer pinned above it.
   if (picking) {
     return (
-      <ExercisePicker
-        busy={busy}
-        error={error}
-        onPick={(ex) => void addExercise(ex)}
-        onClose={() => setPicking(false)}
-        onFatal={onFatal}
-      />
+      <>
+        {restTimer && <div className="rest-pinned">{restTimer}</div>}
+        <ExercisePicker
+          busy={busy}
+          error={error}
+          onPick={(ex) => void addExercise(ex)}
+          onClose={() => setPicking(false)}
+          onFatal={onFatal}
+        />
+      </>
     );
   }
 
@@ -187,9 +200,7 @@ export function ActiveWorkout({
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
-      {lastCompletedAt !== null && (
-        <RestTimer lastCompletedAt={lastCompletedAt} />
-      )}
+      {restTimer}
       {discarding ? (
         <ConfirmRow
           label="確認放棄訓練"
