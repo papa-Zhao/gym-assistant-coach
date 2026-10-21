@@ -537,7 +537,10 @@ export const DEFAULT_FALLBACK = "barbell-bench-press";
 export function poseFor(
   exercise: Pick<Exercise, "slug" | "kind" | "muscleGroup">,
 ): Pose {
-  const own = exercise.slug ? POSES[exercise.slug] : undefined;
+  const own =
+    exercise.slug && Object.hasOwn(POSES, exercise.slug)
+      ? POSES[exercise.slug]
+      : undefined;
   if (own) return own;
   if (exercise.kind === "cardio") return POSES[CARDIO_FALLBACK]!;
   const slug = exercise.muscleGroup

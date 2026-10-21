@@ -97,7 +97,21 @@ describe("ExerciseIllustration", () => {
 
   it("unknown slug falls back without throwing", () => {
     expect(() => html(strength("no-such-exercise"), 40)).not.toThrow();
-    expect(poseFor(strength("no-such-exercise"))).toBeDefined();
+    expect(poseFor(strength("no-such-exercise"))).toBe(
+      POSES["barbell-bench-press"],
+    );
+  });
+
+  it("custom strength exercise without muscle group uses default pose", () => {
+    expect(poseFor({ slug: null, kind: "strength", muscleGroup: null })).toBe(
+      POSES["barbell-bench-press"],
+    );
+  });
+
+  it("inherited object keys are not treated as poses", () => {
+    expect(poseFor(strength("constructor", "back"))).toBe(
+      POSES["lat-pulldown"],
+    );
   });
 
   it("every pose stays inside the canvas with 4 margin", () => {
