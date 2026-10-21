@@ -19,6 +19,20 @@ function setup(handler: Parameters<typeof fakeApi>[0]) {
 }
 
 describe("ExercisePicker", () => {
+  it("each row shows a 40px illustration", async () => {
+    setup(() => [BENCH, TREADMILL]);
+    await screen.findByText("槓鈴臥推");
+    const rows = within(screen.getByLabelText("動作列表")).getAllByRole(
+      "button",
+    );
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      const svg = row.querySelector("svg.illus");
+      expect(svg).toHaveAttribute("width", "40");
+      expect(svg).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
   it("filters by kind, muscle and equipment category; English search; adds exercise", async () => {
     const { calls, onPick } = setup(() => [BENCH]);
     expect(await screen.findByText("槓鈴臥推")).toBeInTheDocument();

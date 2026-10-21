@@ -12,6 +12,7 @@ import { apiFetch } from "../../api";
 import { shortDate } from "../../bodyMetricsView";
 import { ConfirmRow } from "./ConfirmRow";
 import { ExerciseName, ExercisePicker } from "./ExercisePicker";
+import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
 import {
   SPEC,
   describeError,
@@ -301,6 +302,7 @@ function ExerciseCard({
   return (
     <section className="card exercise-card" ref={register}>
       <div className="exercise-head">
+        <ExerciseIllustration exercise={exercise} size={64} />
         <h2 className="exercise-name">
           <ExerciseName exercise={exercise} />
         </h2>
