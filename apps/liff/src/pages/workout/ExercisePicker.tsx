@@ -182,7 +182,7 @@ export function ExercisePicker({
           {error}
         </p>
       )}
-      <section className="card list" aria-label="動作列表">
+      <section className="card list picker-list" aria-label="動作列表">
         {failed ? (
           <p className="error-text">載入動作失敗，請再試一次。</p>
         ) : results === null ? (
@@ -198,10 +198,10 @@ export function ExercisePicker({
               disabled={busy}
               onClick={() => onPick(ex)}
             >
-              <span>
+              <span className="row-name">
                 <ExerciseName exercise={ex} />
               </span>
-              <span className="badge">
+              <span className="badge row-tag">
                 {EQUIPMENT_CATEGORY_LABELS[ex.equipmentCategory]}
               </span>
             </button>

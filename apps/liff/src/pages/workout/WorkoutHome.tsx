@@ -9,6 +9,7 @@ import {
 } from "@gac/shared";
 import { apiFetch } from "../../api";
 import { ActiveWorkout } from "./ActiveWorkout";
+import { ConfirmRow } from "./ConfirmRow";
 import { FinishSummary } from "./FinishSummary";
 import { isAuthExpired } from "./fields";
 
@@ -176,27 +177,14 @@ function Home({ data, onData, onStarted, onFatal }: HomeProps) {
           <div className="template-row" key={t.id}>
             <strong>{t.name}</strong>
             {confirmId === t.id ? (
-              <div
-                className="confirm-row"
-                role="group"
-                aria-label="確認刪除範本"
-              >
-                <span>確定刪除「{t.name}」？</span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void remove(t.id)}
-                >
-                  確定
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => setConfirmId(null)}
-                >
-                  取消
-                </button>
-              </div>
+              <ConfirmRow
+                label="確認刪除範本"
+                message={`確定刪除「${t.name}」？`}
+                confirmLabel="確定"
+                busy={busy}
+                onConfirm={() => void remove(t.id)}
+                onCancel={() => setConfirmId(null)}
+              />
             ) : (
               <div className="editor-actions">
                 <button
@@ -225,8 +213,13 @@ function Home({ data, onData, onStarted, onFatal }: HomeProps) {
           {error}
         </p>
       )}
-      <button type="button" disabled={busy} onClick={() => void start()}>
-        空白開始
+      <button
+        type="button"
+        className="start-button"
+        disabled={busy}
+        onClick={() => void start()}
+      >
+        開始訓練
       </button>
     </main>
   );

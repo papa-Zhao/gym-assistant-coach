@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   EQUIPMENT_CATEGORY_LABELS,
   type ActiveSession,
@@ -10,6 +10,7 @@ import {
 } from "@gac/shared";
 import { apiFetch } from "../../api";
 import { shortDate } from "../../bodyMetricsView";
+import { ConfirmRow } from "./ConfirmRow";
 import { ExerciseName, ExercisePicker } from "./ExercisePicker";
 import {
   SPEC,
@@ -19,6 +20,7 @@ import {
   toText,
   type FieldName,
 } from "./fields";
+import { RestTimer } from "./RestTimer";
 
 interface ActiveWorkoutProps {
   session: ActiveSession;
@@ -49,9 +51,24 @@ function Elapsed({ startedAt }: { startedAt: string }) {
   }, []);
   return (
     <span className="elapsed">
-      {formatElapsed(now - Date.parse(startedAt))}
+      {`訓練 ${formatElapsed(now - Date.parse(startedAt))}`}
     </span>
   );
+}
+
+const MAX_REST_SEC = 3600;
+
+/** Latest completedAt (epoch ms) across all strength sets, or null. */
+function latestCompletedAt(session: ActiveSession): number | null {
+  let latest: number | null = null;
+  for (const item of session.items) {
+    if (isCardio(item)) continue;
+    for (const s of item.sets) {
+      const t = Date.parse(s.completedAt);
+      if (!Number.isNaN(t) && (latest === null || t > latest)) latest = t;
+    }
+  }
+  return latest;
 }
 
 function isCardio(
@@ -72,6 +89,19 @@ export function ActiveWorkout({
   const [discarding, setDiscarding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cards = useRef(new Map<string, HTMLElement>());
+  const scrollTarget = useRef<string | null>(null);
+
+  // After the picker closes and the new card renders, bring it into view.
+  useEffect(() => {
+    if (picking || scrollTarget.current === null) return;
+    const el = cards.current.get(scrollTarget.current);
+    if (!el) return;
+    scrollTarget.current = null;
+    if (typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [picking, session]);
 
   const fail = (err: unknown, fallback: string) => {
     if (isAuthExpired(err)) onFatal();
@@ -104,7 +134,10 @@ export function ActiveWorkout({
     const ok = await mutate(() =>
       send("/items", "POST", { exerciseId: exercise.id }),
     );
-    if (ok) setPicking(false);
+    if (ok) {
+      scrollTarget.current = exercise.id;
+      setPicking(false);
+    }
   };
 
   const finish = async () => {
@@ -134,6 +167,8 @@ export function ActiveWorkout({
     }
   };
 
+  const lastCompletedAt = latestCompletedAt(session);
+
   if (picking) {
     return (
       <ExercisePicker
@@ -152,21 +187,18 @@ export function ActiveWorkout({
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
+      {lastCompletedAt !== null && (
+        <RestTimer lastCompletedAt={lastCompletedAt} />
+      )}
       {discarding ? (
-        <div className="confirm-row" role="group" aria-label="確認放棄訓練">
-          <span>放棄後，這次的紀錄都會刪除。</span>
-          <button type="button" disabled={busy} onClick={() => void discard()}>
-            確定放棄
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            disabled={busy}
-            onClick={() => setDiscarding(false)}
-          >
-            取消
-          </button>
-        </div>
+        <ConfirmRow
+          label="確認放棄訓練"
+          message="放棄後，這次的紀錄都會刪除。"
+          confirmLabel="確定放棄"
+          busy={busy}
+          onConfirm={() => void discard()}
+          onCancel={() => setDiscarding(false)}
+        />
       ) : (
         <button
           type="button"
@@ -187,6 +219,11 @@ export function ActiveWorkout({
           busy={busy}
           mutate={mutate}
           send={send}
+          lastCompletedAt={lastCompletedAt}
+          register={(el) => {
+            if (el) cards.current.set(item.exercise.id, el);
+            else cards.current.delete(item.exercise.id);
+          }}
         />
       ))}
       {error && (
@@ -196,19 +233,14 @@ export function ActiveWorkout({
       )}
       <div className="bottom-bar">
         {confirming ? (
-          <div className="confirm-row" role="group" aria-label="確認結束訓練">
-            <span>確定要結束這次訓練嗎？</span>
-            <button type="button" disabled={busy} onClick={() => void finish()}>
-              確定
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setConfirming(false)}
-            >
-              取消
-            </button>
-          </div>
+          <ConfirmRow
+            label="確認結束訓練"
+            message="確定要結束這次訓練嗎？"
+            confirmLabel="確定"
+            busy={busy}
+            onConfirm={() => void finish()}
+            onCancel={() => setConfirming(false)}
+          />
         ) : (
           <>
             <button
@@ -241,15 +273,54 @@ interface CardProps {
     method: string,
     body?: unknown,
   ) => Promise<ActiveSession>;
+  /** Latest completedAt (epoch ms) across the session, for restSec. */
+  lastCompletedAt: number | null;
 }
 
-function ExerciseCard({ item, busy, mutate, send }: CardProps) {
+function ExerciseCard({
+  item,
+  busy,
+  mutate,
+  send,
+  lastCompletedAt,
+  register,
+}: CardProps & { register: (el: HTMLElement | null) => void }) {
   const { exercise, last, hint } = item;
+  const [removing, setRemoving] = useState(false);
   return (
-    <section className="card exercise-card">
-      <h2 className="exercise-name">
-        <ExerciseName exercise={exercise} />
-      </h2>
+    <section className="card exercise-card" ref={register}>
+      <div className="exercise-head">
+        <h2 className="exercise-name">
+          <ExerciseName exercise={exercise} />
+        </h2>
+        {!removing && (
+          <button
+            type="button"
+            className="text-button"
+            disabled={busy}
+            aria-label={`移除 ${exercise.nameZh}`}
+            onClick={() => setRemoving(true)}
+          >
+            移除
+          </button>
+        )}
+      </div>
+      {removing && (
+        <ConfirmRow
+          label="確認移除動作"
+          message="移除這個動作和本次的紀錄？"
+          confirmLabel="確定移除"
+          busy={busy}
+          onConfirm={() =>
+            void mutate(() => send(`/items/${exercise.id}`, "DELETE")).then(
+              (ok) => {
+                if (!ok) setRemoving(false);
+              },
+            )
+          }
+          onCancel={() => setRemoving(false)}
+        />
+      )}
       <span className="badge">
         {EQUIPMENT_CATEGORY_LABELS[exercise.equipmentCategory]}
       </span>
@@ -266,9 +337,21 @@ function ExerciseCard({ item, busy, mutate, send }: CardProps) {
         </p>
       )}
       {isCardio(item) ? (
-        <CardioSection item={item} busy={busy} mutate={mutate} send={send} />
+        <CardioSection
+          item={item}
+          busy={busy}
+          mutate={mutate}
+          send={send}
+          lastCompletedAt={lastCompletedAt}
+        />
       ) : (
-        <StrengthSection item={item} busy={busy} mutate={mutate} send={send} />
+        <StrengthSection
+          item={item}
+          busy={busy}
+          mutate={mutate}
+          send={send}
+          lastCompletedAt={lastCompletedAt}
+        />
       )}
     </section>
   );
@@ -310,22 +393,32 @@ function StrengthSection({
   busy,
   mutate,
   send,
+  lastCompletedAt,
 }: CardProps & { item: SessionItem & { sets: WorkoutSet[] } }) {
   const [drafting, setDrafting] = useState(item.sets.length === 0);
   const [editing, setEditing] = useState<number | null>(null);
   const exerciseId = item.exercise.id;
   const newIndex = nextIndex(item.sets.map((s) => s.setIndex));
 
-  const save = async (index: number, v: ParsedSet) =>
-    mutate(() =>
-      send("/sets", "PUT", {
+  // Rest is only recorded for a new set that follows an earlier one.
+  const save = async (index: number, v: ParsedSet, isNew: boolean) =>
+    mutate(() => {
+      const restSec =
+        isNew && lastCompletedAt !== null
+          ? Math.min(
+              MAX_REST_SEC,
+              Math.max(0, Math.round((Date.now() - lastCompletedAt) / 1000)),
+            )
+          : undefined;
+      return send("/sets", "PUT", {
         exerciseId,
         setIndex: index,
         weightKg: v.weightKg,
         reps: v.reps,
         ...(v.rpe === undefined ? {} : { rpe: v.rpe }),
-      }),
-    );
+        ...(restSec === undefined ? {} : { restSec }),
+      });
+    });
 
   return (
     <div className="set-grid" role="table" aria-label="組列表">
@@ -333,7 +426,7 @@ function StrengthSection({
         <span role="columnheader">組</span>
         <span role="columnheader">重量 kg</span>
         <span role="columnheader">次數</span>
-        <span role="columnheader">RPE</span>
+        <span role="columnheader">RPE 自覺強度</span>
       </div>
       {item.sets.map((s) =>
         editing === s.setIndex ? (
@@ -348,7 +441,7 @@ function StrengthSection({
             busy={busy}
             submitLabel="儲存"
             onSubmit={async (v) => {
-              if (await save(s.setIndex, v)) setEditing(null);
+              if (await save(s.setIndex, v, false)) setEditing(null);
             }}
             onCancel={() => setEditing(null)}
             onDelete={async () => {
@@ -387,7 +480,7 @@ function StrengthSection({
           busy={busy}
           submitLabel="完成這組"
           onSubmit={async (v) => {
-            if (await save(newIndex, v)) setDrafting(false);
+            if (await save(newIndex, v, true)) setDrafting(false);
           }}
         />
       ) : (
@@ -481,6 +574,7 @@ function SetEditor({
       <Err message={errors.weight} />
       <Err message={errors.reps} />
       <Err message={errors.rpe} />
+      <p className="muted set-hint">1 很輕鬆 – 10 力竭</p>
       <div className="editor-actions">
         <button type="submit" disabled={busy}>
           {submitLabel}

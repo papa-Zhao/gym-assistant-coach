@@ -54,7 +54,7 @@ describe("WorkoutHome", () => {
     expect(screen.getByText("有氧 40 分鐘")).toBeInTheDocument();
     expect(screen.getByText("推日")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "空白開始" }));
+    fireEvent.click(screen.getByRole("button", { name: "開始訓練" }));
     expect(await screen.findByText("訓練進行中")).toBeInTheDocument();
     expect(calls.at(-1)).toEqual({
       method: "POST",
