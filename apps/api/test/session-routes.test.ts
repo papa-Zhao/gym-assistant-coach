@@ -549,6 +549,25 @@ describe("workout session routes", () => {
     );
   });
 
+  it("editing a set keeps its completedAt and restSec", async () => {
+    await reset();
+    const s = await start();
+    const created = (
+      await putSet(s.id, bench.id, 1, { restSec: 75 })
+    ).json<ActiveSession>();
+    const before = (created.items[0] as { sets: { completedAt: string }[] })
+      .sets[0]?.completedAt;
+    await new Promise((r) => setTimeout(r, 20));
+    const edited = (
+      await putSet(s.id, bench.id, 1, { reps: 11 })
+    ).json<ActiveSession>();
+    expect((edited.items[0] as { sets: object[] }).sets[0]).toMatchObject({
+      reps: 11,
+      restSec: 75,
+      completedAt: before,
+    });
+  });
+
   it("finishing an already finished session is 409 and does not notify again", async () => {
     await reset();
     const s = await start();

@@ -472,6 +472,20 @@ describe("ActiveWorkout", () => {
     expect(calls[0]?.body).toMatchObject({ setIndex: 2, restSec: 100 });
   });
 
+  it("first set of a workout omits restSec", async () => {
+    const { calls } = setup(session([strengthItem()]));
+    fireEvent.change(screen.getByLabelText("第 1 組重量"), {
+      target: { value: "60" },
+    });
+    fireEvent.change(screen.getByLabelText("第 1 組次數"), {
+      target: { value: "8" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "完成這組" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.method).toBe("PUT");
+    expect(calls[0]?.body).not.toHaveProperty("restSec");
+  });
+
   it("restSec is capped at 3600 and not sent when editing", async () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
     const { calls } = setup(session([strengthItem({ sets: [doneSet(5000)] })]));

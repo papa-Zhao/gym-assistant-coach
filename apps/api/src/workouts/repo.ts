@@ -797,8 +797,8 @@ export async function upsertSet(
     reps: set.reps,
     weightKg: String(set.weightKg),
     rpe: set.rpe === undefined ? null : String(set.rpe),
-    completedAt: new Date(),
   };
+  // completedAt is set on insert only: an edit keeps the original time.
   // Omitted restSec: null on insert, the stored value kept on update.
   const restSec = set.restSec === undefined ? {} : { restSec: set.restSec };
   await db
@@ -809,6 +809,7 @@ export async function upsertSet(
       setIndex: set.setIndex,
       ...values,
       ...restSec,
+      completedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: [
