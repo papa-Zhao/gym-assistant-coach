@@ -6,9 +6,9 @@ import { configureApi } from "./api";
 const base = { onClose: vi.fn(), today: "2026-10-19" };
 
 describe("App", () => {
-  it("shows loading", () => {
+  it("shows the splash while logging in", () => {
     render(<App {...base} state={{ kind: "loading" }} pathname="/profile" />);
-    expect(screen.getByText("載入中…")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "對話教練" })).toBeInTheDocument();
   });
 
   it("renders the page for the path when ready", async () => {

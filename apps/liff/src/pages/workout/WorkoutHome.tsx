@@ -12,6 +12,7 @@ import { ActiveWorkout } from "./ActiveWorkout";
 import { ConfirmRow } from "./ConfirmRow";
 import { FinishSummary } from "./FinishSummary";
 import { isAuthExpired } from "./fields";
+import { Skeleton } from "../../components/Skeleton";
 
 interface WorkoutHomeProps {
   /** Called when the session cannot be recovered or loading failed. */
@@ -69,7 +70,7 @@ export function WorkoutHome({ onFatal, onClose }: WorkoutHomeProps) {
     case "loading":
       return (
         <main>
-          <p>載入中…</p>
+          <Skeleton layout="workout" />
         </main>
       );
     case "active":

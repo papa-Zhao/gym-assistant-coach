@@ -275,6 +275,52 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .picker-actions { margin-top: var(--space-4); }
 .chip[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-primary); font-weight: 700; }
 button.chip { color: var(--color-text); font-weight: 400; }
+.splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+.splash .splash-name {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: var(--font-size-title);
+}
+.splash p { margin: 0; }
+.splash-logo { animation: splash-breathe 2.4s ease-in-out infinite; }
+@keyframes splash-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.skeleton-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.skeleton-stack > .card + .card { margin-top: 0; }
+.skeleton-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}
+.skeleton.pill { border-radius: var(--radius-pill); }
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--color-surface), transparent);
+  opacity: 0.6;
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo, .skeleton::after { animation: none; }
+  .skeleton::after { display: none; }
+}
 button {
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-6);

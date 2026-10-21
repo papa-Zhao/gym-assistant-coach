@@ -12,6 +12,7 @@ import {
   type Targets,
 } from "@gac/shared";
 import { ApiHttpError, AuthExpiredError, apiFetch } from "../api";
+import { Skeleton } from "../components/Skeleton";
 
 const SEX_LABELS: Record<Sex, string> = { male: "男", female: "女" };
 const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
@@ -235,7 +236,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
   if (step === "loading")
     return (
       <main>
-        <p>載入中…</p>
+        <Skeleton layout="profile" />
       </main>
     );
 

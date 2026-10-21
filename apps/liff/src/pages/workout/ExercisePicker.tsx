@@ -16,6 +16,7 @@ import {
 } from "@gac/shared";
 import { apiFetch } from "../../api";
 import { isAuthExpired } from "./fields";
+import { Skeleton } from "../../components/Skeleton";
 
 interface ExercisePickerProps {
   onPick: (exercise: Exercise) => void;
@@ -186,7 +187,7 @@ export function ExercisePicker({
         {failed ? (
           <p className="error-text">載入動作失敗，請再試一次。</p>
         ) : results === null ? (
-          <p className="muted">載入中…</p>
+          <Skeleton layout="rows" />
         ) : results.length === 0 ? (
           <p className="muted">找不到符合的動作</p>
         ) : (
