@@ -141,6 +141,33 @@ describe("ExerciseIllustration", () => {
     for (const slug of slugs) expect(POSES[slug], slug).toBeDefined();
   });
 
+  it("poses cover arms, core and cardio slugs", () => {
+    const slugs = [
+      "barbell-curl",
+      "dumbbell-curl",
+      "ez-bar-curl",
+      "hammer-curl",
+      "cable-curl",
+      "triceps-pushdown",
+      "skull-crusher",
+      "close-grip-bench-press",
+      "bench-dip",
+      "overhead-triceps-extension",
+      "plank",
+      "hanging-leg-raise",
+      "cable-crunch",
+      "ab-crunch-machine",
+      "treadmill-incline-walk",
+      "outdoor-run",
+      "stair-climber",
+      "stationary-bike",
+      "rowing-machine",
+      "elliptical",
+      "jump-rope",
+    ];
+    for (const slug of slugs) expect(POSES[slug], slug).toBeDefined();
+  });
+
   it("pose paths use only allowed commands", () => {
     for (const pose of Object.values(POSES))
       for (const d of paths(pose))
