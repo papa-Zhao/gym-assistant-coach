@@ -120,6 +120,27 @@ describe("ExerciseIllustration", () => {
     }
   });
 
+  it("poses cover chest, back and shoulders slugs", () => {
+    const slugs = [
+      "incline-dumbbell-press",
+      "chest-press-machine",
+      "cable-crossover",
+      "push-up",
+      "pec-deck-fly",
+      "pull-up",
+      "barbell-row",
+      "seated-cable-row",
+      "one-arm-dumbbell-row",
+      "t-bar-row",
+      "overhead-press",
+      "dumbbell-shoulder-press",
+      "shoulder-press-machine",
+      "dumbbell-lateral-raise",
+      "face-pull",
+    ];
+    for (const slug of slugs) expect(POSES[slug], slug).toBeDefined();
+  });
+
   it("pose paths use only allowed commands", () => {
     for (const pose of Object.values(POSES))
       for (const d of paths(pose))
