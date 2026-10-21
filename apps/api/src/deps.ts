@@ -1,4 +1,5 @@
 import type { FinishSummary } from "@gac/shared";
+import type { DbStats } from "./db/timing.js";
 import type { Db } from "./users/repo";
 
 /** Verifies a Google ID token; rejects on bad signature, audience or unverified email. */
@@ -28,4 +29,6 @@ export interface AppDeps {
   now: () => Date;
   /** How long finish waits for the bot notification; defaults to 5000. */
   notifyTimeoutMs?: number;
+  /** Database stats of the request being logged; defaults to the instrumented client's counts. Injectable for tests. */
+  dbStats?: () => DbStats;
 }

@@ -2,6 +2,7 @@ import { OAuth2Client } from "google-auth-library";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { buildApp } from "./app.js";
+import { instrument } from "./db/timing.js";
 import { createLineVerifier } from "./auth/line.js";
 import { loadConfig } from "./config.js";
 import { createBotNotifier } from "./notify/bot.js";
@@ -17,7 +18,7 @@ try {
 }
 
 // postgres.js connects lazily, so /health works without a reachable database.
-const sql = postgres(config.databaseUrl, { max: 5 });
+const sql = instrument(postgres(config.databaseUrl, { max: 5 }));
 
 const googleClient = new OAuth2Client();
 const verifyServiceToken: VerifyServiceToken = async (idToken) => {

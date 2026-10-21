@@ -141,13 +141,6 @@ export const sessionRoutes =
     const uid = (req: { workoutUserId?: string }) =>
       req.workoutUserId as string;
 
-    /** Re-reads the in-progress session after a change. */
-    const current = async (userId: string): Promise<ActiveSession> => {
-      const s = await getActiveSession(db, userId, taipeiDate(now()));
-      if (!s) throw new Error("active session vanished");
-      return s;
-    };
-
     app.get(
       "/workouts/active",
       auth,
@@ -182,8 +175,12 @@ export const sessionRoutes =
       { ...auth, schema: itemSchema },
       async (req, reply) => {
         try {
-          await addItem(db, uid(req), req.params.id, req.body.exerciseId);
-          return await current(uid(req));
+          return await addItem(
+            db,
+            uid(req),
+            req.params.id,
+            req.body.exerciseId,
+          );
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -211,13 +208,12 @@ export const sessionRoutes =
           return badRequest(reply);
         }
         try {
-          await upsertSet(db, uid(req), req.params.id, exerciseId, {
+          return await upsertSet(db, uid(req), req.params.id, exerciseId, {
             setIndex,
             reps,
             weightKg,
             ...(rpe === undefined ? {} : { rpe }),
           });
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -231,14 +227,13 @@ export const sessionRoutes =
       { ...auth, schema: deleteSetSchema },
       async (req, reply) => {
         try {
-          await deleteSet(
+          return await deleteSet(
             db,
             uid(req),
             req.params.id,
             req.params.exerciseId,
             req.params.setIndex,
           );
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -269,8 +264,13 @@ export const sessionRoutes =
           return badRequest(reply);
         }
         try {
-          await upsertCardio(db, uid(req), req.params.id, exerciseId, entry);
-          return await current(uid(req));
+          return await upsertCardio(
+            db,
+            uid(req),
+            req.params.id,
+            exerciseId,
+            entry,
+          );
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -284,14 +284,13 @@ export const sessionRoutes =
       { ...auth, schema: deleteCardioSchema },
       async (req, reply) => {
         try {
-          await deleteCardio(
+          return await deleteCardio(
             db,
             uid(req),
             req.params.id,
             req.params.exerciseId,
             req.params.entryIndex,
           );
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
