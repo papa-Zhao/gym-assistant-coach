@@ -10,6 +10,7 @@ import {
 import { ApiHttpError, AuthExpiredError, apiFetch } from "../api";
 import { formatChange, seriesFor, shortDate } from "../bodyMetricsView";
 import { TrendChart } from "../components/TrendChart";
+import { Skeleton } from "../components/Skeleton";
 
 const RANGES = [7, 30, 90] as const;
 const KEYS: readonly MetricKey[] = ["weightKg", "bodyFatPct", "waistCm"];
@@ -101,7 +102,7 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
   if (!data)
     return (
       <main>
-        <p>載入中…</p>
+        <Skeleton layout="body" />
       </main>
     );
 

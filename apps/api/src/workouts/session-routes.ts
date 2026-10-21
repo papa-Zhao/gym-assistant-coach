@@ -4,6 +4,7 @@ import {
   taipeiDate,
   weekRange,
   type ActiveSession,
+  type ApiError,
   type FinishSummary,
   type WeekStats,
 } from "@gac/shared";
@@ -16,6 +17,7 @@ import {
   deleteCardio,
   deleteSet,
   discardSession,
+  removeItem,
   finishSession,
   getActiveSession,
   markNotified,
@@ -25,6 +27,7 @@ import {
   upsertSet,
   weekStats,
 } from "./repo";
+import { WorkoutError } from "./repo";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const DEFAULT_NOTIFY_TIMEOUT_MS = 5000;
@@ -61,6 +64,14 @@ const itemSchema = {
   },
 } as const;
 
+const removeItemSchema = {
+  params: {
+    type: "object",
+    required: ["id", "exerciseId"],
+    properties: { id: uuid, exerciseId: uuid },
+  },
+} as const;
+
 const setSchema = {
   ...idSchema,
   body: {
@@ -73,6 +84,7 @@ const setSchema = {
       reps: range(SET_LIMITS.reps, "integer"),
       weightKg: range(SET_LIMITS.weightKg),
       rpe: range(SET_LIMITS.rpe),
+      restSec: range(SET_LIMITS.restSec, "integer"),
     },
   },
 } as const;
@@ -141,13 +153,6 @@ export const sessionRoutes =
     const uid = (req: { workoutUserId?: string }) =>
       req.workoutUserId as string;
 
-    /** Re-reads the in-progress session after a change. */
-    const current = async (userId: string): Promise<ActiveSession> => {
-      const s = await getActiveSession(db, userId, taipeiDate(now()));
-      if (!s) throw new Error("active session vanished");
-      return s;
-    };
-
     app.get(
       "/workouts/active",
       auth,
@@ -182,9 +187,36 @@ export const sessionRoutes =
       { ...auth, schema: itemSchema },
       async (req, reply) => {
         try {
-          await addItem(db, uid(req), req.params.id, req.body.exerciseId);
-          return await current(uid(req));
+          return await addItem(
+            db,
+            uid(req),
+            req.params.id,
+            req.body.exerciseId,
+          );
         } catch (err) {
+          return sendWorkoutError(reply, err);
+        }
+      },
+    );
+
+    app.delete<{ Params: { id: string; exerciseId: string } }>(
+      "/workouts/:id/items/:exerciseId",
+      { ...auth, schema: removeItemSchema },
+      async (req, reply) => {
+        try {
+          return await removeItem(
+            db,
+            uid(req),
+            req.params.id,
+            req.params.exerciseId,
+          );
+        } catch (err) {
+          // A finished session is as good as gone for this route.
+          if (err instanceof WorkoutError && err.code === "session_finished") {
+            return reply
+              .code(404)
+              .send({ error: "not_found" } satisfies ApiError);
+          }
           return sendWorkoutError(reply, err);
         }
       },
@@ -198,12 +230,13 @@ export const sessionRoutes =
         reps: number;
         weightKg: number;
         rpe?: number;
+        restSec?: number;
       };
     }>(
       "/workouts/:id/sets",
       { ...auth, schema: setSchema },
       async (req, reply) => {
-        const { exerciseId, setIndex, reps, weightKg, rpe } = req.body;
+        const { exerciseId, setIndex, reps, weightKg, rpe, restSec } = req.body;
         if (
           !hasPlaces(weightKg, 1) ||
           (rpe !== undefined && !isHalfStep(rpe))
@@ -211,13 +244,13 @@ export const sessionRoutes =
           return badRequest(reply);
         }
         try {
-          await upsertSet(db, uid(req), req.params.id, exerciseId, {
+          return await upsertSet(db, uid(req), req.params.id, exerciseId, {
             setIndex,
             reps,
             weightKg,
             ...(rpe === undefined ? {} : { rpe }),
+            ...(restSec === undefined ? {} : { restSec }),
           });
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -231,14 +264,13 @@ export const sessionRoutes =
       { ...auth, schema: deleteSetSchema },
       async (req, reply) => {
         try {
-          await deleteSet(
+          return await deleteSet(
             db,
             uid(req),
             req.params.id,
             req.params.exerciseId,
             req.params.setIndex,
           );
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -269,8 +301,13 @@ export const sessionRoutes =
           return badRequest(reply);
         }
         try {
-          await upsertCardio(db, uid(req), req.params.id, exerciseId, entry);
-          return await current(uid(req));
+          return await upsertCardio(
+            db,
+            uid(req),
+            req.params.id,
+            exerciseId,
+            entry,
+          );
         } catch (err) {
           return sendWorkoutError(reply, err);
         }
@@ -284,14 +321,13 @@ export const sessionRoutes =
       { ...auth, schema: deleteCardioSchema },
       async (req, reply) => {
         try {
-          await deleteCardio(
+          return await deleteCardio(
             db,
             uid(req),
             req.params.id,
             req.params.exerciseId,
             req.params.entryIndex,
           );
-          return await current(uid(req));
         } catch (err) {
           return sendWorkoutError(reply, err);
         }

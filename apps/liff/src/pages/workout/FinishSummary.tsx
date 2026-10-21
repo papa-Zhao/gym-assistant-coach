@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { FinishSummary as FinishSummaryData, Template } from "@gac/shared";
 import { apiFetch } from "../../api";
 import { isAuthExpired } from "./fields";
+import { formatRest } from "./RestTimer";
 
 interface FinishSummaryProps {
   summary: FinishSummaryData;
@@ -58,6 +59,9 @@ export function FinishSummary({
           {summary.exerciseCount} 個動作・{summary.setCount} 組
           {summary.cardioMinutes > 0 && `・有氧 ${summary.cardioMinutes} 分鐘`}
         </p>
+        {summary.avgRestSec !== null && (
+          <p>平均休息 {formatRest(summary.avgRestSec)}</p>
+        )}
         {summary.notified && <p className="muted">已傳到聊天室</p>}
       </section>
       {summary.prs.length > 0 && (

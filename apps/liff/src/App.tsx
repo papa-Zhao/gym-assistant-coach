@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AuthState } from "./auth";
 import { route } from "./router";
+import { Splash } from "./components/Splash";
 import { BodyMetrics } from "./pages/BodyMetrics";
 import { Profile } from "./pages/Profile";
 import { Records } from "./pages/Records";
@@ -21,11 +22,7 @@ export function App({ state, pathname, today, onClose }: AppProps) {
 
   switch (shown.kind) {
     case "loading":
-      return (
-        <main>
-          <p>載入中…</p>
-        </main>
-      );
+      return <Splash />;
     case "ready":
       switch (route(pathname)) {
         case "profile":

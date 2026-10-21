@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import type { HealthResponse } from "@gac/shared";
+import { newDbStats, withDbStats, type DbStats } from "./db/timing.js";
 import type { AppDeps } from "./deps.js";
 import { apiErrorHandler } from "./http.js";
 import { authRoutes } from "./auth/routes.js";
@@ -14,6 +15,30 @@ import { internalRoutes } from "./internal/routes.js";
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   const app = Fastify(options);
   app.setErrorHandler(apiErrorHandler);
+
+  // One log line per request: route template (never the URL with ids), status,
+  // total time and database work. No bodies or user data.
+  const stats = new WeakMap<object, DbStats>();
+  app.addHook("onRequest", (req, _reply, done) => {
+    const s = newDbStats();
+    stats.set(req, s);
+    withDbStats(s, done);
+  });
+  app.addHook("onResponse", (req, reply, done) => {
+    const db = deps.dbStats?.() ?? stats.get(req) ?? newDbStats();
+    req.log.info(
+      {
+        route: req.routeOptions.url,
+        method: req.method,
+        status: reply.statusCode,
+        ms: Math.round(reply.elapsedTime),
+        dbQueries: db.queries,
+        dbMs: Math.round(db.ms),
+      },
+      "request timing",
+    );
+    done();
+  });
 
   app.get("/health", async (): Promise<HealthResponse> => {
     return { status: "ok", service: "api" };

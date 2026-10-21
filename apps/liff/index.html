@@ -13,9 +13,76 @@
       rel="stylesheet"
     />
     <title>Gym Assistant Coach</title>
+    <style>
+      /* Pre-JS splash: literal design-token values (CSS variables load with the app). */
+      body {
+        margin: 0;
+        background: #fbf6ee;
+      }
+      .boot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 100vh;
+        text-align: center;
+        font-family: "Noto Sans TC", system-ui, sans-serif;
+        color: #2b2420;
+      }
+      .boot p {
+        margin: 0;
+      }
+      .boot-name {
+        margin-top: 8px !important;
+        font-family: "Noto Serif TC", serif;
+        font-weight: 900;
+        font-size: 22px;
+      }
+      .boot-note {
+        color: #6b5e55;
+        font-size: 13px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1c1714;
+        }
+        .boot {
+          color: #f3ece3;
+        }
+        .boot-note {
+          color: #bfb2a5;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="boot" aria-busy="true">
+        <svg
+          width="96"
+          height="96"
+          viewBox="0 0 100 100"
+          role="img"
+          aria-label="對話教練"
+        >
+          <circle cx="50" cy="50" r="50" fill="#B4492A" />
+          <path
+            d="M28 24h44a10 10 0 0 1 10 10v26a10 10 0 0 1-10 10H46l-14 11v-11h-4a10 10 0 0 1-10-10V34a10 10 0 0 1 10-10z"
+            fill="#FBF6EE"
+          />
+          <g fill="#B4492A">
+            <rect x="31" y="38" width="6" height="18" rx="2" />
+            <rect x="63" y="38" width="6" height="18" rx="2" />
+            <rect x="26" y="42" width="5" height="10" rx="1.5" />
+            <rect x="69" y="42" width="5" height="10" rx="1.5" />
+            <rect x="37" y="45" width="26" height="4" rx="2" />
+          </g>
+        </svg>
+        <p class="boot-name">Gym Assistant Coach</p>
+        <p class="boot-note">正在準備你的資料…</p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -57,4 +57,22 @@ describe("FinishSummary", () => {
       },
     ]);
   });
+
+  it("finish shows average rest", () => {
+    render(
+      <FinishSummary
+        summary={{ ...SUMMARY, avgRestSec: 95 }}
+        onClose={vi.fn()}
+        onFatal={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("平均休息 1:35")).toBeInTheDocument();
+  });
+
+  it("finish hides average rest when unknown", () => {
+    render(
+      <FinishSummary summary={SUMMARY} onClose={vi.fn()} onFatal={vi.fn()} />,
+    );
+    expect(screen.queryByText(/平均休息/)).not.toBeInTheDocument();
+  });
 });

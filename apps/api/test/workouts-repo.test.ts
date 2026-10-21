@@ -14,8 +14,10 @@ import {
   deleteTemplate,
   finishSession,
   getActiveSession,
+  getSessionById,
   listExercises,
   listTemplates,
+  removeItem,
   startSession,
   todayWorkoutSummary,
   upsertCardio,
@@ -44,7 +46,7 @@ describe("workouts repo", () => {
       if (!e) throw new Error(`missing seed ${s}`);
       return e;
     };
-    return { db: t.db, userId, otherId, slug };
+    return { db: t.db, statements: t.statements, userId, otherId, slug };
   }
 
   /** Runs one finished session with the given sets for one exercise. */
@@ -281,8 +283,18 @@ describe("workouts repo", () => {
     expect(item?.last).toEqual({
       date: "2026-10-12",
       sets: [
-        { setIndex: 1, weightKg: 60, reps: 8 },
-        { setIndex: 2, weightKg: 60, reps: 8 },
+        {
+          setIndex: 1,
+          weightKg: 60,
+          reps: 8,
+          completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        },
+        {
+          setIndex: 2,
+          weightKg: 60,
+          reps: 8,
+          completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        },
       ],
     });
     expect(item?.hint).toEqual({ suggestWeightKg: 62.5 });
@@ -320,7 +332,13 @@ describe("workouts repo", () => {
     await deleteSet(db, userId, s.id, bench.id, 2);
     const item = (await getActiveSession(db, userId, "2026-10-19"))?.items[0];
     expect(item && "sets" in item ? item.sets : null).toEqual([
-      { setIndex: 1, weightKg: 62.5, reps: 6, rpe: 8.5 },
+      {
+        setIndex: 1,
+        weightKg: 62.5,
+        reps: 6,
+        rpe: 8.5,
+        completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+      },
     ]);
   });
 
@@ -504,6 +522,78 @@ describe("workouts repo", () => {
     expect(await todayWorkoutSummary(db, userId, "2026-10-20")).toMatchObject({
       templateName: "推日",
       exerciseCount: 1,
+    });
+  });
+
+  describe("round trips", () => {
+    const STRENGTH = [
+      "barbell-bench-press",
+      "barbell-back-squat",
+      "barbell-row",
+      "overhead-press",
+      "romanian-deadlift",
+    ];
+
+    it("upsertSet plus response uses at most 5 queries", async () => {
+      const { db, statements, userId, slug } = await setup();
+      const bench = slug(STRENGTH[0] as string);
+      const s = await startSession(db, userId, "2026-10-19");
+      statements.reset();
+      const out = await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 5,
+      });
+      expect(statements.count).toBeLessThanOrEqual(5);
+      expect(out.items[0]?.exercise.id).toBe(bench.id);
+      expect(out).toEqual(await getSessionById(db, userId, s.id));
+    });
+
+    it("removeItem plus response uses at most 5 queries", async () => {
+      const { db, statements, userId, slug } = await setup();
+      const bench = slug(STRENGTH[0] as string);
+      const s = await startSession(db, userId, "2026-10-19");
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 5,
+      });
+      statements.reset();
+      const out = await removeItem(db, userId, s.id, bench.id);
+      expect(statements.count).toBeLessThanOrEqual(5);
+      expect(out.items).toEqual([]);
+    });
+
+    it("getActiveSession query count does not grow with item count", async () => {
+      const { db, statements, userId, slug } = await setup();
+      const ids = STRENGTH.map((x) => slug(x).id);
+      // History so that "last" has something to find for every exercise.
+      const old = await startSession(db, userId, "2026-10-10");
+      for (const id of ids) {
+        await upsertSet(db, userId, old.id, id, {
+          setIndex: 1,
+          weightKg: 50,
+          reps: 8,
+        });
+      }
+      await finishSession(db, userId, old.id);
+
+      const s = await startSession(db, userId, "2026-10-19");
+      await addItem(db, userId, s.id, ids[0] as string);
+      statements.reset();
+      const one = await getActiveSession(db, userId, "2026-10-19");
+      const withOne = statements.count;
+
+      for (const id of ids.slice(1)) await addItem(db, userId, s.id, id);
+      statements.reset();
+      const five = await getActiveSession(db, userId, "2026-10-19");
+      expect(statements.count).toBe(withOne);
+      expect(statements.count).toBeLessThanOrEqual(4);
+      expect(one?.items).toHaveLength(1);
+      expect(five?.items).toHaveLength(5);
+      expect(five?.items.every((i) => i.last?.date === "2026-10-10")).toBe(
+        true,
+      );
     });
   });
 });

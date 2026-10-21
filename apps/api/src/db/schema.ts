@@ -251,8 +251,12 @@ export const workoutSets = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    restSec: integer("rest_sec"),
   },
-  (t) => [primaryKey({ columns: [t.sessionId, t.exerciseId, t.setIndex] })],
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.exerciseId, t.setIndex] }),
+    check("workout_sets_rest_sec_check", sql`${t.restSec} between 0 and 3600`),
+  ],
 );
 
 export const cardioEntries = pgTable(

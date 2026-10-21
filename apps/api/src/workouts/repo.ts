@@ -33,6 +33,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { unionAll } from "drizzle-orm/pg-core";
 import {
   cardioEntries,
   exercises,
@@ -77,7 +78,7 @@ function toExercise(r: ExerciseRow): Exercise {
   };
 }
 
-const num = (v: string | null) => (v === null ? undefined : Number(v));
+const num = (v: string | number | null) => (v === null ? undefined : Number(v));
 
 /** Built-in exercises plus the user's own, never anyone else's. */
 const visibleTo = (userId: string) =>
@@ -207,19 +208,6 @@ export async function archiveCustomExercise(
     await tx.delete(exercises).where(eq(exercises.id, exerciseId));
     return "deleted";
   });
-}
-
-async function requireExercise(
-  db: Db,
-  userId: string,
-  exerciseId: string,
-): Promise<Exercise> {
-  const [row] = await db
-    .select()
-    .from(exercises)
-    .where(and(eq(exercises.id, exerciseId), visibleTo(userId)));
-  if (!row) throw new WorkoutError("not_found");
-  return toExercise(row);
 }
 
 // ---------- templates ----------
@@ -357,61 +345,103 @@ async function requireSession(
   return row;
 }
 
+/** A validated session row plus the name of the template it came from. */
+interface SessionContext {
+  session: SessionRow;
+  templateName: string | null;
+}
+
+const sessionContextColumns = {
+  session: workoutSessions,
+  templateName: workoutTemplates.name,
+};
+
+/** One query: the user's in-progress session (or `not_found` / `session_finished`) with its template name. */
 async function requireActiveSession(
   db: Db,
   userId: string,
   sessionId: string,
-): Promise<SessionRow> {
-  const row = await requireSession(db, userId, sessionId);
-  if (row.endedAt !== null) throw new WorkoutError("session_finished");
+): Promise<SessionContext> {
+  const [row] = await db
+    .select(sessionContextColumns)
+    .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.userId, userId),
+      ),
+    );
+  if (!row) throw new WorkoutError("not_found");
+  if (row.session.endedAt !== null) throw new WorkoutError("session_finished");
   return row;
 }
 
-/** Most recent other finished session of the user that has sets for the exercise. */
-async function lastSets(
+/**
+ * One query that validates both the in-progress session and the visible
+ * exercise. Errors keep the order of the former two-step check: session
+ * problems first, then the exercise.
+ */
+async function requireSessionAndExercise(
   db: Db,
   userId: string,
+  sessionId: string,
   exerciseId: string,
-  excludeSessionId: string,
-): Promise<{ date: string; sets: WorkoutSet[] } | null> {
-  const [prev] = await db
-    .select({ id: workoutSessions.id, date: workoutSessions.performedOn })
+): Promise<SessionContext & { exercise: Exercise }> {
+  const [row] = await db
+    .select({ ...sessionContextColumns, exercise: exercises })
     .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
+    .leftJoin(exercises, and(eq(exercises.id, exerciseId), visibleTo(userId)))
     .where(
       and(
+        eq(workoutSessions.id, sessionId),
         eq(workoutSessions.userId, userId),
-        isNotNull(workoutSessions.endedAt),
-        ne(workoutSessions.id, excludeSessionId),
-        sql`exists (select 1 from ${workoutSets} where ${workoutSets.sessionId} = ${workoutSessions.id} and ${workoutSets.exerciseId} = ${exerciseId})`,
       ),
-    )
-    .orderBy(desc(workoutSessions.performedOn), desc(workoutSessions.endedAt))
-    .limit(1);
-  if (!prev) return null;
-  const rows = await db
-    .select()
-    .from(workoutSets)
-    .where(
-      and(
-        eq(workoutSets.sessionId, prev.id),
-        eq(workoutSets.exerciseId, exerciseId),
-      ),
-    )
-    .orderBy(asc(workoutSets.setIndex));
-  return { date: prev.date, sets: rows.map(toWorkoutSet) };
+    );
+  if (!row) throw new WorkoutError("not_found");
+  if (row.session.endedAt !== null) throw new WorkoutError("session_finished");
+  if (!row.exercise) throw new WorkoutError("not_found");
+  return { ...row, exercise: toExercise(row.exercise) };
 }
 
-function toWorkoutSet(r: typeof workoutSets.$inferSelect): WorkoutSet {
+interface SetJson {
+  setIndex: number;
+  weightKg: number | string;
+  reps: number;
+  rpe: number | string | null;
+  restSec: number | null;
+  completedAt: string;
+}
+
+interface CardioJson {
+  entryIndex: number;
+  durationMin: number;
+  distanceKm: number | string | null;
+  inclinePct: number | string | null;
+  speedKmh: number | string | null;
+  level: number | null;
+}
+
+function toWorkoutSet(r: SetJson): WorkoutSet {
   const rpe = num(r.rpe);
   return {
     setIndex: r.setIndex,
     weightKg: Number(r.weightKg),
     reps: r.reps,
     ...(rpe !== undefined ? { rpe } : {}),
+    ...(r.restSec !== null ? { restSec: r.restSec } : {}),
+    completedAt: new Date(r.completedAt).toISOString(),
   };
 }
 
-function toCardioEntry(r: typeof cardioEntries.$inferSelect): CardioEntry {
+function toCardioEntry(r: CardioJson): CardioEntry {
   const distanceKm = num(r.distanceKm);
   const inclinePct = num(r.inclinePct);
   const speedKmh = num(r.speedKmh);
@@ -425,36 +455,123 @@ function toCardioEntry(r: typeof cardioEntries.$inferSelect): CardioEntry {
   };
 }
 
+/**
+ * Everything keyed by exercise for one session in a single statement:
+ * this session's sets and cardio, plus, for every exercise in it, the sets of
+ * the most recent other finished session that has that exercise ("last").
+ * Rows are `kind`, `exerciseId` and a JSON document in `data` (as text, so
+ * the result is the same on every driver).
+ */
+function sessionDataQuery(db: Db, userId: string, sessionId: string) {
+  const json = (expr: ReturnType<typeof sql>) => sql<string>`(${expr})::text`;
+  const setFields = sql`'setIndex', ${workoutSets.setIndex}, 'weightKg', ${workoutSets.weightKg}, 'reps', ${workoutSets.reps}, 'rpe', ${workoutSets.rpe}, 'restSec', ${workoutSets.restSec}, 'completedAt', ${workoutSets.completedAt}`;
+
+  // Source session per exercise, via distinct on.
+  const src = db
+    .selectDistinctOn([workoutSets.exerciseId], {
+      sessionId: workoutSets.sessionId,
+      exerciseId: workoutSets.exerciseId,
+      date: workoutSessions.performedOn,
+    })
+    .from(workoutSets)
+    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutSets.sessionId))
+    .where(
+      and(
+        eq(workoutSessions.userId, userId),
+        isNotNull(workoutSessions.endedAt),
+        ne(workoutSessions.id, sessionId),
+        inArray(
+          workoutSets.exerciseId,
+          db
+            .select({ id: workoutSessionItems.exerciseId })
+            .from(workoutSessionItems)
+            .where(eq(workoutSessionItems.sessionId, sessionId)),
+        ),
+      ),
+    )
+    .orderBy(
+      asc(workoutSets.exerciseId),
+      desc(workoutSessions.performedOn),
+      desc(workoutSessions.endedAt),
+    )
+    .as("src");
+
+  const mine = db
+    .select({
+      kind: sql<string>`'set'::text`.as("kind"),
+      exerciseId: workoutSets.exerciseId,
+      data: json(sql`jsonb_build_object(${setFields})`).as("data"),
+    })
+    .from(workoutSets)
+    .where(eq(workoutSets.sessionId, sessionId));
+  const cardio = db
+    .select({
+      kind: sql<string>`'cardio'::text`,
+      exerciseId: cardioEntries.exerciseId,
+      data: json(
+        sql`jsonb_build_object('entryIndex', ${cardioEntries.entryIndex}, 'durationMin', ${cardioEntries.durationMin}, 'distanceKm', ${cardioEntries.distanceKm}, 'inclinePct', ${cardioEntries.inclinePct}, 'speedKmh', ${cardioEntries.speedKmh}, 'level', ${cardioEntries.level})`,
+      ),
+    })
+    .from(cardioEntries)
+    .where(eq(cardioEntries.sessionId, sessionId));
+  const last = db
+    .select({
+      kind: sql<string>`'last'::text`,
+      exerciseId: workoutSets.exerciseId,
+      data: json(sql`jsonb_build_object('date', ${src.date}, ${setFields})`),
+    })
+    .from(workoutSets)
+    .innerJoin(
+      src,
+      and(
+        eq(workoutSets.sessionId, src.sessionId),
+        eq(workoutSets.exerciseId, src.exerciseId),
+      ),
+    );
+  return unionAll(mine, cardio, last);
+}
+
+/** Two statements however many items: the items, then {@link sessionDataQuery}. */
 async function buildSession(
   db: Db,
   userId: string,
-  session: SessionRow,
+  { session, templateName }: SessionContext,
 ): Promise<ActiveSession> {
-  const [template] = session.templateId
-    ? await db
-        .select({ name: workoutTemplates.name })
-        .from(workoutTemplates)
-        .where(eq(workoutTemplates.id, session.templateId))
-    : [];
-  const items = await db
-    .select({ item: workoutSessionItems, exercise: exercises })
-    .from(workoutSessionItems)
-    .innerJoin(exercises, eq(exercises.id, workoutSessionItems.exerciseId))
-    .where(eq(workoutSessionItems.sessionId, session.id))
-    .orderBy(asc(workoutSessionItems.position));
-  const sets = await db
-    .select()
-    .from(workoutSets)
-    .where(eq(workoutSets.sessionId, session.id))
-    .orderBy(asc(workoutSets.setIndex));
-  const cardio = await db
-    .select()
-    .from(cardioEntries)
-    .where(eq(cardioEntries.sessionId, session.id))
-    .orderBy(asc(cardioEntries.entryIndex));
+  const [items, data] = await Promise.all([
+    db
+      .select({ item: workoutSessionItems, exercise: exercises })
+      .from(workoutSessionItems)
+      .innerJoin(exercises, eq(exercises.id, workoutSessionItems.exerciseId))
+      .where(eq(workoutSessionItems.sessionId, session.id))
+      .orderBy(asc(workoutSessionItems.position)),
+    sessionDataQuery(db, userId, session.id),
+  ]);
 
-  const out: SessionItem[] = [];
-  for (const { item, exercise } of items) {
+  const sets = new Map<string, WorkoutSet[]>();
+  const cardio = new Map<string, CardioEntry[]>();
+  const lastRows = new Map<string, { date: string; sets: WorkoutSet[] }>();
+  const push = <T>(m: Map<string, T[]>, k: string, v: T) =>
+    m.set(k, [...(m.get(k) ?? []), v]);
+  for (const row of data) {
+    const d = JSON.parse(row.data) as SetJson & CardioJson & { date: string };
+    if (row.kind === "set") push(sets, row.exerciseId, toWorkoutSet(d));
+    else if (row.kind === "cardio")
+      push(cardio, row.exerciseId, toCardioEntry(d));
+    else {
+      const entry = lastRows.get(row.exerciseId) ?? { date: d.date, sets: [] };
+      entry.sets.push(toWorkoutSet(d));
+      lastRows.set(row.exerciseId, entry);
+    }
+  }
+  const byIndex = <T extends { setIndex?: number; entryIndex?: number }>(
+    xs: T[] | undefined,
+  ) =>
+    [...(xs ?? [])].sort(
+      (a, b) =>
+        (a.setIndex ?? a.entryIndex ?? 0) - (b.setIndex ?? b.entryIndex ?? 0),
+    );
+
+  const out: SessionItem[] = items.map(({ item, exercise }) => {
     const ex = toExercise(exercise);
     const base = {
       exercise: ex,
@@ -462,40 +579,70 @@ async function buildSession(
       targetReps: item.targetReps,
     };
     if (ex.kind === "cardio") {
-      out.push({
+      return {
         ...base,
         last: null,
         hint: null,
-        cardio: cardio.filter((c) => c.exerciseId === ex.id).map(toCardioEntry),
-      });
-      continue;
+        cardio: byIndex(cardio.get(ex.id)),
+      };
     }
-    const last = await lastSets(db, userId, ex.id, session.id);
-    out.push({
+    const found = lastRows.get(ex.id);
+    const last = found ? { date: found.date, sets: byIndex(found.sets) } : null;
+    return {
       ...base,
       last,
       hint: last ? overloadHint(last.sets, item.targetReps) : null,
-      sets: sets.filter((s) => s.exerciseId === ex.id).map(toWorkoutSet),
-    });
-  }
+      sets: byIndex(sets.get(ex.id)),
+    };
+  });
   return {
     id: session.id,
     date: session.performedOn,
     startedAt: session.startedAt.toISOString(),
     templateId: session.templateId,
-    templateName: template?.name ?? null,
+    templateName,
     items: out,
   };
 }
 
-async function findActive(db: Db, userId: string): Promise<SessionRow | null> {
+async function findActive(
+  db: Db,
+  userId: string,
+): Promise<SessionContext | null> {
   const [row] = await db
-    .select()
+    .select(sessionContextColumns)
     .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
     .where(
       and(eq(workoutSessions.userId, userId), isNull(workoutSessions.endedAt)),
     );
   return row ?? null;
+}
+
+/** The user's session by id (any state) as an `ActiveSession` shape; `not_found` if foreign. */
+export async function getSessionById(
+  db: Db,
+  userId: string,
+  sessionId: string,
+): Promise<ActiveSession> {
+  const [row] = await db
+    .select(sessionContextColumns)
+    .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.userId, userId),
+      ),
+    );
+  if (!row) throw new WorkoutError("not_found");
+  return buildSession(db, userId, row);
 }
 
 /** The user's in-progress session, or null. `today` is reserved for callers. */
@@ -505,8 +652,8 @@ export async function getActiveSession(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- part of the agreed signature
   _today: string,
 ): Promise<ActiveSession | null> {
-  const row = await findActive(db, userId);
-  return row ? buildSession(db, userId, row) : null;
+  const ctx = await findActive(db, userId);
+  return ctx ? buildSession(db, userId, ctx) : null;
 }
 
 /** Returns the existing in-progress session if there is one. */
@@ -554,32 +701,45 @@ export async function startSession(
     return row;
   });
   // Lost a race with a concurrent start: return the winner.
-  const session = created ?? (await findActive(db, userId));
-  if (!session) throw new Error("startSession: no session");
-  return buildSession(db, userId, session);
+  if (created) {
+    return buildSession(db, userId, {
+      session: created,
+      templateName: template?.name ?? null,
+    });
+  }
+  const winner = await findActive(db, userId);
+  if (!winner) throw new Error("startSession: no session");
+  return buildSession(db, userId, winner);
 }
 
+/** One statement: append the exercise at the next position unless it is already there. */
 async function ensureItem(
   db: Db,
   sessionId: string,
   exerciseId: string,
   targets: { targetSets?: number; targetReps?: number } = {},
 ): Promise<void> {
-  const [{ next } = { next: 0 }] = await db
-    .select({
-      next: sql<number>`coalesce(max(${workoutSessionItems.position}) + 1, 0)::int`,
-    })
-    .from(workoutSessionItems)
-    .where(eq(workoutSessionItems.sessionId, sessionId));
   await db
     .insert(workoutSessionItems)
-    .values({
-      sessionId,
-      exerciseId,
-      position: next,
-      targetSets: targets.targetSets ?? null,
-      targetReps: targets.targetReps ?? null,
-    })
+    .select(
+      db
+        .select({
+          sessionId: sql<string>`${sessionId}::uuid`.as("session_id"),
+          exerciseId: sql<string>`${exerciseId}::uuid`.as("exercise_id"),
+          position:
+            sql<number>`coalesce(max(${workoutSessionItems.position}) + 1, 0)::int`.as(
+              "position",
+            ),
+          targetSets: sql<number | null>`${targets.targetSets ?? null}::int`.as(
+            "target_sets",
+          ),
+          targetReps: sql<number | null>`${targets.targetReps ?? null}::int`.as(
+            "target_reps",
+          ),
+        })
+        .from(workoutSessionItems)
+        .where(eq(workoutSessionItems.sessionId, sessionId)),
+    )
     .onConflictDoNothing();
 }
 
@@ -589,10 +749,15 @@ export async function addItem(
   sessionId: string,
   exerciseId: string,
   targets: { targetSets?: number; targetReps?: number } = {},
-): Promise<void> {
-  await requireActiveSession(db, userId, sessionId);
-  await requireExercise(db, userId, exerciseId);
+): Promise<ActiveSession> {
+  const ctx = await requireSessionAndExercise(
+    db,
+    userId,
+    sessionId,
+    exerciseId,
+  );
   await ensureItem(db, sessionId, exerciseId, targets);
+  return buildSession(db, userId, ctx);
 }
 
 async function requireKind(
@@ -601,38 +766,116 @@ async function requireKind(
   sessionId: string,
   exerciseId: string,
   kind: ExerciseKind,
-): Promise<void> {
-  await requireActiveSession(db, userId, sessionId);
-  const ex = await requireExercise(db, userId, exerciseId);
-  if (ex.kind !== kind) throw new WorkoutError("wrong_kind");
+): Promise<SessionContext> {
+  const ctx = await requireSessionAndExercise(
+    db,
+    userId,
+    sessionId,
+    exerciseId,
+  );
+  if (ctx.exercise.kind !== kind) throw new WorkoutError("wrong_kind");
   await ensureItem(db, sessionId, exerciseId);
+  return ctx;
 }
 
+/** Writes the set, then returns the session as the client should now see it. */
 export async function upsertSet(
   db: Db,
   userId: string,
   sessionId: string,
   exerciseId: string,
-  set: { setIndex: number; weightKg: number; reps: number; rpe?: number },
-): Promise<void> {
-  await requireKind(db, userId, sessionId, exerciseId, "strength");
+  set: {
+    setIndex: number;
+    weightKg: number;
+    reps: number;
+    rpe?: number;
+    restSec?: number;
+  },
+): Promise<ActiveSession> {
+  const ctx = await requireKind(db, userId, sessionId, exerciseId, "strength");
   const values = {
     reps: set.reps,
     weightKg: String(set.weightKg),
     rpe: set.rpe === undefined ? null : String(set.rpe),
-    completedAt: new Date(),
   };
+  // completedAt is set on insert only: an edit keeps the original time.
+  // Omitted restSec: null on insert, the stored value kept on update.
+  const restSec = set.restSec === undefined ? {} : { restSec: set.restSec };
   await db
     .insert(workoutSets)
-    .values({ sessionId, exerciseId, setIndex: set.setIndex, ...values })
+    .values({
+      sessionId,
+      exerciseId,
+      setIndex: set.setIndex,
+      ...values,
+      ...restSec,
+      completedAt: new Date(),
+    })
     .onConflictDoUpdate({
       target: [
         workoutSets.sessionId,
         workoutSets.exerciseId,
         workoutSets.setIndex,
       ],
-      set: values,
+      set: { ...values, ...restSec },
     });
+  return buildSession(db, userId, ctx);
+}
+
+/**
+ * Removes an exercise, with this session's sets and cardio for it, from the
+ * in-progress session: one statement, so all or nothing. `not_found` when the
+ * exercise is not in the session.
+ */
+export async function removeItem(
+  db: Db,
+  userId: string,
+  sessionId: string,
+  exerciseId: string,
+): Promise<ActiveSession> {
+  const ctx = await requireActiveSession(db, userId, sessionId);
+  const item = db.$with("item").as(
+    db
+      .delete(workoutSessionItems)
+      .where(
+        and(
+          eq(workoutSessionItems.sessionId, sessionId),
+          eq(workoutSessionItems.exerciseId, exerciseId),
+        ),
+      )
+      .returning({ exerciseId: workoutSessionItems.exerciseId }),
+  );
+  const found = sql`exists (select 1 from ${item})`;
+  const sets = db.$with("removed_sets").as(
+    db
+      .delete(workoutSets)
+      .where(
+        and(
+          eq(workoutSets.sessionId, sessionId),
+          eq(workoutSets.exerciseId, exerciseId),
+          found,
+        ),
+      )
+      .returning({ n: sql<number>`1`.as("n") }),
+  );
+  const cardio = db.$with("removed_cardio").as(
+    db
+      .delete(cardioEntries)
+      .where(
+        and(
+          eq(cardioEntries.sessionId, sessionId),
+          eq(cardioEntries.exerciseId, exerciseId),
+          found,
+        ),
+      )
+      .returning({ n: sql<number>`1`.as("n") }),
+  );
+  const [{ removed } = { removed: 0 }] = await db
+    .with(item, sets, cardio)
+    .select({ removed: sql<number>`count(*)::int` })
+    .from(item);
+  if (removed === 0) throw new WorkoutError("not_found");
+  return buildSession(db, userId, ctx);
 }
 
 export async function deleteSet(
@@ -641,8 +884,8 @@ export async function deleteSet(
   sessionId: string,
   exerciseId: string,
   setIndex: number,
-): Promise<void> {
-  await requireActiveSession(db, userId, sessionId);
+): Promise<ActiveSession> {
+  const ctx = await requireActiveSession(db, userId, sessionId);
   await db
     .delete(workoutSets)
     .where(
@@ -652,6 +895,7 @@ export async function deleteSet(
         eq(workoutSets.setIndex, setIndex),
       ),
     );
+  return buildSession(db, userId, ctx);
 }
 
 export async function upsertCardio(
@@ -660,8 +904,8 @@ export async function upsertCardio(
   sessionId: string,
   exerciseId: string,
   entry: CardioEntry,
-): Promise<void> {
-  await requireKind(db, userId, sessionId, exerciseId, "cardio");
+): Promise<ActiveSession> {
+  const ctx = await requireKind(db, userId, sessionId, exerciseId, "cardio");
   const opt = (v: number | undefined) => (v === undefined ? null : String(v));
   const values = {
     durationMin: entry.durationMin,
@@ -682,6 +926,7 @@ export async function upsertCardio(
       ],
       set: values,
     });
+  return buildSession(db, userId, ctx);
 }
 
 export async function deleteCardio(
@@ -690,8 +935,8 @@ export async function deleteCardio(
   sessionId: string,
   exerciseId: string,
   entryIndex: number,
-): Promise<void> {
-  await requireActiveSession(db, userId, sessionId);
+): Promise<ActiveSession> {
+  const ctx = await requireActiveSession(db, userId, sessionId);
   await db
     .delete(cardioEntries)
     .where(
@@ -701,6 +946,7 @@ export async function deleteCardio(
         eq(cardioEntries.entryIndex, entryIndex),
       ),
     );
+  return buildSession(db, userId, ctx);
 }
 
 /** Deletes the user's in-progress session (items, sets and cardio cascade); finished or foreign sessions are `not_found`. */
@@ -815,6 +1061,9 @@ export async function finishSession(
       throw new WorkoutError("empty_session");
     }
 
+    const restSecs = mine.flatMap(({ set }) =>
+      set.restSec === null ? [] : [set.restSec],
+    );
     const touched = new Set([
       ...byExercise.keys(),
       ...cardio.map((c) => c.exerciseId),
@@ -830,6 +1079,10 @@ export async function finishSession(
       exerciseCount: touched.size,
       setCount: mine.length,
       cardioMinutes: cardio.reduce((sum, c) => sum + c.durationMin, 0),
+      avgRestSec:
+        restSecs.length === 0
+          ? null
+          : Math.round(restSecs.reduce((a, b) => a + b, 0) / restSecs.length),
       prs,
       notified: false,
     };

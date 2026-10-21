@@ -6,6 +6,7 @@ import {
 } from "@gac/shared";
 import { apiFetch } from "../api";
 import { formatChange, seriesFor } from "../bodyMetricsView";
+import { Skeleton } from "../components/Skeleton";
 
 interface RecordsProps {
   /** Called when the session cannot be recovered or loading failed. */
@@ -50,7 +51,7 @@ export function Records({ onFatal }: RecordsProps) {
       <a className="card link" href="/records/body">
         <h2>身體數據</h2>
         {!data ? (
-          <p className="muted">載入中…</p>
+          <Skeleton layout="value" />
         ) : latest ? (
           <>
             <p>
@@ -73,7 +74,7 @@ export function Records({ onFatal }: RecordsProps) {
         {week ? (
           <p>本週訓練 {week.sessions} 次</p>
         ) : (
-          <p className="muted">載入中…</p>
+          <Skeleton layout="value" />
         )}
         <span className="muted">記訓練 ›</span>
       </a>

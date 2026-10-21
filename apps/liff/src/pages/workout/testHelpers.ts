@@ -93,6 +93,7 @@ export const SUMMARY: FinishSummary = {
   exerciseCount: 2,
   setCount: 6,
   cardioMinutes: 0,
+  avgRestSec: null,
   prs: [
     {
       exerciseId: "ex-bench",
