@@ -439,6 +439,116 @@ describe("workout session routes", () => {
     expect((await req("DELETE", "/workouts/not-a-uuid")).statusCode).toBe(400);
   });
 
+  it("delete item removes its sets and returns session", async () => {
+    await reset();
+    const s = await start();
+    await putSet(s.id, bench.id, 1);
+    await putSet(s.id, squat.id, 1);
+    await req("PUT", `/workouts/${s.id}/cardio`, h1, {
+      exerciseId: treadmill.id,
+      entryIndex: 1,
+      durationMin: 20,
+    });
+    const res = await req("DELETE", `/workouts/${s.id}/items/${bench.id}`);
+    expect(res.statusCode).toBe(200);
+    const out = res.json<ActiveSession>();
+    expect(out.items.map((i) => i.exercise.id)).toEqual([
+      squat.id,
+      treadmill.id,
+    ]);
+    // cardio goes too, and nothing of the removed exercise is left behind
+    const cardioOut = await req(
+      "DELETE",
+      `/workouts/${s.id}/items/${treadmill.id}`,
+    );
+    expect(cardioOut.json<ActiveSession>().items).toHaveLength(1);
+    expect((await finish(s.id)).json<FinishSummary>().setCount).toBe(1);
+    // not in the session: 404
+    const again = await start();
+    const missing = await req(
+      "DELETE",
+      `/workouts/${again.id}/items/${bench.id}`,
+    );
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ error: "not_found" });
+  });
+
+  it("delete item on finished or foreign session is 404", async () => {
+    await reset();
+    const done = await start();
+    await putSet(done.id, bench.id, 1);
+    await finish(done.id);
+    const finished = await req(
+      "DELETE",
+      `/workouts/${done.id}/items/${bench.id}`,
+    );
+    expect(finished.statusCode).toBe(404);
+    expect(finished.json()).toEqual({ error: "not_found" });
+
+    const mine = await start();
+    await putSet(mine.id, bench.id, 1);
+    const foreign = await req(
+      "DELETE",
+      `/workouts/${mine.id}/items/${bench.id}`,
+      h2,
+    );
+    expect(foreign.statusCode).toBe(404);
+    const active = (await req("GET", "/workouts/active")).json<ActiveSession>();
+    expect(active.items[0]?.exercise.id).toBe(bench.id);
+    expect(
+      (await req("DELETE", `/workouts/${mine.id}/items/nope`)).statusCode,
+    ).toBe(400);
+  });
+
+  it("restSec stored and returned; out of range is 400", async () => {
+    await reset();
+    const s = await start();
+    for (const bad of [{ restSec: -1 }, { restSec: 3601 }, { restSec: 1.5 }]) {
+      const res = await putSet(s.id, bench.id, 1, bad);
+      expect(res.statusCode, JSON.stringify(bad)).toBe(400);
+    }
+    const first = await putSet(s.id, bench.id, 1, { restSec: 90 });
+    expect(first.json<ActiveSession>().items[0]).toMatchObject({
+      sets: [{ setIndex: 1, restSec: 90 }],
+    });
+    // omitted on update keeps the stored value; no restSec on insert stays unset
+    await putSet(s.id, bench.id, 2);
+    const kept = await putSet(s.id, bench.id, 1, { reps: 9 });
+    const sets = (kept.json<ActiveSession>().items[0] as { sets: object[] })
+      .sets;
+    expect(sets[0]).toMatchObject({ setIndex: 1, reps: 9, restSec: 90 });
+    expect(sets[1]).not.toHaveProperty("restSec");
+    const edge = await putSet(s.id, bench.id, 3, { restSec: 3600 });
+    expect(edge.statusCode).toBe(200);
+  });
+
+  it("finish reports avgRestSec", async () => {
+    await reset();
+    const none = await start();
+    await putSet(none.id, bench.id, 1);
+    expect((await finish(none.id)).json<FinishSummary>().avgRestSec).toBeNull();
+
+    const s = await start();
+    await putSet(s.id, bench.id, 1);
+    await putSet(s.id, bench.id, 2, { restSec: 60 });
+    await putSet(s.id, bench.id, 3, { restSec: 91 });
+    const summary = (await finish(s.id)).json<FinishSummary>();
+    expect(summary.avgRestSec).toBe(76); // round(75.5)
+  });
+
+  it("completedAt returned for sets", async () => {
+    await reset();
+    const s = await start();
+    const out = (await putSet(s.id, bench.id, 1)).json<ActiveSession>();
+    const set = (out.items[0] as { sets: { completedAt: string }[] }).sets[0];
+    expect(set?.completedAt).toBe(
+      new Date(set?.completedAt ?? "").toISOString(),
+    );
+    expect(Date.now() - Date.parse(set?.completedAt ?? "")).toBeLessThan(
+      60_000,
+    );
+  });
+
   it("finishing an already finished session is 409 and does not notify again", async () => {
     await reset();
     const s = await start();

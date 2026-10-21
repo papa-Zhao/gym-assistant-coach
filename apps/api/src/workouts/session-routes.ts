@@ -4,6 +4,7 @@ import {
   taipeiDate,
   weekRange,
   type ActiveSession,
+  type ApiError,
   type FinishSummary,
   type WeekStats,
 } from "@gac/shared";
@@ -16,6 +17,7 @@ import {
   deleteCardio,
   deleteSet,
   discardSession,
+  removeItem,
   finishSession,
   getActiveSession,
   markNotified,
@@ -25,6 +27,7 @@ import {
   upsertSet,
   weekStats,
 } from "./repo";
+import { WorkoutError } from "./repo";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const DEFAULT_NOTIFY_TIMEOUT_MS = 5000;
@@ -61,6 +64,14 @@ const itemSchema = {
   },
 } as const;
 
+const removeItemSchema = {
+  params: {
+    type: "object",
+    required: ["id", "exerciseId"],
+    properties: { id: uuid, exerciseId: uuid },
+  },
+} as const;
+
 const setSchema = {
   ...idSchema,
   body: {
@@ -73,6 +84,7 @@ const setSchema = {
       reps: range(SET_LIMITS.reps, "integer"),
       weightKg: range(SET_LIMITS.weightKg),
       rpe: range(SET_LIMITS.rpe),
+      restSec: range(SET_LIMITS.restSec, "integer"),
     },
   },
 } as const;
@@ -187,6 +199,29 @@ export const sessionRoutes =
       },
     );
 
+    app.delete<{ Params: { id: string; exerciseId: string } }>(
+      "/workouts/:id/items/:exerciseId",
+      { ...auth, schema: removeItemSchema },
+      async (req, reply) => {
+        try {
+          return await removeItem(
+            db,
+            uid(req),
+            req.params.id,
+            req.params.exerciseId,
+          );
+        } catch (err) {
+          // A finished session is as good as gone for this route.
+          if (err instanceof WorkoutError && err.code === "session_finished") {
+            return reply
+              .code(404)
+              .send({ error: "not_found" } satisfies ApiError);
+          }
+          return sendWorkoutError(reply, err);
+        }
+      },
+    );
+
     app.put<{
       Params: { id: string };
       Body: {
@@ -195,12 +230,13 @@ export const sessionRoutes =
         reps: number;
         weightKg: number;
         rpe?: number;
+        restSec?: number;
       };
     }>(
       "/workouts/:id/sets",
       { ...auth, schema: setSchema },
       async (req, reply) => {
-        const { exerciseId, setIndex, reps, weightKg, rpe } = req.body;
+        const { exerciseId, setIndex, reps, weightKg, rpe, restSec } = req.body;
         if (
           !hasPlaces(weightKg, 1) ||
           (rpe !== undefined && !isHalfStep(rpe))
@@ -213,6 +249,7 @@ export const sessionRoutes =
             reps,
             weightKg,
             ...(rpe === undefined ? {} : { rpe }),
+            ...(restSec === undefined ? {} : { restSec }),
           });
         } catch (err) {
           return sendWorkoutError(reply, err);

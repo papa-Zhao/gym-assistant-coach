@@ -416,6 +416,8 @@ interface SetJson {
   weightKg: number | string;
   reps: number;
   rpe: number | string | null;
+  restSec: number | null;
+  completedAt: string;
 }
 
 interface CardioJson {
@@ -434,6 +436,8 @@ function toWorkoutSet(r: SetJson): WorkoutSet {
     weightKg: Number(r.weightKg),
     reps: r.reps,
     ...(rpe !== undefined ? { rpe } : {}),
+    ...(r.restSec !== null ? { restSec: r.restSec } : {}),
+    completedAt: new Date(r.completedAt).toISOString(),
   };
 }
 
@@ -460,7 +464,7 @@ function toCardioEntry(r: CardioJson): CardioEntry {
  */
 function sessionDataQuery(db: Db, userId: string, sessionId: string) {
   const json = (expr: ReturnType<typeof sql>) => sql<string>`(${expr})::text`;
-  const setFields = sql`'setIndex', ${workoutSets.setIndex}, 'weightKg', ${workoutSets.weightKg}, 'reps', ${workoutSets.reps}, 'rpe', ${workoutSets.rpe}`;
+  const setFields = sql`'setIndex', ${workoutSets.setIndex}, 'weightKg', ${workoutSets.weightKg}, 'reps', ${workoutSets.reps}, 'rpe', ${workoutSets.rpe}, 'restSec', ${workoutSets.restSec}, 'completedAt', ${workoutSets.completedAt}`;
 
   // Source session per exercise, via distinct on.
   const src = db
@@ -780,7 +784,13 @@ export async function upsertSet(
   userId: string,
   sessionId: string,
   exerciseId: string,
-  set: { setIndex: number; weightKg: number; reps: number; rpe?: number },
+  set: {
+    setIndex: number;
+    weightKg: number;
+    reps: number;
+    rpe?: number;
+    restSec?: number;
+  },
 ): Promise<ActiveSession> {
   const ctx = await requireKind(db, userId, sessionId, exerciseId, "strength");
   const values = {
@@ -789,17 +799,81 @@ export async function upsertSet(
     rpe: set.rpe === undefined ? null : String(set.rpe),
     completedAt: new Date(),
   };
+  // Omitted restSec: null on insert, the stored value kept on update.
+  const restSec = set.restSec === undefined ? {} : { restSec: set.restSec };
   await db
     .insert(workoutSets)
-    .values({ sessionId, exerciseId, setIndex: set.setIndex, ...values })
+    .values({
+      sessionId,
+      exerciseId,
+      setIndex: set.setIndex,
+      ...values,
+      ...restSec,
+    })
     .onConflictDoUpdate({
       target: [
         workoutSets.sessionId,
         workoutSets.exerciseId,
         workoutSets.setIndex,
       ],
-      set: values,
+      set: { ...values, ...restSec },
     });
+  return buildSession(db, userId, ctx);
+}
+
+/**
+ * Removes an exercise, with this session's sets and cardio for it, from the
+ * in-progress session: one statement, so all or nothing. `not_found` when the
+ * exercise is not in the session.
+ */
+export async function removeItem(
+  db: Db,
+  userId: string,
+  sessionId: string,
+  exerciseId: string,
+): Promise<ActiveSession> {
+  const ctx = await requireActiveSession(db, userId, sessionId);
+  const item = db.$with("item").as(
+    db
+      .delete(workoutSessionItems)
+      .where(
+        and(
+          eq(workoutSessionItems.sessionId, sessionId),
+          eq(workoutSessionItems.exerciseId, exerciseId),
+        ),
+      )
+      .returning({ exerciseId: workoutSessionItems.exerciseId }),
+  );
+  const found = sql`exists (select 1 from ${item})`;
+  const sets = db.$with("removed_sets").as(
+    db
+      .delete(workoutSets)
+      .where(
+        and(
+          eq(workoutSets.sessionId, sessionId),
+          eq(workoutSets.exerciseId, exerciseId),
+          found,
+        ),
+      )
+      .returning({ n: sql<number>`1`.as("n") }),
+  );
+  const cardio = db.$with("removed_cardio").as(
+    db
+      .delete(cardioEntries)
+      .where(
+        and(
+          eq(cardioEntries.sessionId, sessionId),
+          eq(cardioEntries.exerciseId, exerciseId),
+          found,
+        ),
+      )
+      .returning({ n: sql<number>`1`.as("n") }),
+  );
+  const [{ removed } = { removed: 0 }] = await db
+    .with(item, sets, cardio)
+    .select({ removed: sql<number>`count(*)::int` })
+    .from(item);
+  if (removed === 0) throw new WorkoutError("not_found");
   return buildSession(db, userId, ctx);
 }
 
@@ -986,6 +1060,9 @@ export async function finishSession(
       throw new WorkoutError("empty_session");
     }
 
+    const restSecs = mine.flatMap(({ set }) =>
+      set.restSec === null ? [] : [set.restSec],
+    );
     const touched = new Set([
       ...byExercise.keys(),
       ...cardio.map((c) => c.exerciseId),
@@ -1001,6 +1078,10 @@ export async function finishSession(
       exerciseCount: touched.size,
       setCount: mine.length,
       cardioMinutes: cardio.reduce((sum, c) => sum + c.durationMin, 0),
+      avgRestSec:
+        restSecs.length === 0
+          ? null
+          : Math.round(restSecs.reduce((a, b) => a + b, 0) / restSecs.length),
       prs,
       notified: false,
     };

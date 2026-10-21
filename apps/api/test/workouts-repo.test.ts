@@ -17,6 +17,7 @@ import {
   getSessionById,
   listExercises,
   listTemplates,
+  removeItem,
   startSession,
   todayWorkoutSummary,
   upsertCardio,
@@ -282,8 +283,18 @@ describe("workouts repo", () => {
     expect(item?.last).toEqual({
       date: "2026-10-12",
       sets: [
-        { setIndex: 1, weightKg: 60, reps: 8 },
-        { setIndex: 2, weightKg: 60, reps: 8 },
+        {
+          setIndex: 1,
+          weightKg: 60,
+          reps: 8,
+          completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        },
+        {
+          setIndex: 2,
+          weightKg: 60,
+          reps: 8,
+          completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        },
       ],
     });
     expect(item?.hint).toEqual({ suggestWeightKg: 62.5 });
@@ -321,7 +332,13 @@ describe("workouts repo", () => {
     await deleteSet(db, userId, s.id, bench.id, 2);
     const item = (await getActiveSession(db, userId, "2026-10-19"))?.items[0];
     expect(item && "sets" in item ? item.sets : null).toEqual([
-      { setIndex: 1, weightKg: 62.5, reps: 6, rpe: 8.5 },
+      {
+        setIndex: 1,
+        weightKg: 62.5,
+        reps: 6,
+        rpe: 8.5,
+        completedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+      },
     ]);
   });
 
@@ -530,6 +547,21 @@ describe("workouts repo", () => {
       expect(statements.count).toBeLessThanOrEqual(5);
       expect(out.items[0]?.exercise.id).toBe(bench.id);
       expect(out).toEqual(await getSessionById(db, userId, s.id));
+    });
+
+    it("removeItem plus response uses at most 5 queries", async () => {
+      const { db, statements, userId, slug } = await setup();
+      const bench = slug(STRENGTH[0] as string);
+      const s = await startSession(db, userId, "2026-10-19");
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 5,
+      });
+      statements.reset();
+      const out = await removeItem(db, userId, s.id, bench.id);
+      expect(statements.count).toBeLessThanOrEqual(5);
+      expect(out.items).toEqual([]);
     });
 
     it("getActiveSession query count does not grow with item count", async () => {

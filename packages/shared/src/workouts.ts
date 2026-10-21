@@ -115,6 +115,7 @@ export const SET_LIMITS = {
   reps: { min: 1, max: 100 },
   weightKg: { min: 0, max: 500 },
   rpe: { min: 1, max: 10 },
+  restSec: { min: 0, max: 3600 },
 } as const;
 
 export const CARDIO_LIMITS = {
@@ -189,6 +190,10 @@ export interface WorkoutSet {
   weightKg: number;
   reps: number;
   rpe?: number;
+  /** Seconds rested before this set, when known. */
+  restSec?: number;
+  /** ISO timestamp of when the set was last saved. */
+  completedAt: string;
 }
 
 export interface CardioEntry {
@@ -231,6 +236,8 @@ export interface FinishSummary {
   exerciseCount: number;
   setCount: number;
   cardioMinutes: number;
+  /** Average recorded rest between sets, rounded to whole seconds; null if none recorded. */
+  avgRestSec: number | null;
   prs: {
     exerciseId: string;
     nameZh: string;

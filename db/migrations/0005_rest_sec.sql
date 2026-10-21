@@ -1,0 +1,2 @@
+ALTER TABLE "workout_sets" ADD COLUMN "rest_sec" integer;--> statement-breakpoint
+ALTER TABLE "workout_sets" ADD CONSTRAINT "workout_sets_rest_sec_check" CHECK ("workout_sets"."rest_sec" between 0 and 3600);

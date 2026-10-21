@@ -40,9 +40,24 @@ describe("ActiveWorkout", () => {
           last: {
             date: "2026-10-13",
             sets: [
-              { setIndex: 1, weightKg: 80, reps: 8 },
-              { setIndex: 2, weightKg: 80, reps: 8 },
-              { setIndex: 3, weightKg: 80, reps: 8 },
+              {
+                setIndex: 1,
+                weightKg: 80,
+                reps: 8,
+                completedAt: "2026-10-19T04:00:00.000Z",
+              },
+              {
+                setIndex: 2,
+                weightKg: 80,
+                reps: 8,
+                completedAt: "2026-10-19T04:00:00.000Z",
+              },
+              {
+                setIndex: 3,
+                weightKg: 80,
+                reps: 8,
+                completedAt: "2026-10-19T04:00:00.000Z",
+              },
             ],
           },
           hint: { suggestWeightKg: 82.5 },
@@ -73,7 +88,16 @@ describe("ActiveWorkout", () => {
 
   it("complete set sends PUT with prefilled values", async () => {
     const updated = session([
-      strengthItem({ sets: [{ setIndex: 1, weightKg: 82.5, reps: 8 }] }),
+      strengthItem({
+        sets: [
+          {
+            setIndex: 1,
+            weightKg: 82.5,
+            reps: 8,
+            completedAt: "2026-10-19T04:00:00.000Z",
+          },
+        ],
+      }),
     ]);
     const { calls, onSession } = setup(
       session([
@@ -100,8 +124,18 @@ describe("ActiveWorkout", () => {
       session([
         strengthItem({
           sets: [
-            { setIndex: 1, weightKg: 80, reps: 8 },
-            { setIndex: 2, weightKg: 77.5, reps: 7 },
+            {
+              setIndex: 1,
+              weightKg: 80,
+              reps: 8,
+              completedAt: "2026-10-19T04:00:00.000Z",
+            },
+            {
+              setIndex: 2,
+              weightKg: 77.5,
+              reps: 7,
+              completedAt: "2026-10-19T04:00:00.000Z",
+            },
           ],
         }),
       ]),
@@ -271,7 +305,14 @@ describe("ActiveWorkout", () => {
           targetReps: 10,
           last: {
             date: "2026-10-13",
-            sets: [{ setIndex: 1, weightKg: 60, reps: 8 }],
+            sets: [
+              {
+                setIndex: 1,
+                weightKg: 60,
+                reps: 8,
+                completedAt: "2026-10-19T04:00:00.000Z",
+              },
+            ],
           },
         }),
       ]),
