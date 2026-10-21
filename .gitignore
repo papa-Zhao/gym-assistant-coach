@@ -12,3 +12,6 @@ __pycache__/
 # terraform
 infra/.terraform/
 *.tfstate*
+
+# generated illustration gallery
+apps/liff/gallery.html

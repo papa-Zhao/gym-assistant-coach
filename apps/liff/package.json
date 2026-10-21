@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gallery": "tsx scripts/illustration-gallery.tsx"
   },
   "dependencies": {
     "@gac/shared": "*",

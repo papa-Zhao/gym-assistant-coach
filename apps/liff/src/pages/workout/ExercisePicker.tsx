@@ -17,6 +17,7 @@ import {
 import { apiFetch } from "../../api";
 import { isAuthExpired } from "./fields";
 import { Skeleton } from "../../components/Skeleton";
+import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
 
 interface ExercisePickerProps {
   onPick: (exercise: Exercise) => void;
@@ -199,6 +200,7 @@ export function ExercisePicker({
               disabled={busy}
               onClick={() => onPick(ex)}
             >
+              <ExerciseIllustration exercise={ex} size={40} />
               <span className="row-name">
                 <ExerciseName exercise={ex} />
               </span>

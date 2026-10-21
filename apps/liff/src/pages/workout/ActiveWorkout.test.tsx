@@ -66,6 +66,13 @@ afterEach(() => {
 });
 
 describe("ActiveWorkout", () => {
+  it("exercise card shows a 64px illustration", () => {
+    const { unmount } = setup(session([strengthItem()]));
+    const svg = document.querySelector(".exercise-head svg.illus");
+    expect(svg).toHaveAttribute("width", "64");
+    unmount();
+  });
+
   it("last sets and hint are shown; first-time exercise shows none", () => {
     setup(
       session([
