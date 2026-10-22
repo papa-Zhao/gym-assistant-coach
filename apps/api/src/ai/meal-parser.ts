@@ -2,7 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { FastifyBaseLogger } from "fastify";
 import { MEAL_PHOTO_MAX_TOKENS, MEAL_TEXT_MAX_TOKENS } from "./config";
 import { MEAL_PHOTO_SYSTEM, MEAL_SCHEMA, MEAL_TEXT_SYSTEM } from "./prompts";
-import { AiUnavailable, callStructured } from "./structured-call";
+import {
+  AiUnavailable,
+  callStructured,
+  type StructuredSpec,
+} from "./structured-call";
 import type { AiTokenUsage } from "./usage";
 
 export interface ParsedItem {
@@ -80,13 +84,7 @@ function parseItems(data: unknown): ParsedItem[] | null {
   return parsed;
 }
 
-interface CallSpec {
-  kind: "text" | "photo";
-  system: string;
-  maxTokens: number;
-  content: Anthropic.MessageParam["content"];
-  logExtra?: Record<string, number>;
-}
+type CallSpec = Omit<StructuredSpec, "schema">;
 
 async function callParser(
   client: MessagesClient,

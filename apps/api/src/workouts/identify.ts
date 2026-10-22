@@ -8,7 +8,10 @@ import {
   type IdentifyEquipmentResponse,
   type MuscleGroup,
 } from "@gac/shared";
-import type { EquipmentIdentifier } from "../ai/equipment-identifier";
+import type {
+  EquipmentGuess,
+  EquipmentIdentifier,
+} from "../ai/equipment-identifier";
 import { withAiUse } from "../ai/usage";
 import { InvalidImage, normalizePhoto } from "../photos/image";
 import type { Db } from "../users/repo";
@@ -22,13 +25,19 @@ const isEquipment = (v: string): v is Equipment =>
 const isMuscleGroup = (v: string): v is MuscleGroup =>
   (MUSCLE_GROUPS as readonly string[]).includes(v);
 
+/** Plain code-unit order on slug; independent of database collation. */
+export const bySlugOrder = (a: Exercise, b: Exercise): number =>
+  a.slug! < b.slug! ? -1 : a.slug! > b.slug! ? 1 : 0;
+
 // The built-in list never changes at runtime; keep the first read so the
 // identifier gets the same list (and prompt cache prefix) on every call.
 let builtinLibrary: Promise<Exercise[]> | undefined;
 
 function getBuiltinLibrary(db: Db): Promise<Exercise[]> {
   if (!builtinLibrary) {
-    const loading = listBuiltinExercises(db);
+    const loading = listBuiltinExercises(db).then((rows) =>
+      [...rows].sort(bySlugOrder),
+    );
     // A failed read must not stick.
     loading.catch(() => {
       if (builtinLibrary === loading) builtinLibrary = undefined;
@@ -69,7 +78,18 @@ export async function identifyEquipment(
 
   const result = used.result;
   if (result.kind !== "guess") return { outcome: result.kind };
-  const { guess } = result;
+  return shapeGuess(result.guess, library);
+}
+
+/**
+ * Turns the identifier's guess into the response: unknown or "none"
+ * equipment is not_equipment, candidates are limited to known built-in
+ * slugs (deduped, in the AI's order, max 5), and the suggestion is derived.
+ */
+export function shapeGuess(
+  guess: EquipmentGuess,
+  library: Exercise[],
+): IdentifyEquipmentResponse {
   if (!isEquipment(guess.equipment) || guess.equipment === "none") {
     return { outcome: "not_equipment" };
   }

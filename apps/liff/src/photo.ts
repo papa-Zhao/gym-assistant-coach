@@ -27,7 +27,15 @@ export class PhotoReadError extends Error {
 export async function resizePhoto(file: Blob): Promise<Blob> {
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    try {
+      bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image",
+      });
+    } catch (err) {
+      // Older WebKit / Android WebViews reject the option value.
+      if (!(err instanceof TypeError)) throw err;
+      bitmap = await createImageBitmap(file);
+    }
   } catch {
     throw new PhotoReadError();
   }

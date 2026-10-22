@@ -30,6 +30,7 @@ import {
 } from "../src/ai/config";
 import { createEquipmentIdentifier } from "../src/ai/equipment-identifier";
 import { normalizePhoto } from "../src/photos/image";
+import { bySlugOrder, shapeGuess } from "../src/workouts/identify";
 import { usageCost } from "./eval-cost";
 
 interface Case {
@@ -38,7 +39,6 @@ interface Case {
   note?: string;
 }
 
-const MAX_CANDIDATES = 5;
 // Only 0004 is parsed: no later migration adds built-in exercises today.
 const SEED_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -101,7 +101,7 @@ function parseSeed(sql: string): Exercise[] {
       isCustom: false,
     });
   }
-  return out.sort((a, b) => (a.slug! < b.slug! ? -1 : 1));
+  return out.sort(bySlugOrder);
 }
 
 async function main(): Promise<void> {
@@ -132,7 +132,6 @@ async function main(): Promise<void> {
   const cases: Case[] = parsed;
 
   const library = parseSeed(readFileSync(SEED_PATH, "utf8"));
-  const known = new Set(library.map((e) => e.slug));
 
   const client = new Anthropic({
     timeout: AI_CLIENT_TIMEOUT_MS,
@@ -171,12 +170,20 @@ async function main(): Promise<void> {
       tokens = `in ${u.input} out ${u.output} cache ${u.cacheRead}/${u.cacheCreation}`;
       cost += usageCost(u);
       if (r.kind === "guess") {
-        // Same filter as production: known slugs, deduped, in order, max 5.
-        const candidates = [...new Set(r.guess.candidates)]
-          .filter((s) => known.has(s))
-          .slice(0, MAX_CANDIDATES);
-        ok = c.expectSlugs.some((s) => candidates.includes(s));
-        verdict = `${r.guess.equipment}, ${candidates.length} candidates`;
+        // Same shaping as production.
+        const shaped = shapeGuess(r.guess, library);
+        const candidates =
+          shaped.outcome === "found"
+            ? shaped.candidates.map((e) => e.slug)
+            : [];
+        ok =
+          shaped.outcome === "not_equipment"
+            ? c.expectSlugs.length === 0
+            : c.expectSlugs.some((s) => candidates.includes(s));
+        verdict =
+          shaped.outcome === "found"
+            ? `${shaped.equipment}, ${candidates.length} candidates`
+            : shaped.outcome;
       } else {
         ok = r.kind === "not_equipment" && c.expectSlugs.length === 0;
         verdict = r.kind;

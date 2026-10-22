@@ -19,8 +19,10 @@ import type { AppDeps } from "../src/deps.js";
 import { aiUsageDaily } from "../src/db/schema";
 import { syncUser, type Db } from "../src/users/repo";
 import {
+  bySlugOrder,
   identifyEquipment,
   resetBuiltinLibraryCache,
+  shapeGuess,
 } from "../src/workouts/identify";
 import { listBuiltinExercises } from "../src/workouts/repo";
 import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
@@ -254,6 +256,25 @@ describe("identifyEquipment and POST /exercises/identify", () => {
     await run();
     expect(seen.length).toBe(slugs.length);
     expect(seen.every((e) => !e.isCustom && e.slug !== null)).toBe(true);
+  });
+
+  it("gives the identifier the library in slug code-unit order", async () => {
+    await run();
+    const order = seen.map((e) => e.slug!);
+    expect(order).toEqual([...order].sort((a, b) => (a < b ? -1 : 1)));
+  });
+
+  it("shapeGuess and bySlugOrder work without a database", () => {
+    const ex = (slug: string) => ({ slug }) as never;
+    expect(["b_x", "a-z", "B", "a"].map(ex).sort(bySlugOrder)).toEqual(
+      ["B", "a", "a-z", "b_x"].map(ex),
+    );
+    expect(shapeGuess(guess({ equipment: "none" }), [])).toEqual({
+      outcome: "not_equipment",
+    });
+    expect(shapeGuess(guess({ equipment: "bogus" }), [])).toEqual({
+      outcome: "not_equipment",
+    });
   });
 
   describe("endpoint", () => {

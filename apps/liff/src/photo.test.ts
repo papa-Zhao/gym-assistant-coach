@@ -60,6 +60,38 @@ describe("resizePhoto", () => {
     );
   });
 
+  it("retries without options when the first call throws TypeError", async () => {
+    const close = vi.fn();
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("bad enum"))
+      .mockResolvedValueOnce({ width: 100, height: 100, close });
+    vi.stubGlobal("createImageBitmap", create);
+    const jpeg = new Blob(["j"], { type: "image/jpeg" });
+    stubCanvas(jpeg);
+    await expect(resizePhoto(new Blob(["x"]))).resolves.toBe(jpeg);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1]).toHaveLength(1);
+  });
+
+  it("throws PhotoReadError without retry on a non-TypeError rejection", async () => {
+    const create = vi.fn().mockRejectedValue(new Error("bad"));
+    vi.stubGlobal("createImageBitmap", create);
+    await expect(resizePhoto(new Blob(["x"]))).rejects.toBeInstanceOf(
+      PhotoReadError,
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws PhotoReadError when the retry also fails", async () => {
+    const create = vi.fn().mockRejectedValue(new TypeError("bad"));
+    vi.stubGlobal("createImageBitmap", create);
+    await expect(resizePhoto(new Blob(["x"]))).rejects.toBeInstanceOf(
+      PhotoReadError,
+    );
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
   it("throws PhotoReadError and closes the bitmap when toBlob returns null", async () => {
     const close = vi.fn();
     vi.stubGlobal(
