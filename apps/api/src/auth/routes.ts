@@ -6,9 +6,14 @@ import {
   findById,
   findByLineUserId,
   hasCurrentConsent,
+  requestAccountDeletion,
   updateDisplayName,
 } from "../users/repo";
-import { issueSession, SESSION_TTL_SECONDS, verifySession } from "./session";
+import {
+  issueSession,
+  SESSION_TTL_SECONDS,
+  verifyActiveSession,
+} from "./session";
 
 const liffSchema = {
   body: {
@@ -28,7 +33,7 @@ declare module "fastify" {
 export const authRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
-    const { db, verifyLineIdToken, sessionSecret } = deps;
+    const { db, verifyLineIdToken, sessionSecret, now } = deps;
 
     app.setErrorHandler(apiErrorHandler);
 
@@ -63,7 +68,7 @@ export const authRoutes =
     );
 
     const authenticate = bearerAuth(
-      (token) => verifySession(sessionSecret, token),
+      (token) => verifyActiveSession(db, sessionSecret, token),
       (req, { userId }) => {
         req.sessionUserId = userId;
       },
@@ -84,4 +89,9 @@ export const authRoutes =
         return { displayName: user.displayName ?? "" };
       },
     );
+
+    app.delete("/me", { onRequest: authenticate }, async (req, reply) => {
+      await requestAccountDeletion(db, req.sessionUserId as string, now());
+      return reply.code(204).send();
+    });
   };

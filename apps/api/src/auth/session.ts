@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
+import { users } from "../db/schema";
+import type { Db } from "../users/repo";
 
 export const SESSION_TTL_SECONDS = 3600;
 
@@ -25,4 +28,20 @@ export async function verifySession(
   });
   if (!payload.sub) throw new Error("session has no subject");
   return { userId: payload.sub };
+}
+
+/** verifySession plus a check that the user exists and is not deleted; rejects otherwise. */
+export async function verifyActiveSession(
+  db: Db,
+  secret: Uint8Array,
+  token: string,
+): Promise<{ userId: string }> {
+  const session = await verifySession(secret, token);
+  // A token outlives a deletion by up to SESSION_TTL_SECONDS; check every time.
+  const [row] = await db
+    .select({ status: users.status })
+    .from(users)
+    .where(eq(users.id, session.userId));
+  if (!row || row.status === "deleted") throw new Error("inactive session");
+  return session;
 }

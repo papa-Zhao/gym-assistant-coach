@@ -9,7 +9,7 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
-import { verifySession } from "../auth/session";
+import { verifyActiveSession } from "../auth/session";
 import { listMetrics, recordMetrics } from "./repo";
 
 const KEYS: MetricKey[] = ["weightKg", "bodyFatPct", "waistCm"];
@@ -49,7 +49,7 @@ export const metricsRoutes =
     app.setErrorHandler(apiErrorHandler);
 
     const authenticate = bearerAuth(
-      (token) => verifySession(sessionSecret, token),
+      (token) => verifyActiveSession(db, sessionSecret, token),
       (req, { userId }) => {
         req.metricsUserId = userId;
       },
