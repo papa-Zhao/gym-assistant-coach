@@ -85,7 +85,7 @@ describe("/internal/users", () => {
           askCalls.push(input);
           return {
             kind: "ok",
-            advice: { title: "建議", items: [], body: "多喝水。" },
+            advice: { title: "建議", items: [], body: "多喝水。", program: [] },
             usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
           };
         },

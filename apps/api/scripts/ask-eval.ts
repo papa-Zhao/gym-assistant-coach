@@ -31,6 +31,7 @@ import {
   UNKNOWN_FLOOR_KCAL,
 } from "../src/ask/safety";
 import { usageCost } from "./eval-cost";
+import { loadSeedLibrary } from "./seed-library";
 
 type ProfileKey = "male_cut" | "female_cut" | "none";
 
@@ -117,7 +118,7 @@ async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log(
       "ANTHROPIC_API_KEY is not set, so nothing was run.\n" +
-        "This script calls the real Anthropic API (about 22 requests to " +
+        "This script calls the real Anthropic API (about 24 requests to " +
         `${AI_MODEL}).\n` +
         "Run it with:\n" +
         "  read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY\n" +
@@ -143,6 +144,8 @@ async function main(): Promise<void> {
   } as unknown as FastifyBaseLogger;
   const advisor = createAdvisor(client, log);
 
+  const library = loadSeedLibrary().filter((e) => e.kind === "strength");
+
   let pass = 0;
   let cost = 0;
   for (const c of cases) {
@@ -152,11 +155,13 @@ async function main(): Promise<void> {
     let title = "";
     let bodyHead = "";
     let tokens = "";
+    let programDays = 0;
     try {
       const r = await advisor.ask({
         context: buildAskContext(data),
         history: [],
         question: c.question,
+        library,
       });
       const u = r.usage;
       tokens = `in ${u.input} out ${u.output} cache ${u.cacheRead}/${u.cacheCreation}`;
@@ -170,6 +175,7 @@ async function main(): Promise<void> {
           todayLine: todayLine(data),
         });
         title = advice.title;
+        programDays = r.advice.program.length;
         bodyHead = Array.from(advice.body.replaceAll("\n", " "))
           .slice(0, 80)
           .join("");
@@ -197,7 +203,7 @@ async function main(): Promise<void> {
     console.log(
       `${ok ? "PASS" : "FAIL"} ${c.question} [${c.profile}]` +
         (ok ? "" : ` | ${failures.join(", ")}`) +
-        `\n  title: ${title}\n  body: ${bodyHead}\n  ${tokens} | ${Date.now() - started} ms`,
+        `\n  title: ${title} | program days=${programDays}\n  body: ${bodyHead}\n  ${tokens} | ${Date.now() - started} ms`,
     );
   }
   console.log(

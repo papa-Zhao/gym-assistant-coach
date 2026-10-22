@@ -1,13 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import {
-  EQUIPMENT,
-  EQUIPMENT_LABELS,
-  MUSCLE_GROUPS,
-  MUSCLE_GROUP_LABELS,
-  type Exercise,
-} from "@gac/shared";
+import { EQUIPMENT, MUSCLE_GROUPS, type Exercise } from "@gac/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { EQUIPMENT_PHOTO_MAX_TOKENS } from "./config";
+import { deepFreeze, libraryView } from "./library";
 import { EQUIPMENT_SYSTEM_HEAD } from "./prompts";
 import { callStructured } from "./structured-call";
 import type { AiTokenUsage } from "./usage";
@@ -43,30 +38,9 @@ interface Built {
 // library always yields the same strings and objects (stable cache prefix).
 let cached: Built | undefined;
 
-function deepFreeze<T extends object>(o: T): T {
-  for (const v of Object.values(o)) {
-    if (typeof v === "object" && v !== null) deepFreeze(v);
-  }
-  return Object.freeze(o);
-}
-
 function build(library: Exercise[]): Built {
-  const rows = library.filter(
-    (e): e is Exercise & { slug: string } => e.slug !== null,
-  );
-  const key = rows
-    .map((e) => [e.slug, e.nameZh, e.equipment, e.muscleGroup ?? ""].join("|"))
-    .join("\n");
+  const { key, slugs, lines } = libraryView(library);
   if (cached?.key === key) return cached;
-  const slugs = rows.map((e) => e.slug);
-  const lines = rows.map((e) =>
-    [
-      e.slug,
-      e.nameZh,
-      EQUIPMENT_LABELS[e.equipment],
-      e.muscleGroup ? MUSCLE_GROUP_LABELS[e.muscleGroup] : "—",
-    ].join("｜"),
-  );
   cached = {
     key,
     system: `${EQUIPMENT_SYSTEM_HEAD}\n${lines.join("\n")}`,

@@ -19,6 +19,7 @@ const okResult: AdvisorResult = {
     title: "晚餐建議",
     items: [{ name: "雞胸肉", detail: "150 g" }],
     body: "多吃蛋白質。",
+    program: [],
   },
   usage,
 };

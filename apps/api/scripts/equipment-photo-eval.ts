@@ -11,17 +11,7 @@
 // Use expectSlugs: [] for a photo that is expected not to be equipment.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  EQUIPMENT,
-  MUSCLE_GROUPS,
-  equipmentCategory,
-  type Equipment,
-  type Exercise,
-  type ExerciseKind,
-  type MuscleGroup,
-} from "@gac/shared";
 import type { FastifyBaseLogger } from "fastify";
 import {
   AI_CLIENT_MAX_RETRIES,
@@ -30,20 +20,15 @@ import {
 } from "../src/ai/config";
 import { createEquipmentIdentifier } from "../src/ai/equipment-identifier";
 import { normalizePhoto } from "../src/photos/image";
-import { bySlugOrder, shapeGuess } from "../src/workouts/identify";
+import { shapeGuess } from "../src/workouts/identify";
 import { usageCost } from "./eval-cost";
+import { loadSeedLibrary } from "./seed-library";
 
 interface Case {
   file: string;
   expectSlugs: string[];
   note?: string;
 }
-
-// Only 0004 is parsed: no later migration adds built-in exercises today.
-const SEED_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../db/migrations/0004_seed_exercises.sql",
-);
 
 const USAGE =
   "Usage:\n" +
@@ -61,47 +46,6 @@ function isCase(v: unknown): v is Case {
     Array.isArray(c.expectSlugs) &&
     c.expectSlugs.every((s) => typeof s === "string")
   );
-}
-
-// Row order: (slug, name_zh, name_en, kind, muscle_group, equipment).
-const ROW =
-  /^\s*\(((?:'(?:[^']|'')*'|null)(?:\s*,\s*(?:'(?:[^']|'')*'|null))*)\)/;
-const FIELD = /'((?:[^']|'')*)'|null/g;
-
-function parseSeed(sql: string): Exercise[] {
-  const out: Exercise[] = [];
-  for (const line of sql.split("\n")) {
-    const row = ROW.exec(line);
-    if (!row?.[1]) continue;
-    const f = Array.from(row[1].matchAll(FIELD), (m) =>
-      m[1] === undefined ? null : m[1].replaceAll("''", "'"),
-    );
-    const [slug, nameZh, nameEn, kind, muscleGroup, equipment] = f;
-    if (
-      f.length !== 6 ||
-      !slug ||
-      !nameZh ||
-      (kind !== "strength" && kind !== "cardio") ||
-      !equipment ||
-      !(EQUIPMENT as readonly string[]).includes(equipment) ||
-      (muscleGroup !== null &&
-        !(MUSCLE_GROUPS as readonly string[]).includes(muscleGroup!))
-    ) {
-      throw new Error("bad seed row");
-    }
-    out.push({
-      id: slug,
-      slug,
-      nameZh,
-      nameEn: nameEn ?? null,
-      kind: kind as ExerciseKind,
-      muscleGroup: muscleGroup as MuscleGroup | null,
-      equipment: equipment as Equipment,
-      equipmentCategory: equipmentCategory(equipment as Equipment),
-      isCustom: false,
-    });
-  }
-  return out.sort(bySlugOrder);
 }
 
 async function main(): Promise<void> {
@@ -131,7 +75,7 @@ async function main(): Promise<void> {
   }
   const cases: Case[] = parsed;
 
-  const library = parseSeed(readFileSync(SEED_PATH, "utf8"));
+  const library = loadSeedLibrary();
 
   const client = new Anthropic({
     timeout: AI_CLIENT_TIMEOUT_MS,

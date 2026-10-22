@@ -24,6 +24,7 @@ export async function askCoach(
       context: buildAskContext(data),
       history,
       question,
+      library: [],
     });
   });
 
