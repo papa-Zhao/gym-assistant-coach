@@ -431,6 +431,27 @@ export const aiUsageDaily = pgTable(
   ],
 );
 
+/** ai_usage_daily totals of hard-deleted accounts, with no user column. */
+export const aiUsageAnonymousDaily = pgTable(
+  "ai_usage_anonymous_daily",
+  {
+    day: date("day").notNull(),
+    kind: text("kind").notNull(),
+    count: integer("count").notNull().default(0),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheCreationTokens: integer("cache_creation_tokens").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.day, t.kind] }),
+    check(
+      "ai_usage_anonymous_daily_kind_check",
+      sql`${t.kind} in (${inList(AI_KINDS)})`,
+    ),
+  ],
+);
+
 export const aiConversations = pgTable(
   "ai_conversations",
   {

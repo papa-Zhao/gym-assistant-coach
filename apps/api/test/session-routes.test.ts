@@ -51,6 +51,7 @@ describe("workout session routes", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: (...args) => notify(...args),
       mealParser: unusedMealParser,

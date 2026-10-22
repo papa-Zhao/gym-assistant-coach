@@ -12,6 +12,7 @@ const full = {
   BOT_AUDIENCE: "gac-bot-internal",
   ANTHROPIC_API_KEY: "sk-ant-test-key",
   MEAL_PHOTOS_BUCKET: "test-bucket",
+  SCHEDULER_SA_EMAIL: "scheduler-invoker@x.iam.gserviceaccount.com",
 };
 
 describe("loadConfig", () => {
@@ -43,6 +44,22 @@ describe("loadConfig", () => {
     delete rest.MEAL_PHOTOS_BUCKET;
     expect(() => loadConfig(rest)).toThrow(/MEAL_PHOTOS_BUCKET/);
     expect(loadConfig(full).mealPhotosBucket).toBe("test-bucket");
+  });
+
+  it("requires SCHEDULER_SA_EMAIL, naming only the variable", () => {
+    const rest: Record<string, string> = { ...full };
+    delete rest.SCHEDULER_SA_EMAIL;
+    let message = "";
+    try {
+      loadConfig(rest);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain("SCHEDULER_SA_EMAIL");
+    for (const v of Object.values(rest)) expect(message).not.toContain(v);
+    expect(loadConfig(full).schedulerServiceAccount).toBe(
+      full.SCHEDULER_SA_EMAIL,
+    );
   });
 
   it("treats empty values as missing", () => {

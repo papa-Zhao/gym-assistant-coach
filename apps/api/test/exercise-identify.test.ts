@@ -113,6 +113,7 @@ describe("identifyEquipment and POST /exercises/identify", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,

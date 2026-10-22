@@ -37,6 +37,7 @@ describe("auth", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async (tok) => {
         if (tok === "ok") return { sub: U_OK, name: "Amy" };
         if (tok === "noconsent") return { sub: U_NOCONSENT, name: null };
@@ -229,6 +230,7 @@ describe("error handling", () => {
           throw new Error("unused");
         },
         botServiceAccount: "bot@x",
+        schedulerServiceAccount: "scheduler@x",
         verifyLineIdToken: async () => {
           if (throwing) throw new Error(LEAK);
           return { sub: "Uabc", name: null };

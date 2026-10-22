@@ -71,13 +71,26 @@ export const unusedPhotoStore: PhotoStore = {
   delete: async () => {
     throw new Error("photo store should not be called");
   },
+  deletePrefix: async () => {
+    throw new Error("photo store should not be called");
+  },
 };
 
 /** In-memory store recording calls; set `fail` to make an operation throw. */
 export function memoryPhotoStore() {
   const objects = new Map<string, Buffer>();
-  const calls = { put: [] as string[], delete: [] as string[] };
-  const fail = { put: false, signedUrl: false, delete: false };
+  const calls = {
+    put: [] as string[],
+    delete: [] as string[],
+    deletePrefix: [] as string[],
+  };
+  const fail = {
+    put: false,
+    signedUrl: false,
+    delete: false,
+    /** deletePrefix throws for prefixes in this set. */
+    deletePrefix: new Set<string>(),
+  };
   /** Calls that never settle. */
   const hang = { put: false, delete: false };
   const never = () => new Promise<never>(() => {});
@@ -97,6 +110,13 @@ export function memoryPhotoStore() {
       if (hang.delete) await never();
       if (fail.delete) throw new Error("boom");
       objects.delete(key);
+    },
+    async deletePrefix(prefix) {
+      calls.deletePrefix.push(prefix);
+      if (fail.deletePrefix.has(prefix)) throw new TypeError("boom");
+      for (const key of [...objects.keys()]) {
+        if (key.startsWith(prefix)) objects.delete(key);
+      }
     },
   };
   return { store, objects, calls, fail, hang };

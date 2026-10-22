@@ -274,6 +274,7 @@ describe("GET /me/export", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => {
         throw new Error("unused");
       },

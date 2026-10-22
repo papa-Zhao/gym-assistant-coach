@@ -25,6 +25,8 @@ export interface AppDeps {
   db: Db;
   verifyServiceToken: VerifyServiceToken;
   botServiceAccount: string;
+  /** The only identity allowed to call /jobs (Cloud Scheduler). */
+  schedulerServiceAccount: string;
   verifyLineIdToken: VerifyLineIdToken;
   notifyWorkoutFinished: NotifyWorkoutFinished;
   /** Turns meal text into estimated items; tests inject a fake. */
