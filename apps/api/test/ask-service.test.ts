@@ -1,12 +1,13 @@
 import { AI_DAILY_LIMITS } from "@gac/shared";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Advisor, AdvisorResult } from "../src/ai/advisor";
+import type { Advisor, AdvisorResult, RawAdvice } from "../src/ai/advisor";
 import { AiUnavailable } from "../src/ai/structured-call";
 import { adviceText } from "../src/ask/advice";
 import { appendExchange } from "../src/ask/repo";
 import { askCoach } from "../src/ask/service";
-import { aiMessages, aiUsageDaily } from "../src/db/schema";
+import { MEDICAL_NOTICE } from "../src/ask/safety";
+import { aiMessages, aiPrograms, aiUsageDaily } from "../src/db/schema";
 import { saveProfile } from "../src/profile/repo";
 import { syncUser, type Db } from "../src/users/repo";
 import { createTestDb } from "./db";
@@ -19,6 +20,7 @@ const okResult: AdvisorResult = {
     title: "晚餐建議",
     items: [{ name: "雞胸肉", detail: "150 g" }],
     body: "多吃蛋白質。",
+    program: [],
   },
   usage,
 };
@@ -141,5 +143,88 @@ describe("askCoach", () => {
     const rows = await db.select().from(aiMessages);
     expect(rows.map((r) => r.content)).not.toContain("舊問題");
     expect(rows).toHaveLength(2);
+  });
+
+  const withProgram = (program: RawAdvice["program"]): AdvisorResult => ({
+    ...okResult,
+    advice: { ...okResult.advice, program },
+  });
+  const twoDays = [
+    {
+      name: "推日",
+      exercises: [
+        { slug: "barbell-bench-press", sets: 4, reps: 8 },
+        { slug: "dumbbell-shoulder-press", sets: 3, reps: 10 },
+      ],
+    },
+    {
+      name: "拉日",
+      exercises: [{ slug: "nope", sets: 3, reps: 8 }],
+    },
+    {
+      name: "腿日",
+      exercises: [{ slug: "treadmill-run", sets: 1, reps: 1 }],
+    },
+    {
+      name: " ",
+      exercises: [{ slug: "dumbbell-shoulder-press", sets: 99, reps: 0 }],
+    },
+  ];
+
+  it("shapes, stores and returns a program", async () => {
+    next = async () => withProgram(twoDays);
+    const res = await askCoach(deps(), userId, "幫我排課表");
+    if (res.outcome !== "answer") throw new Error("expected answer");
+    const program = res.advice.program;
+    expect(program?.days).toEqual([
+      {
+        name: "推日",
+        items: [
+          { nameZh: "槓鈴臥推", sets: 4, reps: 8 },
+          { nameZh: "啞鈴肩推", sets: 3, reps: 10 },
+        ],
+      },
+      { name: "第 2 天", items: [{ nameZh: "啞鈴肩推", sets: 10, reps: 1 }] },
+    ]);
+    const rows = await db.select().from(aiPrograms);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(program?.id);
+    const stored = await db.select().from(aiMessages);
+    expect(stored.find((m) => m.role === "assistant")?.content).toContain(
+      "【推日】槓鈴臥推 4×8、啞鈴肩推 3×10",
+    );
+  });
+
+  it("writes no program when the question needs a medical notice", async () => {
+    next = async () => withProgram(twoDays);
+    const res = await askCoach(deps(), userId, "膝蓋痛，幫我排課表");
+    if (res.outcome !== "answer") throw new Error("expected answer");
+    expect(res.advice.program).toBeNull();
+    expect(res.advice.notices).toContain(MEDICAL_NOTICE);
+    expect(await db.select().from(aiPrograms)).toHaveLength(0);
+    const stored = await db.select().from(aiMessages);
+    expect(stored.some((m) => m.content.includes("【"))).toBe(false);
+  });
+
+  it("returns program null for an empty or fully invalid program", async () => {
+    for (const program of [
+      [],
+      [{ name: "A", exercises: [{ slug: "nope", sets: 3, reps: 8 }] }],
+    ]) {
+      next = async () => withProgram(program);
+      const res = await askCoach(deps(), userId, "嗨");
+      if (res.outcome !== "answer") throw new Error("expected answer");
+      expect(res.advice.program).toBeNull();
+    }
+    expect(await db.select().from(aiPrograms)).toHaveLength(0);
+  });
+
+  it("gives the advisor only strength built-ins in slug order", async () => {
+    await askCoach(deps(), userId, "嗨");
+    const lib = calls[0]!.library;
+    expect(lib.length).toBeGreaterThan(0);
+    expect(lib.every((e) => e.kind === "strength" && !e.isCustom)).toBe(true);
+    const slugs = lib.map((e) => e.slug!);
+    expect(slugs).toEqual([...slugs].sort((a, b) => (a < b ? -1 : 1)));
   });
 });

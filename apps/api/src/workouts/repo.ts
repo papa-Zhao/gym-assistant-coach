@@ -45,6 +45,9 @@ import {
 } from "../db/schema";
 import type { Db } from "../users/repo";
 
+/** Longest template name, in code points. */
+export const MAX_TEMPLATE_NAME = 30;
+
 export type WorkoutErrorCode =
   | "not_found"
   | "already_finished"

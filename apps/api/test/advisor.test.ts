@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { Exercise } from "@gac/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { describe, expect, it } from "vitest";
 import { AiUnavailable } from "../src/ai/structured-call";
-import { createAdvisor } from "../src/ai/advisor";
+import { askSchema, askSystemPrompt, createAdvisor } from "../src/ai/advisor";
 import { ASK_MAX_TOKENS } from "../src/ai/config";
-import { ASK_SCHEMA, ASK_SYSTEM } from "../src/ai/prompts";
+import { ASK_SYSTEM_HEAD } from "../src/ai/prompts";
 import { adviceText, shapeAdvice } from "../src/ask/advice";
 import { MEDICAL_NOTICE } from "../src/ask/safety";
 
@@ -12,7 +13,40 @@ const GOOD = {
   title: "吃便當",
   items: [{ name: "雞腿", detail: "560 kcal" }],
   body: "ok",
+  program: [],
 };
+
+function ex(
+  slug: string,
+  nameZh: string,
+  muscleGroup: Exercise["muscleGroup"],
+  equipment: Exercise["equipment"],
+): Exercise {
+  return {
+    id: `id-${slug}`,
+    slug,
+    nameZh,
+    nameEn: null,
+    kind: "strength",
+    muscleGroup,
+    equipment,
+    equipmentCategory: "machine",
+    isCustom: false,
+  };
+}
+
+const LIBRARY: Exercise[] = [
+  ex("barbell-bench-press", "槓鈴臥推", "chest", "barbell"),
+  ex("lat-pulldown", "滑輪下拉", "back", "cable"),
+];
+const OTHER_LIBRARY: Exercise[] = [LIBRARY[0]!];
+
+const PROGRAM = [
+  {
+    name: "推日",
+    exercises: [{ slug: "barbell-bench-press", sets: 4, reps: 8 }],
+  },
+];
 
 function message(content: unknown[], stop_reason = "end_turn") {
   return {
@@ -58,6 +92,7 @@ const input = {
     { role: "assistant" as const, content: "a1" },
   ],
   question: "吃什麼",
+  library: LIBRARY,
 };
 
 describe("advisor", () => {
@@ -74,8 +109,10 @@ describe("advisor", () => {
     };
     expect(req.max_tokens).toBe(ASK_MAX_TOKENS);
     expect(req.output_config.effort).toBe("medium");
-    expect(req.output_config.format.schema).toBe(ASK_SCHEMA);
-    expect(req.system[0]!.text).toBe(ASK_SYSTEM);
+    expect(req.output_config.format.schema).toBe(askSchema(LIBRARY));
+    expect(req.system[0]!.text).toBe(askSystemPrompt(LIBRARY));
+    expect(req.system[0]!.text.startsWith(ASK_SYSTEM_HEAD)).toBe(true);
+    expect(req.system[0]!.text).toContain("barbell-bench-press｜槓鈴臥推｜");
     expect(req.system[0]!.cache_control).toEqual({ type: "ephemeral" });
     expect(req.messages).toEqual([
       { role: "user", content: "q1" },
@@ -95,6 +132,37 @@ describe("advisor", () => {
       advice: GOOD,
       usage: { input: 10, output: 5, cacheRead: 0, cacheCreation: 0 },
     });
+  });
+
+  it("parses a program", async () => {
+    const { advisor } = setup(() =>
+      message([
+        { type: "text", text: JSON.stringify({ ...GOOD, program: PROGRAM }) },
+      ]),
+    );
+    const r = await advisor.ask(input);
+    expect(r.kind === "ok" && r.advice.program).toEqual(PROGRAM);
+  });
+
+  it("rejects a malformed program", async () => {
+    const bads: unknown[] = [
+      undefined,
+      [
+        {
+          name: "推日",
+          exercises: [{ slug: "a", sets: "4", reps: 8 }],
+        },
+      ],
+      [{ name: "推日", exercises: "x" }],
+      [{ name: 1, exercises: [] }],
+      [{ name: "推日", exercises: [{ slug: 1, sets: 4, reps: 8 }] }],
+    ];
+    for (const program of bads) {
+      const { advisor } = setup(() =>
+        message([{ type: "text", text: JSON.stringify({ ...GOOD, program }) }]),
+      );
+      expect((await advisor.ask(input)).kind).toBe("invalid");
+    }
   });
 
   it("maps refusal, max_tokens and bad shape", async () => {
@@ -137,6 +205,37 @@ describe("advisor", () => {
   });
 });
 
+describe("ask prompt and schema", () => {
+  it("are stable for the same library and change with another", () => {
+    expect(askSystemPrompt(LIBRARY)).toBe(askSystemPrompt([...LIBRARY]));
+    expect(askSchema(LIBRARY)).toBe(askSchema([...LIBRARY]));
+    expect(askSystemPrompt(OTHER_LIBRARY)).not.toBe(askSystemPrompt(LIBRARY));
+    expect(askSchema(OTHER_LIBRARY)).not.toBe(askSchema(LIBRARY));
+  });
+
+  it("limits program slugs to the library", () => {
+    const schema = askSchema(LIBRARY) as {
+      required: string[];
+      properties: {
+        program: {
+          items: {
+            properties: {
+              exercises: {
+                items: { properties: { slug: { enum: string[] } } };
+              };
+            };
+          };
+        };
+      };
+    };
+    expect(schema.required).toEqual(["title", "items", "body", "program"]);
+    expect(
+      schema.properties.program.items.properties.exercises.items.properties.slug
+        .enum,
+    ).toEqual(["barbell-bench-press", "lat-pulldown"]);
+  });
+});
+
 describe("shapeAdvice", () => {
   const opts = { question: "吃什麼", floorKcal: 1500, todayLine: "今天剩 500" };
 
@@ -172,6 +271,7 @@ describe("shapeAdvice", () => {
       {
         title: "每天都吃",
         items: [{ name: "雞腿", detail: "560 kcal" }],
+        program: [],
         body: "ok",
       },
       opts,

@@ -78,6 +78,13 @@
       "when": 1792672282343,
       "tag": "0010_ai_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792678294757,
+      "tag": "0011_ai_programs",
+      "breakpoints": true
     }
   ]
 }

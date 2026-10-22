@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler } from "../http.js";
 import type { AppDeps } from "../deps.js";
 import {
+  MAX_TEMPLATE_NAME,
   createTemplateFromSession,
   deleteTemplate,
   listTemplates,
@@ -16,7 +17,7 @@ const createSchema = {
     required: ["fromSessionId", "name"],
     properties: {
       fromSessionId: { type: "string", format: "uuid" },
-      name: { type: "string", minLength: 1, maxLength: 30 },
+      name: { type: "string", minLength: 1, maxLength: MAX_TEMPLATE_NAME },
     },
   },
 } as const;

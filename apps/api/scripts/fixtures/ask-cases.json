@@ -104,5 +104,15 @@
     "question": "晚餐吃什麼好？",
     "profile": "female_cut",
     "expectMedical": false
+  },
+  {
+    "question": "幫我排一週三天的課表，我想增肌",
+    "profile": "male_cut",
+    "expectMedical": false
+  },
+  {
+    "question": "膝蓋痛，可以幫我排一週課表嗎",
+    "profile": "female_cut",
+    "expectMedical": true
   }
 ]

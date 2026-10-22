@@ -2,6 +2,10 @@ import type { AskResponse } from "@gac/shared";
 import type { Advisor } from "../ai/advisor";
 import { withAiUse } from "../ai/usage";
 import type { Db } from "../users/repo";
+import { createProgram } from "./programs";
+import { shapeProgram } from "./program";
+import { MEDICAL_NOTICE } from "./safety";
+import { getBuiltinLibrary } from "../workouts/library";
 import { adviceText, shapeAdvice } from "./advice";
 import { buildAskContext, loadAskContext, todayLine } from "./context";
 import { appendExchange, purgeExpiredMessages, recentTurns } from "./repo";
@@ -16,6 +20,10 @@ export async function askCoach(
   const now = deps.now();
   await purgeExpiredMessages(db, now);
 
+  const library = (await getBuiltinLibrary(db)).filter(
+    (e) => e.kind === "strength",
+  );
+
   let data: Awaited<ReturnType<typeof loadAskContext>> | undefined;
   const outcome = await withAiUse(db, userId, "chat", now, async () => {
     data = await loadAskContext(db, userId, now);
@@ -24,6 +32,7 @@ export async function askCoach(
       context: buildAskContext(data),
       history,
       question,
+      library,
     });
   });
 
@@ -37,6 +46,35 @@ export async function askCoach(
     floorKcal: data.floorKcal,
     todayLine: todayLine(data),
   });
+  const days = advice.notices.includes(MEDICAL_NOTICE)
+    ? []
+    : shapeProgram(result.advice.program, library);
+  if (days.length > 0) {
+    const id = await createProgram(
+      db,
+      userId,
+      days.map((d) => ({
+        name: d.name,
+        items: d.items.map(({ exerciseId, sets, reps }) => ({
+          exerciseId,
+          sets,
+          reps,
+        })),
+      })),
+      now,
+    );
+    advice.program = {
+      id,
+      days: days.map((d) => ({
+        name: d.name,
+        items: d.items.map(({ nameZh, sets, reps }) => ({
+          nameZh,
+          sets,
+          reps,
+        })),
+      })),
+    };
+  }
   await appendExchange(
     db,
     userId,

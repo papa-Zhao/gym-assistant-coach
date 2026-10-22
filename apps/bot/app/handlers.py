@@ -21,6 +21,7 @@ from app.commands import InvalidMetric, MetricCommand, parse_metric_command
 from app.internal import VerifyApiToken, google_verifier, internal_router
 from app.line_replier import LineReplier
 from app.meal_commands import MealPostback, MealText, parse_meal_log, parse_meal_postback
+from app.program_commands import ProgramPostback, parse_program_postback
 from app.settings import CONSENT_VERSION, Settings
 
 logger = logging.getLogger("gac.bot")
@@ -102,6 +103,28 @@ def _handle_meal_postback(
         if failure is None:
             raise
         reply = failure
+    deps.line.reply(token, [reply])
+
+
+def _handle_program_postback(
+    event: PostbackEvent, postback: ProgramPostback, user_id: str, deps: "_Deps"
+) -> None:
+    token = event.reply_token
+    if not deps.api.sync(user_id, deps.line.profile_name(user_id)).consented:
+        deps.line.reply(token, [messages.welcome(deps.settings.public_site_url)])
+        return
+    try:
+        saved = deps.api.save_program_day(user_id, postback.program_id, postback.day)
+    except Exception as err:
+        failure = _api_failure_reply(err, event.type, on_not_found=messages.program_expired())
+        if failure is None:
+            raise
+        deps.line.reply(token, [failure])
+        return
+    if saved.outcome == "already_saved":
+        reply = messages.program_already_saved(saved.template_name)
+    else:
+        reply = messages.program_saved(saved.template_name)
     deps.line.reply(token, [reply])
 
 
@@ -271,12 +294,15 @@ def _handle_event(event: Event, deps: _Deps) -> None:
         return
     action = None
     meal_postback = None
+    program_postback = None
     if isinstance(event, PostbackEvent):
         action = _menu_action(event.postback.data)
         meal_postback = parse_meal_postback(event.postback.data)
+        program_postback = parse_program_postback(event.postback.data)
         if (
             action is None
             and meal_postback is None
+            and program_postback is None
             and not _is_consent_postback(event.postback.data)
         ):
             return
@@ -293,6 +319,8 @@ def _handle_event(event: Event, deps: _Deps) -> None:
         _handle_menu(event, action, user_id, deps)
     elif isinstance(event, PostbackEvent) and meal_postback is not None:
         _handle_meal_postback(event, meal_postback, user_id, deps)
+    elif isinstance(event, PostbackEvent) and program_postback is not None:
+        _handle_program_postback(event, program_postback, user_id, deps)
     elif isinstance(event, PostbackEvent):
         deps.api.consent(user_id, CONSENT_VERSION)
         deps.line.reply(event.reply_token, [messages.consent_done(deps.settings.liff_id)])

@@ -8,10 +8,12 @@ from app.api_client import (
     Meal,
     MealConfirmed,
     MetricRecorded,
+    Program,
     TodayResult,
     WorkoutSummary,
 )
 from app.commands import METRIC_LIMITS
+from app.program_commands import PROGRAM_MAX_DAYS, program_save_data
 from app.settings import CONSENT_VERSION
 
 PRIMARY = "#B4492A"
@@ -765,7 +767,7 @@ def _advice_item_block(name: str, detail: str) -> dict[str, Any]:
     }
 
 
-def advice_card(advice: Advice) -> Message:
+def _advice_bubble(advice: Advice) -> tuple[str, dict[str, Any]]:
     title = advice.title.strip() or "AI 建議"
     body: list[dict[str, Any]] = []
     if advice.today_line is not None and advice.today_line.strip():
@@ -802,32 +804,115 @@ def advice_card(advice: Advice) -> Message:
     )
     body.append({"type": "separator"})
     body.append({"type": "text", "text": DISCLAIMER, "size": "xs", "color": MUTED, "wrap": True})
+    return title, {
+        "type": "bubble",
+        "styles": {
+            "body": {"backgroundColor": SURFACE},
+            "footer": {"backgroundColor": SURFACE},
+        },
+        "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": body},
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "secondary",
+                    "height": "md",
+                    "action": {
+                        "type": "postback",
+                        "label": "再問一個問題",
+                        "data": "action=ask",
+                        "displayText": "再問一個問題",
+                    },
+                }
+            ],
+        },
+    }
+
+
+MAX_CAROUSEL_BUBBLES = 12
+
+
+def _program_day_bubble(program: Program, number: int) -> dict[str, Any]:
+    day = program.days[number - 1]
+    fallback = f"第 {number} 天"
+    name = day.name.strip() or fallback
+    lines = [
+        {
+            "type": "text",
+            "text": f"{item.name} {item.sets}×{item.reps}",
+            "size": "sm",
+            "color": TEXT,
+            "wrap": True,
+        }
+        for item in day.items
+        if item.name.strip()
+    ]
+    return {
+        "type": "bubble",
+        "styles": {"body": {"backgroundColor": SURFACE}, "footer": {"backgroundColor": SURFACE}},
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": fallback, "size": "xs", "color": MUTED},
+                {
+                    "type": "text",
+                    "text": name,
+                    "weight": "bold",
+                    "size": "lg",
+                    "color": TEXT,
+                    "wrap": True,
+                },
+                *lines,
+            ],
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": PRIMARY,
+                    "height": "md",
+                    "action": {
+                        "type": "postback",
+                        "label": "存成範本",
+                        "data": program_save_data(program.id, number),
+                        "displayText": f"存成範本：{name}",
+                    },
+                }
+            ],
+        },
+    }
+
+
+def advice_card(advice: Advice) -> Message:
+    title, bubble = _advice_bubble(advice)
+    program = advice.program
+    if program is None or not program.days:
+        return {"type": "flex", "altText": title, "contents": bubble}
+    days = [
+        _program_day_bubble(program, n)
+        for n in range(1, min(len(program.days), MAX_CAROUSEL_BUBBLES - 1, PROGRAM_MAX_DAYS) + 1)
+    ]
     return {
         "type": "flex",
         "altText": title,
-        "contents": {
-            "type": "bubble",
-            "styles": {
-                "body": {"backgroundColor": SURFACE},
-                "footer": {"backgroundColor": SURFACE},
-            },
-            "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": body},
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "button",
-                        "style": "secondary",
-                        "height": "md",
-                        "action": {
-                            "type": "postback",
-                            "label": "再問一個問題",
-                            "data": "action=ask",
-                            "displayText": "再問一個問題",
-                        },
-                    }
-                ],
-            },
-        },
+        "contents": {"type": "carousel", "contents": [bubble, *days]},
     }
+
+
+def program_saved(name: str) -> Message:
+    return {"type": "text", "text": f"「{name}」範本已經儲存"}
+
+
+def program_already_saved(name: str) -> Message:
+    return {"type": "text", "text": f"「{name}」範本已經存過了"}
+
+
+def program_expired() -> Message:
+    return {"type": "text", "text": "這份課表已過期，請重新問 AI。"}

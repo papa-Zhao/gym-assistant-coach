@@ -5,7 +5,14 @@ import {
   purgeExpiredMessages,
   recentTurns,
 } from "../src/ask/repo";
-import { aiConversations, aiMessages } from "../src/db/schema";
+import { createProgram, saveProgramDay } from "../src/ask/programs";
+import {
+  aiConversations,
+  aiMessages,
+  aiPrograms,
+  exercises,
+  workoutTemplates,
+} from "../src/db/schema";
 import { syncUser, type Db } from "../src/users/repo";
 import { createTestDb } from "./db";
 
@@ -111,6 +118,23 @@ describe("ask repo", () => {
     expect(convs).toHaveLength(2);
     expect(convs.filter((c) => c.endedAt === null)).toHaveLength(1);
     expect(await db.select().from(aiMessages)).toHaveLength(2);
+  });
+
+  it("purge deletes programs older than 90 days but keeps saved templates", async () => {
+    const [ex] = await db.select().from(exercises).limit(1);
+    const day = [
+      { name: "推日", items: [{ exerciseId: ex!.id, sets: 3, reps: 8 }] },
+    ];
+    const old = await createProgram(db, userA, day, daysAgo(91));
+    const fresh = await createProgram(db, userA, day, daysAgo(89));
+    await saveProgramDay(db, userA, old, 1, daysAgo(91));
+    await purgeExpiredMessages(db, NOW);
+    expect((await db.select().from(aiPrograms)).map((p) => p.id)).toEqual([
+      fresh,
+    ]);
+    const tpls = await db.select().from(workoutTemplates);
+    expect(tpls).toHaveLength(1);
+    expect(tpls[0]?.sourceProgramId).toBeNull();
   });
 
   it("keeps users separate", async () => {
