@@ -7,13 +7,12 @@ import {
 import { apiFetch } from "../api";
 import { formatChange, seriesFor } from "../bodyMetricsView";
 import { Skeleton } from "../components/Skeleton";
+import { MealsCard } from "./meal/MealsCard";
 
 interface RecordsProps {
   /** Called when the session cannot be recovered or loading failed. */
   onFatal: () => void;
 }
-
-const SOON = ["飲食"] as const;
 
 export function Records({ onFatal }: RecordsProps) {
   const [data, setData] = useState<BodyMetricsResponse | null>(null);
@@ -78,12 +77,7 @@ export function Records({ onFatal }: RecordsProps) {
         )}
         <span className="muted">記訓練 ›</span>
       </a>
-      {SOON.map((label) => (
-        <button key={label} type="button" className="card soon" disabled>
-          <span>{label}</span>
-          <span className="badge">即將推出</span>
-        </button>
-      ))}
+      <MealsCard onFatal={onFatal} />
     </main>
   );
 }

@@ -26,5 +26,11 @@ export interface ApiError {
     | "bad_request"
     | "not_found"
     | "conflict"
-    | "internal";
+    | "internal"
+    // Meal input errors (see MealInputErrorCode in the api).
+    | "invalid_grams"
+    | "unknown_food"
+    | "unknown_item"
+    | "empty"
+    | "too_many";
 }

@@ -32,6 +32,7 @@ function Root() {
     <App
       state={state}
       pathname={location.pathname}
+      search={location.search}
       today={taipeiDate(new Date())}
       onClose={() => liff.closeWindow()}
     />

@@ -6,17 +6,26 @@ import { BodyMetrics } from "./pages/BodyMetrics";
 import { Profile } from "./pages/Profile";
 import { Records } from "./pages/Records";
 import { Settings } from "./pages/Settings";
+import { MealEdit } from "./pages/meal/MealEdit";
 import { WorkoutHome } from "./pages/workout/WorkoutHome";
 
 interface AppProps {
   state: AuthState;
   pathname: string;
+  /** `location.search`, e.g. `?id=…` for the meal page. */
+  search?: string;
   /** Taipei calendar date (`YYYY-MM-DD`) used for age and target maths. */
   today: string;
   onClose: () => void;
 }
 
-export function App({ state, pathname, today, onClose }: AppProps) {
+export function App({
+  state,
+  pathname,
+  search = "",
+  today,
+  onClose,
+}: AppProps) {
   const [failed, setFailed] = useState(false);
   const shown: AuthState = failed ? { kind: "error" } : state;
 
@@ -39,6 +48,17 @@ export function App({ state, pathname, today, onClose }: AppProps) {
           return <Records onFatal={() => setFailed(true)} />;
         case "body":
           return <BodyMetrics onFatal={() => setFailed(true)} />;
+        case "meal": {
+          const params = new URLSearchParams(search);
+          return (
+            <MealEdit
+              id={params.get("id")}
+              type={params.get("type")}
+              today={today}
+              onFatal={() => setFailed(true)}
+            />
+          );
+        }
         case "workout":
           return (
             <WorkoutHome onFatal={() => setFailed(true)} onClose={onClose} />

@@ -19,7 +19,11 @@ describe("App", () => {
           JSON.stringify(
             url.endsWith("/workouts/week")
               ? { from: "", to: "", sessions: 0 }
-              : { from: "", to: "", points: [] },
+              : url.endsWith("/meals")
+                ? { date: "", meals: [], consumed: { kcal: 0 } }
+                : url.endsWith("/profile")
+                  ? { profile: null, targets: null }
+                  : { from: "", to: "", points: [] },
           ),
         )) as unknown as typeof fetch,
       relogin: async () => ({ kind: "error" }),
