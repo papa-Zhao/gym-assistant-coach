@@ -5,8 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 from linebot.v3.messaging import FlexMessage
 
-from app import messages
-from app.api_client import WorkoutSummary
+from app import api_client, messages
+from app.api_client import HttpApiClient, WorkoutSummary
 from app.handlers import create_app
 from app.line_replier import _to_sdk
 from app.settings import Settings
@@ -200,3 +200,92 @@ def test_workout_done_flex_is_valid_for_sdk() -> None:
     assert "組" not in text
     assert "總訓練量" not in text
     assert "新紀錄" not in text
+
+
+MEAL_JSON: dict[str, Any] = {
+    "id": "m-1",
+    "eatenOn": "2026-10-22",
+    "mealType": "lunch",
+    "status": "draft",
+    "source": "text",
+    "items": [
+        {
+            "id": "i-1",
+            "foodId": None,
+            "name": "雞腿便當",
+            "grams": 600,
+            "kcal": 850.4,
+            "proteinG": 35,
+            "carbG": 90,
+            "fatG": 30,
+            "aiConfidence": 0.8,
+        }
+    ],
+    "total": {"kcal": 850.4, "proteinG": 35, "carbG": 90, "fatG": 30},
+}
+MACROS_JSON = {"kcal": 1800, "proteinG": 90, "carbG": 200, "fatG": 50}
+
+
+class _Res:
+    status_code = 200
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+
+def _http_client(monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any]):
+    sent: list[dict[str, Any]] = []
+
+    def fake_post(url: str, **kwargs: Any) -> _Res:
+        sent.append({"url": url, **kwargs})
+        return _Res(payload)
+
+    monkeypatch.setattr(api_client.id_token, "fetch_id_token", lambda *_: "tok")
+    monkeypatch.setattr(api_client.httpx, "post", fake_post)
+    return HttpApiClient(SETTINGS), sent
+
+
+def test_log_meal_text_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {"outcome": "draft", "meal": MEAL_JSON})
+    result = client.log_meal_text(USER, "lunch", "雞腿便當")
+    assert sent[0]["url"] == "https://api.test/internal/meals/text"
+    assert sent[0]["json"] == {"lineUserId": USER, "mealType": "lunch", "text": "雞腿便當"}
+    assert sent[0]["timeout"] == 30.0
+    assert result.outcome == "draft"
+    assert result.meal is not None
+    assert (result.meal.total_kcal, result.meal.items[0].kcal) == (850, 850)
+
+    client, _ = _http_client(monkeypatch, {"outcome": "limit"})
+    assert client.log_meal_text(USER, "lunch", "x").meal is None
+
+
+def test_confirm_meal_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "meal": MEAL_JSON,
+        "today": {"date": "2026-10-22", "consumed": MACROS_JSON, "targets": None},
+    }
+    client, sent = _http_client(monkeypatch, payload)
+    result = client.confirm_meal(USER, "m-1")
+    assert sent[0]["url"] == "https://api.test/internal/meals/m-1/confirm"
+    assert sent[0]["json"] == {"lineUserId": USER}
+    assert sent[0]["timeout"] == 30.0
+    assert result.consumed.kcal == 1800
+    assert result.targets is None
+
+
+def test_set_meal_type_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {"meal": MEAL_JSON})
+    meal = client.set_meal_type(USER, "m-1", "dinner")
+    assert sent[0]["url"] == "https://api.test/internal/meals/m-1/type"
+    assert sent[0]["json"] == {"lineUserId": USER, "mealType": "dinner"}
+    assert sent[0]["timeout"] == 30.0
+    assert meal.id == "m-1"
+
+
+def test_other_calls_keep_five_second_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {})
+    client.unfollow(USER)
+    assert sent[0]["timeout"] == 5.0

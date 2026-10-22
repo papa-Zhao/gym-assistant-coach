@@ -49,6 +49,50 @@ class MetricRecorded:
     previous: PreviousMetric | None
 
 
+@dataclass(frozen=True)
+class MealItem:
+    name: str
+    grams: float
+    kcal: int
+
+
+@dataclass(frozen=True)
+class Meal:
+    id: str
+    meal_type: str
+    status: str
+    items: list[MealItem]
+    total_kcal: int
+    total_protein_g: float
+
+
+@dataclass(frozen=True)
+class MealTextResult:
+    outcome: str  # draft | limit | not_food | refused | unavailable
+    meal: Meal | None
+
+
+@dataclass(frozen=True)
+class MealConfirmed:
+    meal: Meal
+    consumed: Macros
+    targets: Macros | None
+
+
+def _meal(data: dict) -> Meal:
+    return Meal(
+        id=data["id"],
+        meal_type=data["mealType"],
+        status=data["status"],
+        items=[
+            MealItem(name=i["name"], grams=float(i["grams"]), kcal=round(i["kcal"]))
+            for i in data["items"]
+        ],
+        total_kcal=round(data["total"]["kcal"]),
+        total_protein_g=float(data["total"]["proteinG"]),
+    )
+
+
 def _macros(data: dict) -> Macros:
     return Macros(
         kcal=round(data["kcal"]),
@@ -56,6 +100,10 @@ def _macros(data: dict) -> Macros:
         carb_g=round(data["carbG"]),
         fat_g=round(data["fatG"]),
     )
+
+
+# The three meal calls wait on an AI model; everything else keeps the 5 s default.
+MEAL_TIMEOUT = 30.0
 
 
 class ApiError(Exception):
@@ -77,19 +125,25 @@ class ApiClient(Protocol):
 
     def record_metric(self, line_user_id: str, key: str, value: float) -> MetricRecorded: ...
 
+    def log_meal_text(self, line_user_id: str, meal_type: str, text: str) -> MealTextResult: ...
+
+    def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed: ...
+
+    def set_meal_type(self, line_user_id: str, meal_id: str, meal_type: str) -> Meal: ...
+
 
 class HttpApiClient:
     def __init__(self, settings: Settings) -> None:
         self._base = settings.api_url
         self._audience = settings.internal_audience
 
-    def _post(self, path: str, body: dict[str, object]) -> httpx.Response:
+    def _post(self, path: str, body: dict[str, object], timeout: float = 5.0) -> httpx.Response:
         token = id_token.fetch_id_token(Request(), self._audience)
         res = httpx.post(
             f"{self._base}{path}",
             json=body,
             headers={"Authorization": f"Bearer {token}"},
-            timeout=5.0,
+            timeout=timeout,
         )
         if res.status_code >= 300:
             raise ApiError(res.status_code)
@@ -138,6 +192,36 @@ class HttpApiClient:
                 else None
             ),
         )
+
+    def log_meal_text(self, line_user_id: str, meal_type: str, text: str) -> MealTextResult:
+        data = self._post(
+            "/internal/meals/text",
+            {"lineUserId": line_user_id, "mealType": meal_type, "text": text},
+            timeout=MEAL_TIMEOUT,
+        ).json()
+        meal = _meal(data["meal"]) if data["outcome"] == "draft" else None
+        return MealTextResult(outcome=data["outcome"], meal=meal)
+
+    def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed:
+        data = self._post(
+            f"/internal/meals/{meal_id}/confirm",
+            {"lineUserId": line_user_id},
+            timeout=MEAL_TIMEOUT,
+        ).json()
+        targets = data["today"].get("targets")
+        return MealConfirmed(
+            meal=_meal(data["meal"]),
+            consumed=_macros(data["today"]["consumed"]),
+            targets=_macros(targets) if targets else None,
+        )
+
+    def set_meal_type(self, line_user_id: str, meal_id: str, meal_type: str) -> Meal:
+        data = self._post(
+            f"/internal/meals/{meal_id}/type",
+            {"lineUserId": line_user_id, "mealType": meal_type},
+            timeout=MEAL_TIMEOUT,
+        ).json()
+        return _meal(data["meal"])
 
 
 class WorkoutPr(BaseModel):
