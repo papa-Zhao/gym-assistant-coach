@@ -2,7 +2,14 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from app.api_client import Macros, MetricRecorded, TodayResult, WorkoutSummary
+from app.api_client import (
+    Macros,
+    Meal,
+    MealConfirmed,
+    MetricRecorded,
+    TodayResult,
+    WorkoutSummary,
+)
 from app.commands import METRIC_LIMITS
 from app.settings import CONSENT_VERSION
 
@@ -482,3 +489,203 @@ def workout_done(summary: WorkoutSummary, template_name: str | None, liff_id: st
             },
         },
     }
+
+
+MEAL_LABELS = {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐", "snack": "點心"}
+
+
+def _meal_item_row(name: str, grams: float, kcal: int) -> dict[str, Any]:
+    return {
+        "type": "box",
+        "layout": "horizontal",
+        "spacing": "sm",
+        "contents": [
+            {
+                "type": "text",
+                "text": f"{name} {_num(grams)} g",
+                "size": "sm",
+                "color": TEXT,
+                "wrap": True,
+                "flex": 3,
+            },
+            {
+                "type": "text",
+                "text": f"{kcal} kcal",
+                "size": "sm",
+                "color": MUTED,
+                "align": "end",
+                "flex": 1,
+            },
+        ],
+    }
+
+
+def meal_draft(meal: Meal, liff_id: str) -> Message:
+    label = MEAL_LABELS[meal.meal_type]
+    title = f"{label}・AI 估計"
+    return {
+        "type": "flex",
+        "altText": f"{title}：共 {meal.total_kcal} kcal",
+        "contents": {
+            "type": "bubble",
+            "styles": {
+                "body": {"backgroundColor": SURFACE},
+                "footer": {"backgroundColor": SURFACE},
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": title,
+                        "weight": "bold",
+                        "size": "xl",
+                        "color": TEXT,
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "sm",
+                        "contents": [_meal_item_row(i.name, i.grams, i.kcal) for i in meal.items],
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "xs",
+                        "backgroundColor": ACCENT_SOFT,
+                        "cornerRadius": "8px",
+                        "paddingAll": "12px",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": f"合計 {meal.total_kcal} kcal",
+                                "size": "sm",
+                                "weight": "bold",
+                                "color": ON_ACCENT_SOFT,
+                            },
+                            {
+                                "type": "text",
+                                "text": f"蛋白質 {_num(meal.total_protein_g)} g",
+                                "size": "sm",
+                                "color": ON_ACCENT_SOFT,
+                            },
+                        ],
+                    },
+                    {
+                        "type": "text",
+                        "text": "數值為 AI 估計，可按修改調整",
+                        "size": "xs",
+                        "color": MUTED,
+                        "wrap": True,
+                    },
+                ],
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "color": PRIMARY,
+                        "height": "md",
+                        "action": {
+                            "type": "postback",
+                            "label": "✅ 確認記錄",
+                            "data": f"action=meal_confirm&id={meal.id}",
+                        },
+                    },
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "height": "md",
+                        "action": {
+                            "type": "uri",
+                            "label": "✏️ 修改",
+                            "uri": f"https://liff.line.me/{liff_id}/meal?id={meal.id}",
+                        },
+                    },
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "height": "md",
+                        "action": {
+                            "type": "postback",
+                            "label": "🍽 換餐別",
+                            "data": f"action=meal_type_menu&id={meal.id}",
+                        },
+                    },
+                ],
+            },
+        },
+    }
+
+
+def meal_confirmed(confirmed: MealConfirmed, liff_id: str) -> Message:
+    text = f"已記錄！今日已攝取 {confirmed.consumed.kcal} kcal"
+    if confirmed.targets is not None:
+        left = confirmed.targets.kcal - confirmed.consumed.kcal
+        text += f"，還剩 {left} kcal" if left >= 0 else f"，已超過 {-left} kcal"
+    return {
+        "type": "text",
+        "text": text,
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {
+                        "type": "postback",
+                        "label": "看今日總覽",
+                        "data": "action=today",
+                        "displayText": "今日總覽",
+                    },
+                }
+            ]
+        },
+    }
+
+
+def meal_type_menu(meal_id: str) -> Message:
+    return {
+        "type": "text",
+        "text": "要換成哪一餐？",
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {
+                        "type": "postback",
+                        "label": label,
+                        "data": f"action=meal_type&id={meal_id}&type={key}",
+                        "displayText": label,
+                    },
+                }
+                for key, label in MEAL_LABELS.items()
+            ]
+        },
+    }
+
+
+def meal_type_changed(meal: Meal, liff_id: str) -> Message:
+    if meal.status == "confirmed":
+        return {"type": "text", "text": f"已改成{MEAL_LABELS[meal.meal_type]}"}
+    return meal_draft(meal, liff_id)
+
+
+MEAL_OUTCOME_TEXT = {
+    "limit": "今天的文字記錄次數用完了，明天再試。",
+    "not_food": "看不太出吃了什麼，可以寫得更具體一點，例如「午餐 雞腿便當 無糖豆漿」。",
+    "refused": "這則內容沒辦法處理，換個說法再試試。",
+    "unavailable": "AI 暫時忙不過來，請稍後再試。",
+}
+
+
+def meal_outcome(outcome: str) -> Message:
+    return {"type": "text", "text": MEAL_OUTCOME_TEXT[outcome]}
+
+
+def meal_not_found() -> Message:
+    return {"type": "text", "text": "找不到這一餐，可能已經刪除了。"}

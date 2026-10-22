@@ -10,6 +10,7 @@ const full = {
   CORS_ORIGIN: "https://example.web.app",
   BOT_URL: "https://bot.example.run.app",
   BOT_AUDIENCE: "gac-bot-internal",
+  ANTHROPIC_API_KEY: "sk-ant-test-key",
 };
 
 describe("loadConfig", () => {
@@ -27,6 +28,13 @@ describe("loadConfig", () => {
     expect(message).toContain("BOT_SA_EMAIL");
     expect(message).not.toContain("LINE_LOGIN_CHANNEL_ID");
     for (const v of Object.values(rest)) expect(message).not.toContain(v);
+  });
+
+  it("requires ANTHROPIC_API_KEY without echoing it", () => {
+    const rest: Record<string, string> = { ...full };
+    delete rest.ANTHROPIC_API_KEY;
+    expect(() => loadConfig(rest)).toThrow(/ANTHROPIC_API_KEY/);
+    expect(loadConfig(full).anthropicApiKey).toBe(full.ANTHROPIC_API_KEY);
   });
 
   it("treats empty values as missing", () => {

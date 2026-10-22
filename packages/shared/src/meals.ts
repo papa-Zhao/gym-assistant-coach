@@ -19,6 +19,16 @@ export type MealSource = (typeof MEAL_SOURCES)[number];
 export const FOOD_SOURCES = ["tfda", "custom", "ai"] as const;
 export type FoodSource = (typeof FOOD_SOURCES)[number];
 
+export const AI_KINDS = ["photo", "text", "chat"] as const;
+export type AiKind = (typeof AI_KINDS)[number];
+
+/** Per-user daily AI call limits (Taipei day). */
+export const AI_DAILY_LIMITS: Record<AiKind, number> = {
+  photo: 10,
+  text: 20,
+  chat: 20,
+};
+
 /** Accepted grams per meal item (one decimal allowed). */
 export const GRAMS_LIMITS = { min: 1, max: 2000 } as const;
 export const MAX_MEAL_ITEMS = 30;
@@ -49,6 +59,8 @@ export interface MealItem extends Nutrition {
   foodId: string | null;
   name: string;
   grams: number;
+  /** AI estimate confidence 0-1; null for database and manual items. */
+  aiConfidence: number | null;
 }
 
 export interface Meal {

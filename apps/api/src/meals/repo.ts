@@ -65,6 +65,7 @@ function toItem(r: ItemRow): MealItem {
     proteinG: Number(r.proteinG),
     carbG: Number(r.carbG),
     fatG: Number(r.fatG),
+    aiConfidence: num(r.aiConfidence),
   };
 }
 
@@ -193,6 +194,7 @@ type NewItem = Nutrition & {
   foodId: string | null;
   name: string;
   grams: number;
+  aiConfidence?: number | null;
 };
 
 /** Validate input and compute the rows to store. Reads only. */
@@ -224,6 +226,7 @@ async function buildItems(
         foodId: old.foodId,
         name: old.name,
         grams: input.grams,
+        aiConfidence: old.aiConfidence,
         ...scaleNutrition(old, old.grams, input.grams),
       };
     }
@@ -250,6 +253,7 @@ function itemValues(mealId: string, items: NewItem[]) {
     proteinG: String(it.proteinG),
     carbG: String(it.carbG),
     fatG: String(it.fatG),
+    aiConfidence: it.aiConfidence == null ? null : String(it.aiConfidence),
   }));
 }
 
@@ -326,4 +330,78 @@ export async function deleteMeal(
     .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
     .returning({ id: meals.id });
   return rows.length > 0;
+}
+
+export interface DraftItem extends Nutrition {
+  name: string;
+  grams: number;
+  aiConfidence: number;
+}
+
+/** Stores an unconfirmed meal of AI-estimated items (no food link). */
+export async function createDraftMeal(
+  db: Db,
+  userId: string,
+  input: { eatenOn: string; mealType: MealType; items: DraftItem[] },
+  source: "text" | "photo",
+  now: Date,
+): Promise<Meal> {
+  if (input.items.length === 0) throw new MealInputError("empty");
+  if (input.items.length > MAX_MEAL_ITEMS) throw new MealInputError("too_many");
+  return db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(meals)
+      .values({
+        userId,
+        eatenOn: input.eatenOn,
+        mealType: input.mealType,
+        status: "draft",
+        source,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const row = one(inserted[0]);
+    await tx.insert(mealItems).values(
+      itemValues(
+        row.id,
+        input.items.map((i) => ({ ...i, foodId: null })),
+      ),
+    );
+    return loadMeal(tx, row);
+  });
+}
+
+/** Confirms a meal; an already confirmed meal keeps its confirmed_at. */
+export async function confirmMeal(
+  db: Db,
+  userId: string,
+  mealId: string,
+  now: Date,
+): Promise<Meal | null> {
+  const [row] = await db
+    .update(meals)
+    .set({
+      status: "confirmed",
+      confirmedAt: sql`coalesce(${meals.confirmedAt}, ${now.toISOString()}::timestamptz)`,
+      updatedAt: sql`case when ${meals.status} = 'confirmed' then ${meals.updatedAt} else ${now.toISOString()}::timestamptz end`,
+    })
+    .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
+    .returning();
+  return row ? loadMeal(db, row) : null;
+}
+
+export async function setMealType(
+  db: Db,
+  userId: string,
+  mealId: string,
+  mealType: MealType,
+  now: Date,
+): Promise<Meal | null> {
+  const [row] = await db
+    .update(meals)
+    .set({ mealType, updatedAt: now })
+    .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
+    .returning();
+  return row ? loadMeal(db, row) : null;
 }

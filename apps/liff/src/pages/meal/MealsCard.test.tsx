@@ -38,6 +38,19 @@ describe("MealsCard", () => {
     expect(screen.getByText("／ 2000 kcal")).toBeInTheDocument();
   });
 
+  it("marks a draft row with 草稿", async () => {
+    const m = meal({ status: "draft" });
+    fakeApi((call) =>
+      call.path === "/meals"
+        ? { date: "2026-10-22", meals: [m], consumed: m.total }
+        : { profile: null, targets: null },
+    );
+    render(<MealsCard onFatal={vi.fn()} />);
+    expect(await screen.findByRole("link", { name: /午餐/ })).toHaveTextContent(
+      "234 kcal 草稿",
+    );
+  });
+
   it("orders rows breakfast, lunch, dinner with empty rows in place", async () => {
     api(2000);
     render(<MealsCard onFatal={vi.fn()} />);

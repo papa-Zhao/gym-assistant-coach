@@ -23,7 +23,7 @@ class LineReplier(Protocol):
 
     def profile_name(self, user_id: str) -> str | None: ...
 
-    def show_loading(self, user_id: str) -> None: ...
+    def show_loading(self, user_id: str, seconds: int = 10) -> None: ...
 
 
 def _to_sdk(message: Message) -> FlexMessage | TextMessage:
@@ -59,8 +59,8 @@ class SdkLineReplier:
             return None
         return name or None
 
-    def show_loading(self, user_id: str) -> None:
+    def show_loading(self, user_id: str, seconds: int = 10) -> None:
         with LineApiClient(self._configuration) as client:
             MessagingApi(client).show_loading_animation(
-                ShowLoadingAnimationRequest(chat_id=user_id, loading_seconds=10)
+                ShowLoadingAnimationRequest(chat_id=user_id, loading_seconds=seconds)
             )

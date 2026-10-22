@@ -10,10 +10,12 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "tfda:seed": "tsx scripts/tfda-seed.ts",
+    "eval:meal-text": "tsx scripts/meal-text-eval.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
     "@fastify/cors": "^11.3.1",
     "@gac/shared": "*",
     "drizzle-orm": "^0.45.4",

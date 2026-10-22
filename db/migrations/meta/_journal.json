@@ -57,6 +57,13 @@
       "when": 1792632080539,
       "tag": "0007_seed_tfda_foods",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792635322520,
+      "tag": "0008_ai_usage_daily",
+      "breakpoints": true
     }
   ]
 }

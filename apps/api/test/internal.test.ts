@@ -14,11 +14,31 @@ import {
 import { foods } from "../src/db/schema";
 import { createMeal } from "../src/meals/repo";
 import { formatWorkoutSummary } from "../src/workouts/summary";
+import { MealParserUnavailable, type MealParser } from "../src/ai/meal-parser";
+import { meals } from "../src/db/schema";
+import { eq } from "drizzle-orm";
 import { createTestDb } from "./db";
 
 const BOT = "bot-runtime@x.iam.gserviceaccount.com";
 const LINE_ID = `U${"a".repeat(32)}`;
 let nowIso = "2026-10-19T04:00:00Z";
+let parser: MealParser = {
+  parseText: async () => ({
+    kind: "items",
+    items: [
+      {
+        name: "雞腿便當",
+        grams: 450,
+        kcal: 800,
+        proteinG: 35,
+        carbG: 90,
+        fatG: 30,
+        confidence: 0.7,
+      },
+    ],
+    usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
+  }),
+};
 const auth = { authorization: "Bearer good" };
 
 describe("/internal/users", () => {
@@ -41,6 +61,7 @@ describe("/internal/users", () => {
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: LINE_ID, name: null }),
       notifyWorkoutFinished: async () => {},
+      mealParser: { parseText: (text) => parser.parseText(text) },
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -241,6 +262,148 @@ describe("/internal/users", () => {
     } finally {
       nowIso = "2026-10-19T04:00:00Z";
     }
+  });
+
+  describe("meal text", () => {
+    const ME = `U${"1".repeat(32)}`;
+    const OTHER = `U${"2".repeat(32)}`;
+    const text = (lineUserId: string, t = "午餐 雞腿便當") =>
+      post("/internal/meals/text", { lineUserId, mealType: "lunch", text: t });
+
+    it("returns a draft that counts toward today", async () => {
+      await syncUser(db, ME, null);
+      const res = await text(ME);
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe("draft");
+      expect(body.meal).toMatchObject({ status: "draft", source: "text" });
+      const today = (
+        await post("/internal/users/today", { lineUserId: ME })
+      ).json();
+      expect(today.consumed.kcal).toBe(800);
+    });
+
+    it("404s for an unknown user", async () => {
+      const res = await text(`U${"3".repeat(32)}`);
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("maps parser outcomes", async () => {
+      const id = `U${"4".repeat(32)}`;
+      await syncUser(db, id, null);
+      const saved = parser;
+      try {
+        parser = {
+          parseText: async () => ({
+            kind: "refused",
+            usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
+          }),
+        };
+        expect((await text(id)).json()).toEqual({ outcome: "refused" });
+        parser = {
+          parseText: async () => {
+            throw new MealParserUnavailable("down");
+          },
+        };
+        expect((await text(id)).json()).toEqual({ outcome: "unavailable" });
+      } finally {
+        parser = saved;
+      }
+    });
+
+    it("rejects bad bodies with 400", async () => {
+      expect((await text(ME, "")).statusCode).toBe(400);
+      expect((await text(ME, "x".repeat(201))).statusCode).toBe(400);
+      expect((await text(ME, "x".repeat(200))).statusCode).toBe(200);
+      const badType = await post("/internal/meals/text", {
+        lineUserId: ME,
+        mealType: "brunch",
+        text: "a",
+      });
+      expect(badType.statusCode).toBe(400);
+    });
+
+    it("confirms idempotently and returns today", async () => {
+      const id = `U${"5".repeat(32)}`;
+      await syncUser(db, id, null);
+      const draft = (await text(id)).json().meal;
+      const first = await post(`/internal/meals/${draft.id}/confirm`, {
+        lineUserId: id,
+      });
+      expect(first.statusCode).toBe(200);
+      const a = first.json();
+      expect(a.meal.status).toBe("confirmed");
+      expect(a.today).toEqual({
+        date: "2026-10-19",
+        consumed: { kcal: 800, proteinG: 35, carbG: 90, fatG: 30 },
+        targets: null,
+      });
+      const [row1] = await db
+        .select()
+        .from(meals)
+        .where(eq(meals.id, draft.id));
+      nowIso = "2026-10-19T05:00:00Z";
+      try {
+        const second = await post(`/internal/meals/${draft.id}/confirm`, {
+          lineUserId: id,
+        });
+        expect(second.json()).toEqual(a);
+      } finally {
+        nowIso = "2026-10-19T04:00:00Z";
+      }
+      const [row2] = await db
+        .select()
+        .from(meals)
+        .where(eq(meals.id, draft.id));
+      expect(row2?.confirmedAt).toEqual(row1?.confirmedAt);
+      expect(row2?.confirmedAt).not.toBeNull();
+    });
+
+    it("404s and changes nothing for another user's meal", async () => {
+      await syncUser(db, OTHER, null);
+      const draft = (await text(ME)).json().meal;
+      const confirm = await post(`/internal/meals/${draft.id}/confirm`, {
+        lineUserId: OTHER,
+      });
+      expect(confirm.statusCode).toBe(404);
+      const type = await post(`/internal/meals/${draft.id}/type`, {
+        lineUserId: OTHER,
+        mealType: "dinner",
+      });
+      expect(type.statusCode).toBe(404);
+      const [row] = await db.select().from(meals).where(eq(meals.id, draft.id));
+      expect(row).toMatchObject({ status: "draft", mealType: "lunch" });
+    });
+
+    it("changes the meal type", async () => {
+      const draft = (await text(ME)).json().meal;
+      const res = await post(`/internal/meals/${draft.id}/type`, {
+        lineUserId: ME,
+        mealType: "dinner",
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().meal).toMatchObject({
+        id: draft.id,
+        mealType: "dinner",
+      });
+    });
+
+    it("400s on a non-uuid id and 404s on an unknown one", async () => {
+      const bad = await post("/internal/meals/nope/confirm", {
+        lineUserId: ME,
+      });
+      expect(bad.statusCode).toBe(400);
+      const badType = await post("/internal/meals/nope/type", {
+        lineUserId: ME,
+        mealType: "lunch",
+      });
+      expect(badType.statusCode).toBe(400);
+      const missing = await post(
+        "/internal/meals/00000000-0000-4000-8000-000000000000/confirm",
+        { lineUserId: ME },
+      );
+      expect(missing.statusCode).toBe(404);
+    });
   });
 
   it("today uses Taipei date", async () => {

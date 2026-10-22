@@ -109,6 +109,14 @@ run "service_env" {
 
   assert {
     condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "ANTHROPIC_API_KEY" && anytrue([for v in e.value_source : anytrue([for k in v.secret_key_ref : k.secret == "anthropic-api-key" && k.version == "latest"])])
+    ])
+    error_message = "api ANTHROPIC_API_KEY must come from the anthropic-api-key secret."
+  }
+
+  assert {
+    condition = anytrue([
       for e in google_cloud_run_v2_service.svc["bot"].template[0].containers[0].env :
       e.name == "LINE_CHANNEL_SECRET" && anytrue([for v in e.value_source : anytrue([for k in v.secret_key_ref : k.secret == "line-channel-secret"])])
     ])

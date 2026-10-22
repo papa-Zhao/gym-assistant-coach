@@ -26,6 +26,7 @@ export function meal(over: Partial<Meal> = {}): Meal {
         proteinG: 4.9,
         carbG: 50.8,
         fatG: 0.5,
+        aiConfidence: null,
       },
     ],
     total: { kcal: 234, proteinG: 4.9, carbG: 50.8, fatG: 0.5 },

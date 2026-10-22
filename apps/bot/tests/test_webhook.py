@@ -6,10 +6,22 @@ import logging
 import re
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api_client import ApiError, Macros, MetricRecorded, PreviousMetric, SyncResult, TodayResult
+from app.api_client import (
+    ApiError,
+    Macros,
+    Meal,
+    MealConfirmed,
+    MealItem,
+    MealTextResult,
+    MetricRecorded,
+    PreviousMetric,
+    SyncResult,
+    TodayResult,
+)
 from app.handlers import create_app
 from app.settings import CONSENT_VERSION, Settings
 
@@ -25,6 +37,17 @@ SETTINGS = Settings(
 )
 
 
+MEAL_ID = "0b0e7c9e-3f55-4c0a-9a43-2d4a5f6c7d8e"
+MEAL = Meal(
+    id=MEAL_ID,
+    meal_type="lunch",
+    status="draft",
+    items=[MealItem("雞腿便當", 600.0, 850)],
+    total_kcal=850,
+    total_protein_g=35.0,
+)
+
+
 class FakeApi:
     def __init__(
         self,
@@ -32,7 +55,12 @@ class FakeApi:
         fail_status: int | None = None,
         today: TodayResult | None = None,
         metric_previous: dict[str, Any] | None = None,
+        meal_outcome: str = "draft",
+        meal_fail_status: int | None = None,
     ) -> None:
+        self.meal_outcome = meal_outcome
+        self.meal_fail_status = meal_fail_status
+        self.meal_raises: Exception | None = None
         self.consented = consented
         self.metric_previous = metric_previous
         self.today_result = today
@@ -73,12 +101,35 @@ class FakeApi:
             previous=PreviousMetric(prev["value"], prev["date"]) if prev else None,
         )
 
+    def _meal_fail(self) -> None:
+        if self.meal_raises is not None:
+            raise self.meal_raises
+        if self.meal_fail_status is not None:
+            raise ApiError(self.meal_fail_status)
+
+    def log_meal_text(self, line_user_id: str, meal_type: str, text: str) -> MealTextResult:
+        self.calls.append(("log_meal_text", meal_type, text))
+        self._meal_fail()
+        meal = MEAL if self.meal_outcome == "draft" else None
+        return MealTextResult(outcome=self.meal_outcome, meal=meal)
+
+    def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed:
+        self.calls.append(("confirm_meal", meal_id))
+        self._meal_fail()
+        return MealConfirmed(MEAL, Macros(1800, 0, 0, 0), Macros(2200, 0, 0, 0))
+
+    def set_meal_type(self, line_user_id: str, meal_id: str, meal_type: str) -> Meal:
+        self.calls.append(("set_meal_type", meal_id, meal_type))
+        self._meal_fail()
+        return MEAL
+
 
 class FakeLine:
     def __init__(self, name: str | None = "小明") -> None:
         self.name = name
         self.replies: list[tuple[str, list[dict[str, Any]]]] = []
         self.loading: list[str] = []
+        self.loading_seconds: list[int] = []
 
     def reply(self, reply_token: str, messages: list[dict[str, Any]]) -> None:
         self.replies.append((reply_token, messages))
@@ -86,8 +137,9 @@ class FakeLine:
     def profile_name(self, user_id: str) -> str | None:
         return self.name
 
-    def show_loading(self, user_id: str) -> None:
+    def show_loading(self, user_id: str, seconds: int = 10) -> None:
         self.loading.append(user_id)
+        self.loading_seconds.append(seconds)
 
 
 def sign(body: bytes) -> str:
@@ -242,6 +294,7 @@ def test_message_after_consent_replies_placeholder() -> None:
     api, line = FakeApi(consented=True), FakeLine()
     post(TestClient(create_app(SETTINGS, api, line)), [text_event()])
     assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    assert len(line.replies) == 1
 
 
 def test_unfollow_calls_api_and_does_not_reply(client, api, line) -> None:
@@ -420,6 +473,7 @@ def test_invalid_weight_replies_range_and_does_not_call_api() -> None:
         _reply_text(line) == "體重的數字好像不太對，請輸入 30–300 之間的數字，例如「體重 72.5」。"
     )
     assert "quickReply" in line.replies[0][1][0]
+    assert len(line.replies) == 1
 
 
 def test_non_command_text_keeps_placeholder() -> None:
@@ -427,6 +481,7 @@ def test_non_command_text_keeps_placeholder() -> None:
     post(client, [text_event("今天吃了雞腿便當")])
     assert [c[0] for c in api.calls] == ["sync"]
     assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    assert len(line.replies) == 1
 
 
 def test_command_before_consent_replies_welcome() -> None:
@@ -460,3 +515,116 @@ def test_metric_reply_is_valid_for_the_line_sdk() -> None:
 
     msg = messages.metric_range_error("bodyFatPct", "1234-abcd")
     assert _to_sdk(msg).to_dict()["quickReply"]["items"][0]["action"]["label"] == "看趨勢"
+
+
+def meal_setup(**kwargs: Any):
+    api, line = FakeApi(consented=True, **kwargs), FakeLine()
+    return TestClient(create_app(SETTINGS, api, line)), api, line
+
+
+def test_meal_text_replies_draft_card() -> None:
+    client, api, line = meal_setup()
+    post(client, [text_event("午餐 雞腿便當")])
+    assert api.calls == [("sync", USER, "小明"), ("log_meal_text", "lunch", "雞腿便當")]
+    assert line.loading == [USER]
+    assert line.loading_seconds == [30]
+    assert len(line.replies) == 1
+    card = line.replies[0][1][0]
+    assert card["type"] == "flex"
+    assert "午餐・AI 估計" in json.dumps(card, ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        ("limit", "今天的文字記錄次數用完了，明天再試。"),
+        ("not_food", "看不太出吃了什麼，可以寫得更具體一點，例如「午餐 雞腿便當 無糖豆漿」。"),
+        ("refused", "這則內容沒辦法處理，換個說法再試試。"),
+        ("unavailable", "AI 暫時忙不過來，請稍後再試。"),
+    ],
+)
+def test_meal_text_outcomes(outcome: str, expected: str) -> None:
+    client, _, line = meal_setup(meal_outcome=outcome)
+    post(client, [text_event("午餐 雞腿便當")])
+    assert line.replies[0][1] == [{"type": "text", "text": expected}]
+
+
+def test_meal_confirm_postback() -> None:
+    client, api, line = meal_setup()
+    post(client, [menu_postback(f"action=meal_confirm&id={MEAL_ID}")])
+    assert ("confirm_meal", MEAL_ID) in api.calls
+    assert line.replies[0][1][0]["text"] == "已記錄！今日已攝取 1800 kcal，還剩 400 kcal"
+
+
+def test_meal_confirm_not_found() -> None:
+    client, _, line = meal_setup(meal_fail_status=404)
+    post(client, [menu_postback(f"action=meal_confirm&id={MEAL_ID}")])
+    assert line.replies[0][1] == [{"type": "text", "text": "找不到這一餐，可能已經刪除了。"}]
+
+
+def test_meal_type_menu_and_change_postbacks() -> None:
+    client, api, line = meal_setup()
+    post(client, [menu_postback(f"action=meal_type_menu&id={MEAL_ID}")])
+    assert len(line.replies[0][1][0]["quickReply"]["items"]) == 4
+    post(client, [menu_postback(f"action=meal_type&id={MEAL_ID}&type=dinner")])
+    assert ("set_meal_type", MEAL_ID, "dinner") in api.calls
+    assert line.replies[1][1][0]["type"] == "flex"
+
+
+def test_meal_postback_with_bad_id_is_ignored() -> None:
+    client, api, line = meal_setup()
+    post(client, [menu_postback("action=meal_confirm&id=abc")])
+    assert api.calls == []
+    assert line.replies == []
+
+
+def test_meal_text_before_consent_replies_welcome() -> None:
+    api, line = FakeApi(consented=False), FakeLine()
+    post(TestClient(create_app(SETTINGS, api, line)), [text_event("午餐 便當")])
+    assert all(c[0] != "log_meal_text" for c in api.calls)
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_meal_postback_before_consent_replies_welcome() -> None:
+    api, line = FakeApi(consented=False), FakeLine()
+    post(
+        TestClient(create_app(SETTINGS, api, line)),
+        [menu_postback(f"action=meal_confirm&id={MEAL_ID}")],
+    )
+    assert all(c[0] != "confirm_meal" for c in api.calls)
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_metric_text_still_records_metric() -> None:
+    client, api, line = meal_setup()
+    post(client, [text_event("體重 72")])
+    assert ("record_metric", USER, "weightKg", 72.0) in api.calls
+    assert all(c[0] != "log_meal_text" for c in api.calls)
+    assert "已記錄體重" in line.replies[0][1][0]["text"]
+    assert len(line.replies) == 1
+    assert line.loading_seconds == [10]
+
+
+UNAVAILABLE = [{"type": "text", "text": "AI 暫時忙不過來，請稍後再試。"}]
+
+
+@pytest.mark.parametrize(
+    ("event_payload"),
+    [text_event("午餐 雞腿便當"), menu_postback(f"action=meal_confirm&id={MEAL_ID}")],
+)
+def test_meal_api_timeout_replies_unavailable_once(event_payload: dict[str, Any]) -> None:
+    client, api, line = meal_setup()
+    api.meal_raises = httpx.ReadTimeout("slow")
+    post(client, [event_payload])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+@pytest.mark.parametrize(
+    ("event_payload"),
+    [text_event("午餐 雞腿便當"), menu_postback(f"action=meal_confirm&id={MEAL_ID}")],
+)
+def test_meal_api_5xx_replies_unavailable_once(event_payload: dict[str, Any]) -> None:
+    client, api, line = meal_setup()
+    api.meal_fail_status = 500
+    post(client, [event_payload])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
