@@ -177,3 +177,29 @@ def test_ask_outcome_and_fixed_texts() -> None:
     assert messages.ask_too_long()["text"] == "問題有點長，請精簡到 500 字以內再問一次。"
     assert messages.conversation_reset()["text"] == "好，我們重新開始，之前的對話不會再當作參考。"
     assert messages.ASK_MAX_CHARS == 500
+
+
+def _texts(node: object) -> list[str]:
+    if isinstance(node, dict):
+        found = [node["text"]] if node.get("type") == "text" else []
+        return found + [t for v in node.values() for t in _texts(v)]
+    if isinstance(node, list):
+        return [t for v in node for t in _texts(v)]
+    return []
+
+
+def test_advice_card_skips_blank_text_components() -> None:
+    advice = Advice(
+        title=" ",
+        items=[AdviceItem("雞胸沙拉", ""), AdviceItem("燕麥", "  ")],
+        body="",
+        today_line=" ",
+        notices=["", "  ", "提醒"],
+    )
+    card = messages.advice_card(advice)
+    texts = _texts(card["contents"])
+    assert all(t.strip() for t in texts)
+    assert "雞胸沙拉" in texts
+    assert "提醒" in texts
+    assert card["altText"] == "AI 建議"
+    assert isinstance(_to_sdk(card), FlexMessage)

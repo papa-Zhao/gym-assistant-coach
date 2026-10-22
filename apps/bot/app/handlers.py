@@ -195,6 +195,7 @@ def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
         _reply_to_restart(event, user_id, deps)
         return
     question = text.strip()
+    # Blank text is not a question (unlike _is_ask_question, which only picks the loading time).
     if not question:
         deps.line.reply(token, [messages.ask_menu()])
     elif len(question) > messages.ASK_MAX_CHARS:

@@ -748,6 +748,12 @@ def conversation_reset() -> Message:
 
 
 def _advice_item_block(name: str, detail: str) -> dict[str, Any]:
+    # LINE rejects Flex text components with empty text, so a blank detail is left out.
+    texts: list[dict[str, Any]] = [
+        {"type": "text", "text": name, "size": "sm", "weight": "bold", "color": TEXT, "wrap": True}
+    ]
+    if detail.strip():
+        texts.append({"type": "text", "text": detail, "size": "xs", "color": MUTED, "wrap": True})
     return {
         "type": "box",
         "layout": "vertical",
@@ -755,30 +761,21 @@ def _advice_item_block(name: str, detail: str) -> dict[str, Any]:
         "backgroundColor": SURFACE_ALT,
         "cornerRadius": "8px",
         "paddingAll": "12px",
-        "contents": [
-            {
-                "type": "text",
-                "text": name,
-                "size": "sm",
-                "weight": "bold",
-                "color": TEXT,
-                "wrap": True,
-            },
-            {"type": "text", "text": detail, "size": "xs", "color": MUTED, "wrap": True},
-        ],
+        "contents": texts,
     }
 
 
 def advice_card(advice: Advice) -> Message:
+    title = advice.title.strip() or "AI 建議"
     body: list[dict[str, Any]] = []
-    if advice.today_line is not None:
+    if advice.today_line is not None and advice.today_line.strip():
         body.append(
             {"type": "text", "text": advice.today_line, "size": "xs", "color": MUTED, "wrap": True}
         )
     body.append(
         {
             "type": "text",
-            "text": advice.title,
+            "text": title,
             "weight": "bold",
             "size": "xl",
             "color": TEXT,
@@ -794,16 +791,20 @@ def advice_card(advice: Advice) -> Message:
                 "contents": [_advice_item_block(i.name, i.detail) for i in advice.items],
             }
         )
-    body.append({"type": "text", "text": advice.body, "size": "sm", "color": TEXT, "wrap": True})
+    if advice.body.strip():
+        body.append(
+            {"type": "text", "text": advice.body, "size": "sm", "color": TEXT, "wrap": True}
+        )
     body.extend(
         {"type": "text", "text": notice, "size": "xs", "color": PRIMARY, "wrap": True}
         for notice in advice.notices
+        if notice.strip()
     )
     body.append({"type": "separator"})
     body.append({"type": "text", "text": DISCLAIMER, "size": "xs", "color": MUTED, "wrap": True})
     return {
         "type": "flex",
-        "altText": advice.title,
+        "altText": title,
         "contents": {
             "type": "bubble",
             "styles": {
