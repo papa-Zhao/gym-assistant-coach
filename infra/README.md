@@ -167,6 +167,23 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 - 以上標籤取自 Neon 官方文件（branch-restore）。
 - `pre-migrate-<sha>` 是 migration 前的快照，用來檢視或複製當時的資料。Neon 的「從另一個 branch 還原」要求來源為 root branch，因此不要把它當作還原來源。它只保留最新 3 個。
 
+## 10. 監控與警示
+
+`infra/monitoring.tf` 建立 email 通知管道、api 與 bot 的 `/health` uptime check（每 15 分鐘、3 個區域）、錯誤警示（10 分鐘內 5 次以上 5xx 或 ERROR log）與 p95 延遲警示（api 20 秒、bot 45 秒，持續 15 分鐘）。
+
+1. **【使用者自行操作】** 提供警示信箱（不進 git），擇一：
+   - 在 `infra/alert.auto.tfvars` 寫入 `alert_email = "<你的警示信箱>"`。這個檔案已在 `.gitignore`。
+   - 或在 shell 執行 `export TF_VAR_alert_email=<你的警示信箱>`。
+
+   換電腦時要重新提供，否則 Terraform 會要求輸入 `alert_email`。
+2. **【使用者自行操作】** 執行 `terraform -chdir=infra apply`。
+3. 收到警示信時：
+   - 信件標題寫著是哪個服務（`api` 或 `bot`）與哪一種警示（uptime、errors、p95 latency）。
+   - 先到 Cloud Run → 該服務 → **Logs**，篩選 `severity>=ERROR`，看最近的錯誤。
+   - 再用瀏覽器打開該服務的 `/health`，應該回 `{"status":"ok",...}`。
+   - bot 的 webhook 處理失敗也回 200，所以 bot 的問題主要看 ERROR log。
+   - 問題解決後警示會自動關閉（最晚 30 分鐘）。
+
 ## 疑難排解
 
 - **`deploy-liff` 回 403**：在 `infra/wif.tf` 為 deployer 服務帳號加上 `roles/serviceusage.serviceUsageConsumer`（或 `roles/firebase.viewer`），再 `terraform apply`。
