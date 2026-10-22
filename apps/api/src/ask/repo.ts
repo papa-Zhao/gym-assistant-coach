@@ -1,4 +1,14 @@
-import { and, desc, eq, gte, isNull, lt, notExists, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNull,
+  lt,
+  notExists,
+  sql,
+} from "drizzle-orm";
 import { aiConversations, aiMessages } from "../db/schema";
 import type { Db } from "../users/repo";
 
@@ -37,12 +47,17 @@ export async function recentTurns(
         gte(aiMessages.createdAt, retentionCutoff(now)),
       ),
     )
-    .orderBy(desc(aiMessages.createdAt))
+    .orderBy(desc(aiMessages.createdAt), asc(aiMessages.role))
     .limit(ASK_HISTORY_MESSAGES);
-  return rows.reverse().map((r) => ({
-    role: r.role as ChatTurn["role"],
-    content: r.content,
-  }));
+  // Keep roles strictly alternating, starting with a user turn.
+  const turns: ChatTurn[] = [];
+  for (const r of rows.reverse()) {
+    const role = r.role as ChatTurn["role"];
+    const last = turns[turns.length - 1];
+    if (last ? last.role === role : role !== "user") continue;
+    turns.push({ role, content: r.content });
+  }
+  return turns;
 }
 
 /** Appends the question and the answer to the current conversation, creating it if needed; one transaction. */

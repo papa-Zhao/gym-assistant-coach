@@ -117,7 +117,7 @@ async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log(
       "ANTHROPIC_API_KEY is not set, so nothing was run.\n" +
-        "This script calls the real Anthropic API (about 20 requests to " +
+        "This script calls the real Anthropic API (about 22 requests to " +
         `${AI_MODEL}).\n` +
         "Run it with:\n" +
         "  read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY\n" +

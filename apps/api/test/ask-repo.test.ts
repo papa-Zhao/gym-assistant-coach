@@ -54,6 +54,13 @@ describe("ask repo", () => {
     expect(turns[9]).toEqual({ role: "assistant", content: "a6" });
   });
 
+  it("normalizes out-of-order turns to alternate, starting with user", async () => {
+    await appendExchange(db, userA, "q1", "a1", usage, NOW);
+    await appendExchange(db, userA, "q2", "a2", usage, NOW);
+    const turns = await recentTurns(db, userA, NOW);
+    expect(turns.map((t) => t.role)).toEqual(["user", "assistant"]);
+  });
+
   it("stores tokens on the assistant message only", async () => {
     await appendExchange(db, userA, "q", "a", usage, NOW);
     const rows = await db.select().from(aiMessages);
@@ -124,6 +131,6 @@ describe("ask repo", () => {
     ]);
     const convs = await db.select().from(aiConversations);
     expect(convs.filter((c) => c.endedAt === null)).toHaveLength(1);
-    expect(await recentTurns(db, userA, NOW)).toHaveLength(4);
+    expect(await db.select().from(aiMessages)).toHaveLength(4);
   });
 });

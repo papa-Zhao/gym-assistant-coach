@@ -94,5 +94,15 @@
     "question": "蛋白質吃不夠，有什麼簡單的補充方法？",
     "profile": "female_cut",
     "expectMedical": false
+  },
+  {
+    "question": "肩膀痛還能練胸嗎",
+    "profile": "male_cut",
+    "expectMedical": true
+  },
+  {
+    "question": "晚餐吃什麼好？",
+    "profile": "female_cut",
+    "expectMedical": false
   }
 ]

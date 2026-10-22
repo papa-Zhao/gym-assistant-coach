@@ -5,6 +5,8 @@ describe("needsMedicalNotice", () => {
   it("matches keywords in any text", () => {
     expect(needsMedicalNotice("我膝蓋痛還能深蹲嗎")).toBe(true);
     expect(needsMedicalNotice("今天練什麼", "練腿")).toBe(false);
+    expect(needsMedicalNotice("肩膀痛還能練胸嗎")).toBe(true);
+    expect(needsMedicalNotice("練完肌肉酸痛正常嗎")).toBe(false);
     expect(needsMedicalNotice("今天練什麼", "我懷孕了")).toBe(true);
   });
 });
