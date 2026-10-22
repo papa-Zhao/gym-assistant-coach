@@ -1,7 +1,8 @@
-import { AI_DAILY_LIMITS, type AiKind } from "@gac/shared";
+import { AI_DAILY_LIMITS, taipeiDate, type AiKind } from "@gac/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { aiUsageDaily } from "../db/schema";
 import type { Db } from "../users/repo";
+import { AiUnavailable } from "./structured-call";
 
 export interface AiTokenUsage {
   input: number;
@@ -79,4 +80,34 @@ function rowKey(userId: string, kind: AiKind, day: string) {
     eq(aiUsageDaily.day, day),
     eq(aiUsageDaily.kind, kind),
   );
+}
+
+export type AiUseOutcome<T> =
+  { kind: "limit" } | { kind: "unavailable" } | { kind: "done"; result: T };
+
+/**
+ * Reserve a use, run the AI call, record its tokens. An AiUnavailable gives
+ * the use back; any other error propagates and keeps the reservation.
+ */
+export async function withAiUse<T extends { usage: AiTokenUsage }>(
+  db: Db,
+  userId: string,
+  kind: AiKind,
+  now: Date,
+  call: () => Promise<T>,
+): Promise<AiUseOutcome<T>> {
+  const day = taipeiDate(now);
+  if (!(await reserveAiUse(db, userId, kind, day))) return { kind: "limit" };
+  let result: T;
+  try {
+    result = await call();
+  } catch (err) {
+    if (err instanceof AiUnavailable) {
+      await releaseAiUse(db, userId, kind, day);
+      return { kind: "unavailable" };
+    }
+    throw err;
+  }
+  await addAiTokens(db, userId, kind, day, result.usage);
+  return { kind: "done", result };
 }

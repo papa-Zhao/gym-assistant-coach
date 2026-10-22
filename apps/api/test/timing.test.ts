@@ -5,7 +5,12 @@ import { issueSession } from "../src/auth/session";
 import { instrument, newDbStats, withDbStats } from "../src/db/timing.js";
 import type { AppDeps } from "../src/deps.js";
 import { syncUser } from "../src/users/repo";
-import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
+import {
+  createTestDb,
+  unusedMealParser,
+  unusedPhotoStore,
+  unusedEquipmentIdentifier,
+} from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 
@@ -27,6 +32,7 @@ describe("request timing", () => {
       verifyLineIdToken: async () => ({ sub: "U", name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      equipmentIdentifier: unusedEquipmentIdentifier,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

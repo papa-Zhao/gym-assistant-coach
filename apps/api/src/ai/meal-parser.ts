@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { FastifyBaseLogger } from "fastify";
-import {
-  AI_MODEL,
-  MEAL_PHOTO_MAX_TOKENS,
-  MEAL_TEXT_MAX_TOKENS,
-} from "./config";
+import { MEAL_PHOTO_MAX_TOKENS, MEAL_TEXT_MAX_TOKENS } from "./config";
 import { MEAL_PHOTO_SYSTEM, MEAL_SCHEMA, MEAL_TEXT_SYSTEM } from "./prompts";
+import {
+  AiUnavailable,
+  callStructured,
+  type StructuredSpec,
+} from "./structured-call";
 import type { AiTokenUsage } from "./usage";
 
 export interface ParsedItem {
@@ -25,12 +26,11 @@ export type ParseResult =
 
 export interface MealParser {
   parseText(text: string): Promise<ParseResult>;
-  /** `jpeg` is the normalized image from normalizeMealImage. */
+  /** `jpeg` is the normalized image from normalizePhoto. */
   parsePhoto(jpeg: Buffer): Promise<ParseResult>;
 }
 
-/** Thrown on network errors, timeouts, 429, 5xx and any other API error. */
-export class MealParserUnavailable extends Error {}
+export { AiUnavailable as MealParserUnavailable };
 
 type MessagesClient = Pick<Anthropic, "messages">;
 
@@ -68,14 +68,8 @@ function toItem(raw: RawItem): ParsedItem | null {
   };
 }
 
-/** Returns null when the text is not valid JSON in the expected shape. */
-function parseItems(text: string): ParsedItem[] | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return null;
-  }
+/** Returns null when the data is not in the expected shape. */
+function parseItems(data: unknown): ParsedItem[] | null {
   if (typeof data !== "object" || data === null) return null;
   const { is_food, items } = data as { is_food?: unknown; items?: unknown };
   if (typeof is_food !== "boolean" || !Array.isArray(items)) return null;
@@ -90,88 +84,24 @@ function parseItems(text: string): ParsedItem[] | null {
   return parsed;
 }
 
-interface CallSpec {
-  kind: "text" | "photo";
-  system: string;
-  maxTokens: number;
-  content: Anthropic.MessageParam["content"];
-  /** Extra log fields; never content. */
-  logExtra?: Record<string, unknown>;
-}
+type CallSpec = Omit<StructuredSpec, "schema">;
 
 async function callParser(
   client: MessagesClient,
   log: FastifyBaseLogger,
   spec: CallSpec,
 ): Promise<ParseResult> {
-  const started = Date.now();
-  let message: Anthropic.Message;
-  try {
-    message = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: spec.maxTokens,
-      system: [
-        {
-          type: "text",
-          text: spec.system,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: spec.content }],
-      output_config: {
-        effort: "low",
-        format: { type: "json_schema", schema: MEAL_SCHEMA },
-      },
-    });
-  } catch (err) {
-    const ms = Date.now() - started;
-    if (err instanceof Anthropic.APIError) {
-      const expected =
-        err instanceof Anthropic.APIConnectionError ||
-        err instanceof Anthropic.RateLimitError ||
-        err instanceof Anthropic.InternalServerError;
-      const fields = {
-        event: "ai_call",
-        kind: spec.kind,
-        ...spec.logExtra,
-        ms,
-        status: err.status,
-      };
-      if (expected) log.warn(fields, "ai call unavailable");
-      else log.error(fields, "ai call failed");
-      throw new MealParserUnavailable("meal parser unavailable");
-    }
-    throw err;
-  }
-
-  const usage: AiTokenUsage = {
-    input: message.usage.input_tokens,
-    output: message.usage.output_tokens,
-    cacheRead: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreation: message.usage.cache_creation_input_tokens ?? 0,
-  };
-  log.info(
-    {
-      event: "ai_call",
-      kind: spec.kind,
-      ...spec.logExtra,
-      stopReason: message.stop_reason,
-      ms: Date.now() - started,
-      inputTokens: usage.input,
-      outputTokens: usage.output,
-      cacheRead: usage.cacheRead,
-      cacheCreation: usage.cacheCreation,
-    },
-    "ai call",
+  const r = await callStructured(
+    client,
+    log,
+    { ...spec, schema: MEAL_SCHEMA },
+    parseItems,
   );
-
-  if (message.stop_reason === "refusal") return { kind: "refused", usage };
-  if (message.stop_reason === "max_tokens") return { kind: "not_food", usage };
-
-  const block = message.content.find((b) => b.type === "text");
-  const items = block && block.type === "text" ? parseItems(block.text) : null;
-  if (!items || items.length === 0) return { kind: "not_food", usage };
-  return { kind: "items", items, usage };
+  if (r.kind === "refused") return r;
+  if (r.kind === "invalid" || r.value.length === 0) {
+    return { kind: "not_food", usage: r.usage };
+  }
+  return { kind: "items", items: r.value, usage: r.usage };
 }
 
 export function createMealParser(

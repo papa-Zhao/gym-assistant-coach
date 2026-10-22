@@ -12,12 +12,14 @@ import {
   type Equipment,
   type Exercise,
   type ExerciseKind,
+  type ExerciseSuggestion,
   type MuscleGroup,
 } from "@gac/shared";
 import { apiFetch } from "../../api";
 import { isAuthExpired } from "./fields";
 import { Skeleton } from "../../components/Skeleton";
-import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
+import { EquipmentPhoto, type PhotoPhase } from "./EquipmentPhoto";
+import { ExerciseRow } from "./ExerciseRow";
 
 interface ExercisePickerProps {
   onPick: (exercise: Exercise) => void;
@@ -31,15 +33,6 @@ interface ExercisePickerProps {
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
-
-export function ExerciseName({ exercise }: { exercise: Exercise }) {
-  return (
-    <>
-      <span>{exercise.nameZh}</span>
-      {exercise.nameEn && <small className="muted"> {exercise.nameEn}</small>}
-    </>
-  );
-}
 
 export function ExercisePicker({
   onPick,
@@ -56,6 +49,8 @@ export function ExercisePicker({
   const [results, setResults] = useState<Exercise[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [custom, setCustom] = useState(false);
+  const [photo, setPhoto] = useState<PhotoPhase>({ kind: "idle" });
+  const [initial, setInitial] = useState<ExerciseSuggestion | undefined>();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -101,7 +96,11 @@ export function ExercisePicker({
     return (
       <CustomExerciseForm
         onCreated={onPick}
-        onBack={() => setCustom(false)}
+        initial={initial}
+        onBack={() => {
+          setCustom(false);
+          setInitial(undefined);
+        }}
         onFatal={onFatal}
         busy={busy}
         error={error}
@@ -112,122 +111,126 @@ export function ExercisePicker({
   return (
     <main>
       <h1>加動作</h1>
-      <form className="stack" role="search" onSubmit={onSubmit}>
-        <label className="field">
-          搜尋動作
-          <input
-            type="search"
-            value={draft}
-            placeholder="中文或英文，例如 bench"
-            onChange={(e) => onType(e.target.value)}
-          />
-        </label>
-        <button type="submit" className="secondary">
-          搜尋
-        </button>
-      </form>
-      <div className="chips picker-chips" role="group" aria-label="種類">
-        {EXERCISE_KINDS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            className={`chip${kind === k ? " selected" : ""}`}
-            aria-pressed={kind === k}
-            onClick={() => {
-              setKind(k);
-              setMuscle(null);
-              setCategory(null);
-            }}
-          >
-            {EXERCISE_KIND_LABELS[k]}
-          </button>
-        ))}
-      </div>
-      {kind === "strength" && (
-        <>
-          <div className="chips picker-chips" role="group" aria-label="肌群">
-            {MUSCLE_GROUPS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={`chip${muscle === m ? " selected" : ""}`}
-                aria-pressed={muscle === m}
-                onClick={() => setMuscle(muscle === m ? null : m)}
-              >
-                {MUSCLE_GROUP_LABELS[m]}
-              </button>
-            ))}
-          </div>
-          <div
-            className="chips picker-chips"
-            role="group"
-            aria-label="器材類別"
-          >
-            {EQUIPMENT_CATEGORIES.filter((c) => c !== "cardio_equipment").map(
-              (c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`chip${category === c ? " selected" : ""}`}
-                  aria-pressed={category === c}
-                  onClick={() => setCategory(category === c ? null : c)}
-                >
-                  {EQUIPMENT_CATEGORY_LABELS[c]}
-                </button>
-              ),
-            )}
-          </div>
-        </>
-      )}
       {error && (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-      <section className="card list picker-list" aria-label="動作列表">
-        {failed ? (
-          <p className="error-text">載入動作失敗，請再試一次。</p>
-        ) : results === null ? (
-          <Skeleton layout="rows" />
-        ) : results.length === 0 ? (
-          <p className="muted">找不到符合的動作</p>
-        ) : (
-          results.map((ex) => (
+      <EquipmentPhoto
+        phase={photo}
+        onPhase={setPhoto}
+        onPick={onPick}
+        onCustom={(suggestion) => {
+          setInitial(suggestion);
+          setCustom(true);
+        }}
+        onFatal={onFatal}
+        busy={busy}
+      >
+        <form className="stack" role="search" onSubmit={onSubmit}>
+          <label className="field">
+            搜尋動作
+            <input
+              type="search"
+              value={draft}
+              placeholder="中文或英文，例如 bench"
+              onChange={(e) => onType(e.target.value)}
+            />
+          </label>
+          <button type="submit" className="secondary">
+            搜尋
+          </button>
+        </form>
+        <div className="chips picker-chips" role="group" aria-label="種類">
+          {EXERCISE_KINDS.map((k) => (
             <button
-              key={ex.id}
+              key={k}
               type="button"
-              className="row"
-              disabled={busy}
-              onClick={() => onPick(ex)}
+              className={`chip${kind === k ? " selected" : ""}`}
+              aria-pressed={kind === k}
+              onClick={() => {
+                setKind(k);
+                setMuscle(null);
+                setCategory(null);
+              }}
             >
-              <ExerciseIllustration exercise={ex} size={40} />
-              <span className="row-name">
-                <ExerciseName exercise={ex} />
-              </span>
-              <span className="badge row-tag">
-                {EQUIPMENT_CATEGORY_LABELS[ex.equipmentCategory]}
-              </span>
+              {EXERCISE_KIND_LABELS[k]}
             </button>
-          ))
+          ))}
+        </div>
+        {kind === "strength" && (
+          <>
+            <div className="chips picker-chips" role="group" aria-label="肌群">
+              {MUSCLE_GROUPS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`chip${muscle === m ? " selected" : ""}`}
+                  aria-pressed={muscle === m}
+                  onClick={() => setMuscle(muscle === m ? null : m)}
+                >
+                  {MUSCLE_GROUP_LABELS[m]}
+                </button>
+              ))}
+            </div>
+            <div
+              className="chips picker-chips"
+              role="group"
+              aria-label="器材類別"
+            >
+              {EQUIPMENT_CATEGORIES.filter((c) => c !== "cardio_equipment").map(
+                (c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`chip${category === c ? " selected" : ""}`}
+                    aria-pressed={category === c}
+                    onClick={() => setCategory(category === c ? null : c)}
+                  >
+                    {EQUIPMENT_CATEGORY_LABELS[c]}
+                  </button>
+                ),
+              )}
+            </div>
+          </>
         )}
-      </section>
-      <div className="stack picker-actions">
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => setCustom(true)}
-        >
-          新增自訂動作
-        </button>
-        <button type="button" className="secondary" onClick={onClose}>
-          返回訓練
-        </button>
-      </div>
+        <section className="card list picker-list" aria-label="動作列表">
+          {failed ? (
+            <p className="error-text">載入動作失敗，請再試一次。</p>
+          ) : results === null ? (
+            <Skeleton layout="rows" />
+          ) : results.length === 0 ? (
+            <p className="muted">找不到符合的動作</p>
+          ) : (
+            results.map((ex) => (
+              <ExerciseRow
+                key={ex.id}
+                exercise={ex}
+                disabled={busy}
+                onPick={onPick}
+              />
+            ))
+          )}
+        </section>
+        <div className="stack picker-actions">
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setCustom(true)}
+          >
+            新增自訂動作
+          </button>
+          <button type="button" className="secondary" onClick={onClose}>
+            返回訓練
+          </button>
+        </div>
+      </EquipmentPhoto>
     </main>
   );
 }
 
 interface CustomFormProps {
+  initial?: ExerciseSuggestion | undefined;
   busy: boolean;
   error: string | null;
   onCreated: (exercise: Exercise) => void;
@@ -236,17 +239,22 @@ interface CustomFormProps {
 }
 
 function CustomExerciseForm({
+  initial,
   onCreated,
   onBack,
   onFatal,
   busy: adding,
   error: addError,
 }: CustomFormProps) {
-  const [nameZh, setNameZh] = useState("");
+  const [nameZh, setNameZh] = useState(initial?.nameZh ?? "");
   const [nameEn, setNameEn] = useState("");
-  const [kind, setKind] = useState<ExerciseKind>("strength");
-  const [muscle, setMuscle] = useState<MuscleGroup | "">("");
-  const [equipment, setEquipment] = useState<Equipment | "">("");
+  const [kind, setKind] = useState<ExerciseKind>(initial?.kind ?? "strength");
+  const [muscle, setMuscle] = useState<MuscleGroup | "">(
+    initial?.muscleGroup ?? "",
+  );
+  const [equipment, setEquipment] = useState<Equipment | "">(
+    initial?.equipment ?? "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

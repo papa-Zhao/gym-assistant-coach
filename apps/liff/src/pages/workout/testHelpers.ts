@@ -23,7 +23,11 @@ export function fakeApi(handler: Handler): Call[] {
       const call: Call = {
         method: init?.method ?? "GET",
         path: url.replace("https://api.test", ""),
-        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        body: !init?.body
+          ? undefined
+          : init.body instanceof Blob
+            ? init.body
+            : JSON.parse(String(init.body)),
       };
       calls.push(call);
       const out = handler(call);

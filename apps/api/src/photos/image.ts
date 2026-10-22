@@ -11,7 +11,7 @@ const MAX_INPUT_PIXELS = 50_000_000;
  * metadata (sharp drops EXIF/GPS/ICC unless asked to keep them). Throws
  * InvalidImage; the sharp error text is never propagated.
  */
-export async function normalizeMealImage(input: Buffer): Promise<Buffer> {
+export async function normalizePhoto(input: Buffer): Promise<Buffer> {
   try {
     return await sharp(input, {
       failOn: "error",

@@ -11,7 +11,8 @@ import {
 import { apiFetch } from "../../api";
 import { shortDate } from "../../bodyMetricsView";
 import { ConfirmRow } from "./ConfirmRow";
-import { ExerciseName, ExercisePicker } from "./ExercisePicker";
+import { ExerciseName } from "./ExerciseName";
+import { ExercisePicker } from "./ExercisePicker";
 import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
 import {
   SPEC,

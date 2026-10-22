@@ -9,6 +9,9 @@ import {
   type Exercise,
   type ExerciseKind,
   type MuscleGroup,
+  MEAL_PHOTO_MAX_BYTES,
+  type ApiError,
+  type IdentifyEquipmentResponse,
 } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler } from "../http.js";
@@ -18,6 +21,7 @@ import {
   createCustomExercise,
   listExercises,
 } from "./repo";
+import { identifyEquipment } from "./identify";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const listSchema = {
@@ -70,6 +74,35 @@ export const exerciseRoutes =
     const { db, sessionSecret } = deps;
     app.setErrorHandler(apiErrorHandler);
     const authenticate = workoutAuth(sessionSecret);
+
+    // Photo bytes arrive raw from the LIFF. Registered in this plugin only,
+    // and only /exercises/identify reads them.
+    app.addContentTypeParser(
+      "application/octet-stream",
+      { parseAs: "buffer" },
+      (_req, body, done) => done(null, body),
+    );
+
+    app.post(
+      "/exercises/identify",
+      { onRequest: authenticate, bodyLimit: MEAL_PHOTO_MAX_BYTES },
+      async (req, reply): Promise<IdentifyEquipmentResponse> => {
+        if (!Buffer.isBuffer(req.body)) {
+          return reply
+            .code(415)
+            .send({ error: "unsupported_media_type" } satisfies ApiError);
+        }
+        return identifyEquipment(
+          {
+            db,
+            identifier: deps.equipmentIdentifier,
+            now: deps.now,
+          },
+          req.workoutUserId as string,
+          req.body,
+        );
+      },
+    );
 
     app.get<{
       Querystring: {

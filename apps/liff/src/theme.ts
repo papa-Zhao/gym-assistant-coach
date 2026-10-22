@@ -290,6 +290,7 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .bar-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--color-accent); }
 .picker-chips { margin-top: var(--space-3); }
 .picker-actions { margin-top: var(--space-4); }
+.picker-photo { margin-top: var(--space-3); margin-bottom: var(--space-3); }
 .chip[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-primary); font-weight: 700; }
 button.chip { color: var(--color-text); font-weight: 400; }
 .meal-page { padding-bottom: calc(${minTouchTarget}px * 3 + var(--space-8) + env(safe-area-inset-bottom)); }

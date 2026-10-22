@@ -5,13 +5,8 @@ import {
   type Meal,
   type MealType,
 } from "@gac/shared";
-import {
-  MealParserUnavailable,
-  type MealParser,
-  type ParseResult,
-  type ParsedItem,
-} from "../ai/meal-parser";
-import { addAiTokens, releaseAiUse, reserveAiUse } from "../ai/usage";
+import type { MealParser, ParseResult, ParsedItem } from "../ai/meal-parser";
+import { withAiUse } from "../ai/usage";
 import type { Db } from "../users/repo";
 import { createDraftMeal, type DraftItem } from "./repo";
 
@@ -84,19 +79,9 @@ export async function runAiMeal(
 ): Promise<AiMealOutcome> {
   const { db } = deps;
   const day = taipeiDate(now);
-  if (!(await reserveAiUse(db, userId, kind, day))) return { kind: "limit" };
-
-  let result;
-  try {
-    result = await parse();
-  } catch (err) {
-    if (err instanceof MealParserUnavailable) {
-      await releaseAiUse(db, userId, kind, day);
-      return { kind: "unavailable" };
-    }
-    throw err;
-  }
-  await addAiTokens(db, userId, kind, day, result.usage);
+  const used = await withAiUse(db, userId, kind, now, parse);
+  if (used.kind !== "done") return used;
+  const result = used.result;
 
   if (result.kind === "refused") return { kind: "refused" };
   if (result.kind === "not_food") return { kind: "not_food" };

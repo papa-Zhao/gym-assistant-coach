@@ -43,7 +43,9 @@ export async function apiFetch<T>(
   const send = () => {
     const headers = new Headers(init.headers);
     headers.set("authorization", `Bearer ${getAccessToken() ?? ""}`);
-    if (init.body !== undefined && init.body !== null)
+    // Raw bytes keep the caller's content-type; everything else is JSON.
+    const raw = init.body instanceof Blob || init.body instanceof ArrayBuffer;
+    if (init.body !== undefined && init.body !== null && !raw)
       headers.set("content-type", "application/json");
     return (config?.fetchImpl ?? fetch)(`${apiUrl}${path}`, {
       ...init,

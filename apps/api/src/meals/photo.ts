@@ -1,7 +1,7 @@
 import { defaultMealType, taipeiHour, type Meal } from "@gac/shared";
 import type { FastifyBaseLogger } from "fastify";
 import type { MealParser } from "../ai/meal-parser";
-import { InvalidImage, normalizeMealImage } from "../photos/image";
+import { InvalidImage, normalizePhoto } from "../photos/image";
 import {
   newMealPhotoKey,
   withPhotoDeadline,
@@ -43,7 +43,7 @@ export async function logMealFromPhoto(
 ): Promise<PhotoMealOutcome> {
   let jpeg: Buffer;
   try {
-    jpeg = await normalizeMealImage(image);
+    jpeg = await normalizePhoto(image);
   } catch (err) {
     if (err instanceof InvalidImage) return { kind: "invalid_image" };
     throw err;

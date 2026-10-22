@@ -185,6 +185,26 @@ export interface Exercise {
   isCustom: boolean;
 }
 
+/** Prefill for the custom-exercise form after an equipment photo. */
+export interface ExerciseSuggestion {
+  nameZh: string;
+  kind: ExerciseKind;
+  muscleGroup: MuscleGroup | null;
+  equipment: Equipment;
+}
+
+export type IdentifyEquipmentResponse =
+  | {
+      outcome: "found";
+      equipment: Equipment;
+      candidates: Exercise[];
+      suggestion: ExerciseSuggestion;
+    }
+  | {
+      outcome:
+        "not_equipment" | "limit" | "refused" | "unavailable" | "invalid_image";
+    };
+
 export interface WorkoutSet {
   setIndex: number;
   weightKg: number;
