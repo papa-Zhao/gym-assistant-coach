@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import type { HealthResponse } from "@gac/shared";
 import { newDbStats, withDbStats, type DbStats } from "./db/timing.js";
@@ -12,10 +13,27 @@ import { templateRoutes } from "./workouts/template-routes.js";
 import { sessionRoutes } from "./workouts/session-routes.js";
 import { mealRoutes } from "./meals/routes.js";
 import { internalRoutes } from "./internal/routes.js";
+import { rateLimitOptions } from "./rate-limit.js";
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
-  const app = Fastify(options);
+  // Cloud Run appends the real client IP as the last X-Forwarded-For hop;
+  // earlier hops are client-supplied and must not be trusted. Trusting only
+  // hop 0 (the socket peer) is `trustProxy: 1`, which Fastify's types reject.
+  const serverOptions: FastifyServerOptions = {
+    trustProxy: (_addr, hop) => hop < 1,
+    ...options,
+  };
+  const app = Fastify(serverOptions);
   app.setErrorHandler(apiErrorHandler);
+  // A root onRequest hook, not the plugin's per-route one: that runs after
+  // route-level auth hooks, so 401s for bad tokens would never be counted.
+  app.register(rateLimit, {
+    ...rateLimitOptions(deps.sessionSecret),
+    global: false,
+  });
+  app.after(() => {
+    app.addHook("onRequest", app.rateLimit());
+  });
 
   // One log line per request: route template (never the URL with ids), status,
   // total time and database work. No bodies or user data.
