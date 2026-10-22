@@ -8,7 +8,7 @@ import {
   type SessionItem,
   type WorkoutSet,
 } from "@gac/shared";
-import { apiFetch } from "../../api";
+import { apiFetch, failureMessage } from "../../api";
 import { shortDate } from "../../bodyMetricsView";
 import { ConfirmRow } from "./ConfirmRow";
 import { ExerciseName } from "./ExerciseName";
@@ -108,7 +108,7 @@ export function ActiveWorkout({
 
   const fail = (err: unknown, fallback: string) => {
     if (isAuthExpired(err)) onFatal();
-    else setError(describeError(err, fallback));
+    else setError(describeError(err, failureMessage(err, fallback)));
   };
 
   // Every change goes to the server and the screen re-renders from its answer.

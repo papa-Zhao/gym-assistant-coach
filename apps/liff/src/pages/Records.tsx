@@ -11,7 +11,7 @@ import { MealsCard } from "./meal/MealsCard";
 
 interface RecordsProps {
   /** Called when the session cannot be recovered or loading failed. */
-  onFatal: () => void;
+  onFatal: (err?: unknown) => void;
 }
 
 export function Records({ onFatal }: RecordsProps) {
@@ -24,15 +24,15 @@ export function Records({ onFatal }: RecordsProps) {
       .then((res) => {
         if (live) setData(res);
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     apiFetch<WeekStats>("/workouts/week")
       .then((res) => {
         if (live) setWeek(res);
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     return () => {
       live = false;

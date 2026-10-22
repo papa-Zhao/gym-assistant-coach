@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { failureMessage } from "./api";
 import type { AuthState } from "./auth";
 import { route } from "./router";
 import { Splash } from "./components/Splash";
@@ -26,8 +27,10 @@ export function App({
   today,
   onClose,
 }: AppProps) {
-  const [failed, setFailed] = useState(false);
-  const shown: AuthState = failed ? { kind: "error" } : state;
+  // `failure` holds the error a page gave up on (null until then).
+  const [failure, setFailure] = useState<{ err: unknown } | null>(null);
+  const shown: AuthState = failure ? { kind: "error" } : state;
+  const onFatal = useCallback((err?: unknown) => setFailure({ err }), []);
 
   switch (shown.kind) {
     case "loading":
@@ -35,19 +38,13 @@ export function App({
     case "ready":
       switch (route(pathname)) {
         case "profile":
-          return (
-            <Profile
-              today={today}
-              onClose={onClose}
-              onFatal={() => setFailed(true)}
-            />
-          );
+          return <Profile today={today} onClose={onClose} onFatal={onFatal} />;
         case "settings":
           return <Settings />;
         case "records":
-          return <Records onFatal={() => setFailed(true)} />;
+          return <Records onFatal={onFatal} />;
         case "body":
-          return <BodyMetrics onFatal={() => setFailed(true)} />;
+          return <BodyMetrics onFatal={onFatal} />;
         case "meal": {
           const params = new URLSearchParams(search);
           return (
@@ -55,14 +52,12 @@ export function App({
               id={params.get("id")}
               type={params.get("type")}
               today={today}
-              onFatal={() => setFailed(true)}
+              onFatal={onFatal}
             />
           );
         }
         case "workout":
-          return (
-            <WorkoutHome onFatal={() => setFailed(true)} onClose={onClose} />
-          );
+          return <WorkoutHome onFatal={onFatal} onClose={onClose} />;
       }
       break;
     case "consent_required":
@@ -84,7 +79,9 @@ export function App({
       return (
         <main>
           <section className="card">
-            <p>連線出了點問題，請稍後再試。</p>
+            <p>
+              {failureMessage(failure?.err, "連線出了點問題，請稍後再試。")}
+            </p>
             <button type="button" onClick={() => window.location.reload()}>
               重新整理
             </button>

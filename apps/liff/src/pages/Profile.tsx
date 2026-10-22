@@ -11,7 +11,12 @@ import {
   type Sex,
   type Targets,
 } from "@gac/shared";
-import { ApiHttpError, AuthExpiredError, apiFetch } from "../api";
+import {
+  ApiHttpError,
+  AuthExpiredError,
+  apiFetch,
+  failureMessage,
+} from "../api";
 import { Skeleton } from "../components/Skeleton";
 
 const SEX_LABELS: Record<Sex, string> = { male: "男", female: "女" };
@@ -132,7 +137,7 @@ interface ProfileProps {
   today: string;
   onClose: () => void;
   /** Called when the session cannot be recovered or loading failed. */
-  onFatal: () => void;
+  onFatal: (err?: unknown) => void;
 }
 
 export function Profile({ today, onClose, onFatal }: ProfileProps) {
@@ -169,8 +174,8 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
           setStep(1);
         }
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     return () => {
       live = false;
@@ -196,7 +201,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
       if (err instanceof AuthExpiredError) onFatal();
       else if (err instanceof ApiHttpError && err.status === 400)
         setSaveError(badRequestMessage);
-      else setSaveError("儲存失敗，請稍後再試。");
+      else setSaveError(failureMessage(err, "儲存失敗，請稍後再試。"));
       return null;
     } finally {
       setSaving(false);
