@@ -28,6 +28,7 @@ export async function createProgram(
 
 /**
  * Saves day `day` (1-based) of the user's program as a template named after the day.
+ * Items must reference existing exercises (foreign key); repeated exercises keep the first occurrence.
  * null when the program is missing, another user's, older than ASK_RETENTION_DAYS, or has no such day.
  */
 export async function saveProgramDay(
@@ -86,9 +87,14 @@ export async function saveProgramDay(
       if (!raced) throw new Error("saveProgramDay: no template");
       return { outcome: "already_saved", templateName: raced.name };
     }
-    if (target.items.length > 0) {
+    // template_items is keyed by (template, exercise): drop repeats.
+    const seen = new Set<string>();
+    const items = target.items.filter(
+      (it) => !seen.has(it.exerciseId) && !!seen.add(it.exerciseId),
+    );
+    if (items.length > 0) {
       await tx.insert(templateItems).values(
-        target.items.map((it, position) => ({
+        items.map((it, position) => ({
           templateId: tpl.id,
           exerciseId: it.exerciseId,
           position,

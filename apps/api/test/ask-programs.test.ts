@@ -6,7 +6,7 @@ import {
   type StoredProgramDay,
 } from "../src/ask/programs";
 import { deleteTemplate, listTemplates } from "../src/workouts/repo";
-import { exercises } from "../src/db/schema";
+import { exercises, workoutTemplates } from "../src/db/schema";
 import { syncUser, type Db } from "../src/users/repo";
 import { createTestDb } from "./db";
 
@@ -81,6 +81,76 @@ describe("ai programs", () => {
       "saved",
     ]);
     expect(await listTemplates(db, userA)).toHaveLength(1);
+  });
+
+  it("falls back to already_saved when the insert hits the unique index", async () => {
+    const pid = await createProgram(db, userA, days, NOW);
+    await saveProgramDay(db, userA, pid, 1, NOW);
+    // Make the template pre-check miss, as if a concurrent save committed after it.
+    let selects = 0;
+    const stale = new Proxy(db, {
+      get(target, prop, recv) {
+        if (prop !== "transaction") return Reflect.get(target, prop, recv);
+        return (cb: (tx: Db) => Promise<unknown>) =>
+          target.transaction((tx) =>
+            cb(
+              new Proxy(tx, {
+                get(t, p, r) {
+                  if (p === "select" && ++selects === 2) {
+                    return () => ({
+                      from: () => ({
+                        where: () => ({ limit: async () => [] }),
+                      }),
+                    });
+                  }
+                  const v = Reflect.get(t, p, r);
+                  return typeof v === "function" ? v.bind(t) : v;
+                },
+              }),
+            ),
+          );
+      },
+    }) as Db;
+    expect(await saveProgramDay(stale, userA, pid, 1, NOW)).toEqual({
+      outcome: "already_saved",
+      templateName: "推日",
+    });
+    expect(selects).toBeGreaterThanOrEqual(3);
+    expect(await listTemplates(db, userA)).toHaveLength(1);
+  });
+
+  it("unique index rejects a duplicate (program, day) but allows nulls", async () => {
+    const pid = await createProgram(db, userA, days, NOW);
+    const row = {
+      userId: userA,
+      name: "x",
+      sourceProgramId: pid,
+      sourceDay: 1,
+    };
+    await db.insert(workoutTemplates).values(row);
+    await expect(db.insert(workoutTemplates).values(row)).rejects.toThrow();
+    await db.insert(workoutTemplates).values({ userId: userA, name: "y" });
+    await db.insert(workoutTemplates).values({ userId: userA, name: "z" });
+  });
+
+  it("drops repeated exercises, keeping the first and contiguous positions", async () => {
+    const [a, b] = days[0]!.items;
+    const pid = await createProgram(
+      db,
+      userA,
+      [{ name: "推日", items: [a!, { ...a!, sets: 9 }, b!] }],
+      NOW,
+    );
+    expect((await saveProgramDay(db, userA, pid, 1, NOW))?.outcome).toBe(
+      "saved",
+    );
+    const [tpl] = await listTemplates(db, userA);
+    expect(
+      tpl?.items.map((i) => [i.exercise.id, i.targetSets, i.targetReps]),
+    ).toEqual([
+      [a!.exerciseId, a!.sets, a!.reps],
+      [b!.exerciseId, b!.sets, b!.reps],
+    ]);
   });
 
   it("can save again after the template was deleted", async () => {
