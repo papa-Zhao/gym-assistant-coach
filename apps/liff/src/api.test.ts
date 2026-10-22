@@ -105,6 +105,59 @@ describe("apiFetch", () => {
     expect(sessions).toBe(2);
   });
 
+  it("keeps the caller's content-type for a Blob body and resends it on retry", async () => {
+    const seen: Array<{ type: string | null; body: unknown }> = [];
+    setup((_, auth) => {
+      const call = fetchImpl.mock.calls.at(-1)?.[1] as RequestInit;
+      seen.push({
+        type: new Headers(call.headers).get("content-type"),
+        body: call.body,
+      });
+      return auth === "Bearer s2" ? json({ ok: true }) : json({}, 401);
+    });
+    await login({
+      liff,
+      liffId: "id",
+      apiUrl: API,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const blob = new Blob(["abc"], { type: "image/jpeg" });
+    await expect(
+      apiFetch("/upload", {
+        method: "POST",
+        body: blob,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(seen).toHaveLength(2);
+    for (const s of seen) {
+      expect(s.type).toBe("application/octet-stream");
+      expect(s.body).toBe(blob);
+    }
+  });
+
+  it("does not add a content-type for an ArrayBuffer body", async () => {
+    let type: string | null = "unset";
+    setup(() => {
+      const call = fetchImpl.mock.calls.at(-1)?.[1] as RequestInit;
+      type = new Headers(call.headers).get("content-type");
+      return json({});
+    });
+    await apiFetch("/upload", { method: "POST", body: new ArrayBuffer(4) });
+    expect(type).toBeNull();
+  });
+
+  it("still sends application/json for a string body", async () => {
+    let type: string | null = null;
+    setup(() => {
+      const call = fetchImpl.mock.calls.at(-1)?.[1] as RequestInit;
+      type = new Headers(call.headers).get("content-type");
+      return json({});
+    });
+    await apiFetch("/x", { method: "POST", body: JSON.stringify({ a: 1 }) });
+    expect(type).toBe("application/json");
+  });
+
   it("throws ApiHttpError with the status for other failures", async () => {
     setup(() => json({ error: "conflict" }, 409));
     await expect(apiFetch("/profile/targets")).rejects.toMatchObject({
