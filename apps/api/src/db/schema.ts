@@ -307,10 +307,7 @@ export const foods = pgTable(
   },
   (t) => [
     unique("foods_source_source_ref_unique").on(t.source, t.sourceRef),
-    check(
-      "foods_source_check",
-      sql`${t.source} in (${inList(FOOD_SOURCES)})`,
-    ),
+    check("foods_source_check", sql`${t.source} in (${inList(FOOD_SOURCES)})`),
   ],
 );
 
@@ -339,14 +336,8 @@ export const meals = pgTable(
       "meals_meal_type_check",
       sql`${t.mealType} in (${inList(MEAL_TYPES)})`,
     ),
-    check(
-      "meals_status_check",
-      sql`${t.status} in (${inList(MEAL_STATUSES)})`,
-    ),
-    check(
-      "meals_source_check",
-      sql`${t.source} in (${inList(MEAL_SOURCES)})`,
-    ),
+    check("meals_status_check", sql`${t.status} in (${inList(MEAL_STATUSES)})`),
+    check("meals_source_check", sql`${t.source} in (${inList(MEAL_SOURCES)})`),
   ],
 );
 

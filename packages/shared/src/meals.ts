@@ -87,7 +87,10 @@ function round1(n: number): number {
 }
 
 /** Nutrition for `grams` of a food; kcal is an integer, macros 1 decimal. */
-export function nutritionFor(per100g: Food["per100g"], grams: number): Nutrition {
+export function nutritionFor(
+  per100g: Food["per100g"],
+  grams: number,
+): Nutrition {
   const f = grams / 100;
   return {
     kcal: Math.round(per100g.kcal * f + EPS),

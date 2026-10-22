@@ -96,6 +96,7 @@ describe("meal routes", () => {
 
   it("rejects an empty or missing or overlong q", async () => {
     expect((await req("GET", "/foods?q=")).statusCode).toBe(400);
+    expect((await req("GET", "/foods?q=%20%20%20")).statusCode).toBe(400);
     expect((await req("GET", "/foods")).statusCode).toBe(400);
     expect((await req("GET", `/foods?q=${"a".repeat(41)}`)).statusCode).toBe(
       400,
@@ -195,6 +196,7 @@ describe("meal routes", () => {
       mealType: "dinner",
       items: [{ id: ZERO, grams: 10 }],
     });
+    expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "unknown_item" });
   });
 

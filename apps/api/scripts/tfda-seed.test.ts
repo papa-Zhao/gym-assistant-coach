@@ -12,14 +12,19 @@ describe("parseTfdaCsv", () => {
   const foods = parseTfdaCsv(csv);
 
   it("returns one food per 整合編號, in file order", () => {
-    expect(foods.map((f) => f.ref)).toEqual(["J0403106", "N0300101", "A0550601"]);
+    expect(foods.map((f) => f.ref)).toEqual([
+      "J0403106",
+      "N0300101",
+      "A0550601",
+    ]);
   });
 
   it("reads quoted fields that contain commas, with numbers trimmed", () => {
     expect(foods[0]).toEqual({
       ref: "J0403106",
       name: "鯔(12月,雄魚)",
-      aliases: "青頭仔(幼魚),奇目仔(成魚),信魚,正烏,烏魚,正頭烏,回頭烏,大烏(澎湖)",
+      aliases:
+        "青頭仔(幼魚),奇目仔(成魚),信魚,正烏,烏魚,正頭烏,回頭烏,大烏(澎湖)",
       category: "魚貝類",
       kcal: 137,
       proteinG: 21.1,
@@ -29,7 +34,13 @@ describe("parseTfdaCsv", () => {
   });
 
   it("uses null for a missing 粗蛋白 and for empty 俗名", () => {
-    expect(foods[1]).toMatchObject({ name: "果糖", kcal: 297, proteinG: null, fatG: null, carbG: 76.9 });
+    expect(foods[1]).toMatchObject({
+      name: "果糖",
+      kcal: 297,
+      proteinG: null,
+      fatG: null,
+      carbG: 76.9,
+    });
     expect(foods[2]).toMatchObject({ name: "白飯", aliases: null, kcal: 183 });
   });
 
@@ -41,7 +52,10 @@ describe("parseTfdaCsv", () => {
   it("reads quoted fields with escaped quotes and embedded newlines", () => {
     const header = "整合編號,樣品名稱,俗名,食品分類,分析項,每100克含量";
     const text = `${header}\r\nX1,"a ""b"", c","l1\nl2",類,熱量,10\r\n`;
-    expect(parseTfdaCsv(text)[0]).toMatchObject({ name: 'a "b", c', aliases: "l1\nl2" });
+    expect(parseTfdaCsv(text)[0]).toMatchObject({
+      name: 'a "b", c',
+      aliases: "l1\nl2",
+    });
   });
 });
 
@@ -54,7 +68,9 @@ describe("seedSql", () => {
   });
 
   it("writes null as SQL null and escapes single quotes", () => {
-    expect(sql).toContain("'N0300101', '果糖', '高果糖糖漿', '糖類', 297, null, 76.9, null");
+    expect(sql).toContain(
+      "'N0300101', '果糖', '高果糖糖漿', '糖類', 297, null, 76.9, null",
+    );
     const quoted = seedSql([{ ...foods[0]!, name: "it's" }]);
     expect(quoted).toContain("'it''s'");
   });

@@ -16,10 +16,7 @@ describe("nutritionFor", () => {
 
   it("treats null macros as 0", () => {
     expect(
-      nutritionFor(
-        { kcal: 100, proteinG: null, carbG: null, fatG: null },
-        50,
-      ),
+      nutritionFor({ kcal: 100, proteinG: null, carbG: null, fatG: null }, 50),
     ).toEqual({ kcal: 50, proteinG: 0, carbG: 0, fatG: 0 });
   });
 });

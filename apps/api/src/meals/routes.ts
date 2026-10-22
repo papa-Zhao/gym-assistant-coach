@@ -132,9 +132,17 @@ export const mealRoutes =
     app.get<{ Querystring: { q: string } }>(
       "/foods",
       { ...auth, schema: searchSchema },
-      async (req): Promise<{ foods: Food[] }> => ({
-        foods: await searchFoods(db, req.query.q),
-      }),
+      async (req, reply) => {
+        const q = req.query.q.trim();
+        if (!q) {
+          return reply
+            .code(400)
+            .send({ error: "bad_request" } satisfies ApiError);
+        }
+        return { foods: await searchFoods(db, q) } satisfies {
+          foods: Food[];
+        };
+      },
     );
 
     app.get<{ Querystring: { date?: string } }>(

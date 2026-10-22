@@ -57,7 +57,7 @@ const num = (v: string | undefined) => {
 };
 
 export function parseTfdaCsv(csv: string): TfdaFood[] {
-  const [header, ...rows] = parseRows(csv.replace(/^﻿/, ""));
+  const [header, ...rows] = parseRows(csv.replace(/^\uFEFF/, ""));
   if (!header) return [];
   const col = (name: string) => {
     const i = header.indexOf(name);
