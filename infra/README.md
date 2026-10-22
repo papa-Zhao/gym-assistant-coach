@@ -68,6 +68,18 @@ read -rs URL
 printf %s "$URL" | gcloud secrets versions add database-url --project <project-id> --data-file=-
 ```
 
+### Anthropic API key（`anthropic-api-key`）
+
+**【使用者自行操作】** `api` 啟動時需要 `ANTHROPIC_API_KEY`（以 `latest` 掛載 `anthropic-api-key`），secret 沒有版本時 revision 無法啟動。順序：先 `terraform apply` 建立 secret 與存取權限，再執行腳本寫入金鑰，然後才合併使用它的 PR。
+
+腳本會用 `read -rs` 提示輸入金鑰（不顯示、不進 shell 歷史），並經 stdin 傳給 Secret Manager，金鑰不會出現在參數、環境變數或檔案：
+
+```sh
+infra/scripts/set-anthropic-key.sh <project-id>
+```
+
+並到 Anthropic console 設定每月用量上限。
+
 ## 5. GitHub secret
 
 **【使用者自行操作】** 建立 Neon API key 後存成 Actions secret（指令會提示輸入值）：

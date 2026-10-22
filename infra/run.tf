@@ -34,8 +34,9 @@ locals {
   # Env name => secret_id, resolved at version "latest".
   service_secret_env = {
     api = {
-      DATABASE_URL   = google_secret_manager_secret.database_url.secret_id
-      SESSION_SECRET = google_secret_manager_secret.api_session_secret.secret_id
+      DATABASE_URL      = google_secret_manager_secret.database_url.secret_id
+      SESSION_SECRET    = google_secret_manager_secret.api_session_secret.secret_id
+      ANTHROPIC_API_KEY = google_secret_manager_secret.anthropic_api_key.secret_id
     }
     bot = {
       LINE_CHANNEL_SECRET       = google_secret_manager_secret.line_channel_secret.secret_id
@@ -108,6 +109,7 @@ resource "google_cloud_run_v2_service" "svc" {
     google_project_service.enabled,
     google_secret_manager_secret_iam_member.api_database_url,
     google_secret_manager_secret_iam_member.api_session_secret,
+    google_secret_manager_secret_iam_member.api_anthropic_api_key,
     google_secret_manager_secret_iam_member.bot_line_channel_secret,
     google_secret_manager_secret_iam_member.bot_line_channel_access_token,
     google_secret_manager_secret_version.api_session_secret,
