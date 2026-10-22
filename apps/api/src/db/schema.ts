@@ -2,6 +2,10 @@ import {
   CONSENT_DOCS,
   EQUIPMENT,
   EXERCISE_KINDS,
+  FOOD_SOURCES,
+  MEAL_SOURCES,
+  MEAL_STATUSES,
+  MEAL_TYPES,
   MUSCLE_GROUPS,
 } from "@gac/shared";
 import { sql } from "drizzle-orm";
@@ -9,6 +13,7 @@ import {
   boolean,
   check,
   date,
+  index,
   integer,
   numeric,
   pgTable,
@@ -279,4 +284,88 @@ export const cardioEntries = pgTable(
       .defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.sessionId, t.exerciseId, t.entryIndex] })],
+);
+
+export const foods = pgTable(
+  "foods",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source").notNull(),
+    sourceRef: text("source_ref"),
+    name: text("name").notNull(),
+    aliases: text("aliases"),
+    category: text("category"),
+    kcalPer100g: numeric("kcal_per_100g", { precision: 6, scale: 1 }).notNull(),
+    proteinPer100g: numeric("protein_per_100g", { precision: 6, scale: 1 }),
+    carbPer100g: numeric("carb_per_100g", { precision: 6, scale: 1 }),
+    fatPer100g: numeric("fat_per_100g", { precision: 6, scale: 1 }),
+    servingDesc: text("serving_desc"),
+    ownerUserId: uuid("owner_user_id").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("foods_source_source_ref_unique").on(t.source, t.sourceRef),
+    check(
+      "foods_source_check",
+      sql`${t.source} in (${inList(FOOD_SOURCES)})`,
+    ),
+  ],
+);
+
+export const meals = pgTable(
+  "meals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    eatenOn: date("eaten_on").notNull(),
+    mealType: text("meal_type").notNull(),
+    status: text("status").notNull(),
+    source: text("source").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("meals_user_eaten_on_idx").on(t.userId, t.eatenOn),
+    check(
+      "meals_meal_type_check",
+      sql`${t.mealType} in (${inList(MEAL_TYPES)})`,
+    ),
+    check(
+      "meals_status_check",
+      sql`${t.status} in (${inList(MEAL_STATUSES)})`,
+    ),
+    check(
+      "meals_source_check",
+      sql`${t.source} in (${inList(MEAL_SOURCES)})`,
+    ),
+  ],
+);
+
+export const mealItems = pgTable(
+  "meal_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => meals.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    foodId: uuid("food_id").references(() => foods.id),
+    name: text("name").notNull(),
+    grams: numeric("grams", { precision: 6, scale: 1 }).notNull(),
+    kcal: integer("kcal").notNull(),
+    proteinG: numeric("protein_g", { precision: 6, scale: 1 }).notNull(),
+    carbG: numeric("carb_g", { precision: 6, scale: 1 }).notNull(),
+    fatG: numeric("fat_g", { precision: 6, scale: 1 }).notNull(),
+    aiConfidence: numeric("ai_confidence", { precision: 3, scale: 2 }),
+  },
+  (t) => [unique("meal_items_meal_position_unique").on(t.mealId, t.position)],
 );
