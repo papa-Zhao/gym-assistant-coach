@@ -366,6 +366,22 @@ export const mealItems = pgTable(
   (t) => [unique("meal_items_meal_position_unique").on(t.mealId, t.position)],
 );
 
+export const mealPhotos = pgTable(
+  "meal_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => meals.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("meal_photos_meal_id_idx").on(t.mealId)],
+);
+
 export const aiUsageDaily = pgTable(
   "ai_usage_daily",
   {

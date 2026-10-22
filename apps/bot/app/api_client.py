@@ -68,7 +68,8 @@ class Meal:
 
 @dataclass(frozen=True)
 class MealTextResult:
-    outcome: str  # draft | limit | not_food | refused | unavailable
+    # draft | limit | not_food | refused | unavailable | invalid_image (photos only)
+    outcome: str
     meal: Meal | None
 
 
@@ -127,6 +128,8 @@ class ApiClient(Protocol):
 
     def log_meal_text(self, line_user_id: str, meal_type: str, text: str) -> MealTextResult: ...
 
+    def log_meal_photo(self, line_user_id: str, image: bytes) -> MealTextResult: ...
+
     def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed: ...
 
     def set_meal_type(self, line_user_id: str, meal_id: str, meal_type: str) -> Meal: ...
@@ -143,6 +146,24 @@ class HttpApiClient:
             f"{self._base}{path}",
             json=body,
             headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+        if res.status_code >= 300:
+            raise ApiError(res.status_code)
+        return res
+
+    def _post_bytes(
+        self, path: str, line_user_id: str, content: bytes, timeout: float
+    ) -> httpx.Response:
+        token = id_token.fetch_id_token(Request(), self._audience)
+        res = httpx.post(
+            f"{self._base}{path}",
+            content=content,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "x-line-user-id": line_user_id,
+                "content-type": "application/octet-stream",
+            },
             timeout=timeout,
         )
         if res.status_code >= 300:
@@ -198,6 +219,13 @@ class HttpApiClient:
             "/internal/meals/text",
             {"lineUserId": line_user_id, "mealType": meal_type, "text": text},
             timeout=MEAL_TIMEOUT,
+        ).json()
+        meal = _meal(data["meal"]) if data["outcome"] == "draft" else None
+        return MealTextResult(outcome=data["outcome"], meal=meal)
+
+    def log_meal_photo(self, line_user_id: str, image: bytes) -> MealTextResult:
+        data = self._post_bytes(
+            "/internal/meals/photo", line_user_id, image, timeout=MEAL_TIMEOUT
         ).json()
         meal = _meal(data["meal"]) if data["outcome"] == "draft" else None
         return MealTextResult(outcome=data["outcome"], meal=meal)

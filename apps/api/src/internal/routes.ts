@@ -1,4 +1,5 @@
 import {
+  MEAL_PHOTO_MAX_BYTES,
   MEAL_TYPES,
   isValidMetric,
   roundMetric,
@@ -14,6 +15,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
 import { confirmMeal, consumedOn, setMealType } from "../meals/repo";
+import { logMealFromPhoto } from "../meals/photo";
 import { logMealFromText } from "../meals/text";
 import { todayWorkoutSummary } from "../workouts/repo";
 import { formatWorkoutSummary } from "../workouts/summary";
@@ -104,6 +106,14 @@ const mealTypeChangeSchema = {
   },
 } as const;
 
+const mealPhotoSchema = {
+  headers: {
+    type: "object",
+    required: ["x-line-user-id"],
+    properties: { "x-line-user-id": lineUserId },
+  },
+} as const;
+
 const notFound = { error: "not_found" } satisfies ApiError;
 
 export const internalRoutes =
@@ -120,6 +130,14 @@ export const internalRoutes =
     );
 
     app.setErrorHandler(apiErrorHandler);
+
+    // Photo bytes arrive raw from the bot. Registered here only, so the public
+    // routes keep rejecting octet-stream bodies.
+    app.addContentTypeParser(
+      "application/octet-stream",
+      { parseAs: "buffer" },
+      (_req, body, done) => done(null, body),
+    );
 
     async function todayFor(
       userId: string | null,
@@ -195,6 +213,35 @@ export const internalRoutes =
         ? { outcome: "draft", meal: outcome.meal }
         : { outcome: outcome.kind };
     });
+
+    app.post<{ Headers: { "x-line-user-id": string } }>(
+      "/meals/photo",
+      { schema: mealPhotoSchema, bodyLimit: MEAL_PHOTO_MAX_BYTES },
+      async (req, reply) => {
+        if (!Buffer.isBuffer(req.body)) {
+          return reply
+            .code(415)
+            .send({ error: "unsupported_media_type" } satisfies ApiError);
+        }
+        const user = await findByLineUserId(db, req.headers["x-line-user-id"]);
+        if (!user) return reply.code(404).send(notFound);
+        const outcome = await logMealFromPhoto(
+          {
+            db,
+            parser: deps.mealParser,
+            photos: deps.photoStore,
+            photoTimeoutMs: deps.photoTimeoutMs,
+            now,
+            log: req.log,
+          },
+          user.id,
+          req.body,
+        );
+        return outcome.kind === "draft"
+          ? { outcome: "draft", meal: outcome.meal }
+          : { outcome: outcome.kind };
+      },
+    );
 
     app.post<{ Params: { id: string }; Body: { lineUserId: string } }>(
       "/meals/:id/confirm",

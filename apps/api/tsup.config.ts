@@ -7,7 +7,10 @@ export default defineConfig({
   clean: true,
   // Bundle every dependency (incl. @gac/shared, which ships TS source) so the
   // runtime image needs no node_modules.
-  noExternal: [/.*/],
+  noExternal: [/^(?!sharp$)/],
+  // sharp is a native module: it cannot be bundled and is installed in the
+  // runtime image at the version pinned in package.json (see Dockerfile).
+  external: ["sharp"],
   // Bundled CommonJS deps (fastify's) call require() on Node built-ins, which
   // plain ESM output lacks.
   banner: {

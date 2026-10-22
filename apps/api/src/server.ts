@@ -9,6 +9,7 @@ import { createMealParser } from "./ai/meal-parser.js";
 import { instrument } from "./db/timing.js";
 import { createLineVerifier } from "./auth/line.js";
 import { loadConfig } from "./config.js";
+import { createGcsPhotoStore } from "./photos/store.js";
 import { createBotNotifier } from "./notify/bot.js";
 import type { AppDeps, VerifyServiceToken } from "./deps.js";
 
@@ -59,6 +60,7 @@ const deps: AppDeps = {
   verifyLineIdToken: createLineVerifier(config.lineLoginChannelId),
   notifyWorkoutFinished: createBotNotifier(config.botUrl, config.botAudience),
   mealParser: createMealParser(anthropic, parserLog),
+  photoStore: createGcsPhotoStore(config.mealPhotosBucket),
   sessionSecret: config.sessionSecret,
   corsOrigin: config.corsOrigin,
   now: () => new Date(),

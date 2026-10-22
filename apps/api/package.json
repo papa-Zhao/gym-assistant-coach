@@ -11,6 +11,7 @@
     "test": "vitest run",
     "tfda:seed": "tsx scripts/tfda-seed.ts",
     "eval:meal-text": "tsx scripts/meal-text-eval.ts",
+    "eval:meal-photo": "tsx scripts/meal-photo-eval.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
@@ -18,11 +19,13 @@
     "@anthropic-ai/sdk": "^1.1.0",
     "@fastify/cors": "^11.3.1",
     "@gac/shared": "*",
+    "@google-cloud/storage": "8.4.0",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
     "google-auth-library": "^11.3.1",
     "jose": "^6.2.12",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",

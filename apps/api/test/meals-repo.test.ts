@@ -416,9 +416,9 @@ describe("meals repo", () => {
         "manual",
         NOW,
       );
-      expect(await deleteMeal(db, otherId, meal.id)).toBe(false);
+      expect(await deleteMeal(db, otherId, meal.id)).toBeNull();
       expect(await getMeal(db, userId, meal.id)).not.toBeNull();
-      expect(await deleteMeal(db, userId, meal.id)).toBe(true);
+      expect(await deleteMeal(db, userId, meal.id)).toEqual({ photoKeys: [] });
       expect(await getMeal(db, userId, meal.id)).toBeNull();
       expect(await db.select().from(mealItems)).toEqual([]);
     });

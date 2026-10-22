@@ -73,6 +73,13 @@ export interface Meal {
   total: Nutrition;
 }
 
+export const MEAL_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+export const MEAL_PHOTO_RETENTION_DAYS = 90;
+
+export interface MealDetail extends Meal {
+  photoUrl: string | null;
+}
+
 export interface DayMeals {
   date: string;
   meals: Meal[];

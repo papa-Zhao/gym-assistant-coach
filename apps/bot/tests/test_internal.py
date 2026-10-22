@@ -262,6 +262,26 @@ def test_log_meal_text_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> Non
     assert client.log_meal_text(USER, "lunch", "x").meal is None
 
 
+def test_log_meal_photo_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {"outcome": "draft", "meal": MEAL_JSON})
+    result = client.log_meal_photo(USER, b"\xff\xd8raw")
+    assert sent[0]["url"] == "https://api.test/internal/meals/photo"
+    assert sent[0]["content"] == b"\xff\xd8raw"
+    assert "json" not in sent[0]
+    assert sent[0]["headers"] == {
+        "Authorization": "Bearer tok",
+        "x-line-user-id": USER,
+        "content-type": "application/octet-stream",
+    }
+    assert sent[0]["timeout"] == 30.0
+    assert result.outcome == "draft"
+    assert result.meal is not None
+    assert result.meal.total_kcal == 850
+
+    client, _ = _http_client(monkeypatch, {"outcome": "not_food"})
+    assert client.log_meal_photo(USER, b"x").meal is None
+
+
 def test_confirm_meal_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {
         "meal": MEAL_JSON,

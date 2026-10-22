@@ -17,7 +17,9 @@ import { formatWorkoutSummary } from "../src/workouts/summary";
 import { MealParserUnavailable, type MealParser } from "../src/ai/meal-parser";
 import { meals } from "../src/db/schema";
 import { eq } from "drizzle-orm";
-import { createTestDb } from "./db";
+import { createTestDb, memoryPhotoStore } from "./db";
+import sharp from "sharp";
+import { MEAL_PHOTO_MAX_BYTES } from "@gac/shared";
 
 const BOT = "bot-runtime@x.iam.gserviceaccount.com";
 const LINE_ID = `U${"a".repeat(32)}`;
@@ -38,8 +40,14 @@ let parser: MealParser = {
     ],
     usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
   }),
+  parsePhoto: async () => {
+    photoCalls += 1;
+    return parser.parseText("");
+  },
 };
 const auth = { authorization: "Bearer good" };
+const photos = memoryPhotoStore();
+let photoCalls = 0;
 
 describe("/internal/users", () => {
   let app: ReturnType<typeof buildApp>;
@@ -61,7 +69,11 @@ describe("/internal/users", () => {
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: LINE_ID, name: null }),
       notifyWorkoutFinished: async () => {},
-      mealParser: { parseText: (text) => parser.parseText(text) },
+      mealParser: {
+        parseText: (text) => parser.parseText(text),
+        parsePhoto: (jpeg) => parser.parsePhoto(jpeg),
+      },
+      photoStore: photos.store,
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -298,11 +310,17 @@ describe("/internal/users", () => {
             kind: "refused",
             usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
           }),
+          parsePhoto: async () => {
+            throw new Error("unused");
+          },
         };
         expect((await text(id)).json()).toEqual({ outcome: "refused" });
         parser = {
           parseText: async () => {
             throw new MealParserUnavailable("down");
+          },
+          parsePhoto: async () => {
+            throw new Error("unused");
           },
         };
         expect((await text(id)).json()).toEqual({ outcome: "unavailable" });
@@ -446,6 +464,81 @@ describe("/internal/users", () => {
     expect((await today()).json().workoutSummary).toBe(
       "訓練・2 個動作・2,000 kg・有氧 20 分鐘",
     );
+  });
+
+  describe("meal photo", () => {
+    const ME = `U${"6".repeat(32)}`;
+    const photo = (
+      lineUserId: string | undefined,
+      payload: Buffer,
+      type = "application/octet-stream",
+    ) =>
+      app.inject({
+        method: "POST",
+        url: "/internal/meals/photo",
+        payload,
+        headers: {
+          ...auth,
+          "content-type": type,
+          ...(lineUserId ? { "x-line-user-id": lineUserId } : {}),
+        },
+      });
+    const jpeg = () =>
+      sharp({
+        create: {
+          width: 20,
+          height: 20,
+          channels: 3,
+          background: { r: 1, g: 2, b: 3 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+    it("returns a draft that confirms normally", async () => {
+      await syncUser(db, ME, null);
+      const res = await photo(ME, await jpeg());
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe("draft");
+      expect(body.meal).toMatchObject({ status: "draft", source: "photo" });
+      const confirm = await post(`/internal/meals/${body.meal.id}/confirm`, {
+        lineUserId: ME,
+      });
+      expect(confirm.statusCode).toBe(200);
+      expect(confirm.json().meal.status).toBe("confirmed");
+    });
+
+    it("maps an unreadable image to invalid_image", async () => {
+      const res = await photo(ME, Buffer.from("nope"));
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ outcome: "invalid_image" });
+    });
+
+    it("400s on a missing or malformed header", async () => {
+      expect((await photo(undefined, await jpeg())).statusCode).toBe(400);
+      expect((await photo("U123", await jpeg())).statusCode).toBe(400);
+    });
+
+    it("404s for an unknown user", async () => {
+      expect((await photo(`U${"7".repeat(32)}`, await jpeg())).statusCode).toBe(
+        404,
+      );
+    });
+
+    it("413s over the size limit without calling the parser", async () => {
+      const before = photoCalls;
+      const res = await photo(ME, Buffer.alloc(MEAL_PHOTO_MAX_BYTES + 1));
+      expect(res.statusCode).toBe(413);
+      expect(res.json()).toEqual({ error: "payload_too_large" });
+      expect(photoCalls).toBe(before);
+    });
+
+    it("415s a JSON body", async () => {
+      const res = await photo(ME, Buffer.from("{}"), "application/json");
+      expect(res.statusCode).toBe(415);
+      expect(res.json()).toEqual({ error: "unsupported_media_type" });
+    });
   });
 
   it("formats workout summaries", () => {

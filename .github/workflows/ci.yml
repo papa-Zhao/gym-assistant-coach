@@ -82,6 +82,7 @@ jobs:
             -e BOT_URL=https://bot.example.run.app
             -e BOT_AUDIENCE=gac-bot-internal
             -e ANTHROPIC_API_KEY=ci-fake-key
+            -e MEAL_PHOTOS_BUCKET=ci-fake-bucket
           )
           for svc in api bot; do
             extra=()

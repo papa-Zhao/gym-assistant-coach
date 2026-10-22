@@ -73,3 +73,31 @@ def test_meal_type_changed() -> None:
         "type": "text",
         "text": "已改成午餐",
     }
+
+
+def test_photo_prompt_has_camera_and_camera_roll_quick_replies() -> None:
+    msg = messages.photo_prompt()
+    assert msg["text"] == "直接在聊天室傳一張餐點照片，我會幫你估算熱量。"
+    actions = [i["action"] for i in msg["quickReply"]["items"]]
+    assert actions == [
+        {"type": "camera", "label": "拍照"},
+        {"type": "cameraRoll", "label": "從相簿選"},
+    ]
+    assert _to_sdk(msg).to_dict()["quickReply"]["items"][0]["action"]["type"] == "camera"
+
+
+def test_meal_photo_outcome_covers_all_outcomes() -> None:
+    outcomes = ["invalid_image", "limit", "not_food", "refused", "unavailable"]
+    for outcome in outcomes:
+        assert messages.meal_photo_outcome(outcome)["type"] == "text"
+    assert messages.meal_photo_outcome("limit")["text"] != messages.meal_outcome("limit")["text"]
+    assert (
+        messages.meal_photo_outcome("not_food")["text"]
+        != (messages.meal_outcome("not_food")["text"])
+    )
+    assert messages.meal_photo_outcome("refused") == messages.meal_outcome("refused")
+    assert messages.meal_photo_outcome("unavailable") == messages.meal_outcome("unavailable")
+    assert (
+        messages.meal_photo_outcome("invalid_image")["text"] == "這張照片沒辦法讀取，請換一張再試。"
+    )
+    assert messages.MEAL_PHOTO_MAX_BYTES == 10 * 1024 * 1024

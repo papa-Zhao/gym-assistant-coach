@@ -27,6 +27,8 @@ export interface ApiError {
     | "not_found"
     | "conflict"
     | "internal"
+    | "payload_too_large"
+    | "unsupported_media_type"
     // Meal input errors (see MealInputErrorCode in the api).
     | "invalid_grams"
     | "unknown_food"

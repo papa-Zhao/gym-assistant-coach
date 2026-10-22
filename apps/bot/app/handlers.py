@@ -8,6 +8,7 @@ from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import (
     Event,
     FollowEvent,
+    ImageMessageContent,
     MessageEvent,
     PostbackEvent,
     UnfollowEvent,
@@ -48,7 +49,7 @@ def _handle_menu(event: PostbackEvent, action: str, user_id: str, deps: "_Deps")
     if not deps.api.sync(user_id, deps.line.profile_name(user_id)).consented:
         deps.line.reply(token, [messages.welcome(deps.settings.public_site_url)])
     elif action == "photo":
-        deps.line.reply(token, [messages.photo_coming_soon()])
+        deps.line.reply(token, [messages.photo_prompt()])
     elif action == "ask":
         deps.line.reply(token, [messages.ask_coming_soon()])
     else:
@@ -99,8 +100,56 @@ def _sync_and_greet(event: FollowEvent | MessageEvent, user_id: str, deps: "_Dep
         deps.line.reply(token, [messages.welcome(deps.settings.public_site_url)])
     elif isinstance(event, FollowEvent):
         deps.line.reply(token, [messages.welcome_back()])
+    elif isinstance(event.message, ImageMessageContent):
+        _reply_to_image(event, event.message, user_id, deps)
     else:
         _reply_to_text(event, user_id, deps)
+
+
+def _reply_to_image(
+    event: MessageEvent, content: ImageMessageContent, user_id: str, deps: "_Deps"
+) -> None:
+    token = event.reply_token
+    provider = content.content_provider
+    if provider is None or provider.type != "line":
+        logger.info("meal photo not downloadable event=%s", event.type)
+        deps.line.reply(token, [messages.meal_photo_outcome("invalid_image")])
+        return
+    try:
+        image = deps.line.get_message_content(content.id)
+    except Exception as err:
+        logger.warning(
+            "meal photo download failed event=%s error=%s", event.type, type(err).__name__
+        )
+        deps.line.reply(token, [messages.meal_outcome("unavailable")])
+        return
+    if len(image) > messages.MEAL_PHOTO_MAX_BYTES:
+        logger.info("meal photo too large event=%s bytes=%s", event.type, len(image))
+        deps.line.reply(token, [messages.meal_photo_outcome("invalid_image")])
+        return
+    try:
+        result = deps.api.log_meal_photo(user_id, image)
+    except ApiError as err:
+        if err.status_code == 404:
+            reply = messages.meal_photo_outcome("unavailable")
+        elif err.status_code == 413:
+            reply = messages.meal_photo_outcome("invalid_image")
+        elif err.status_code >= 500:
+            logger.warning("meal api error event=%s status=%s", event.type, err.status_code)
+            reply = messages.meal_outcome("unavailable")
+        else:
+            raise
+        deps.line.reply(token, [reply])
+        return
+    except (httpx.TimeoutException, httpx.TransportError):
+        logger.warning("meal api unreachable event=%s", event.type)
+        deps.line.reply(token, [messages.meal_outcome("unavailable")])
+        return
+    logger.info("meal photo outcome=%s bytes=%s", result.outcome, len(image))
+    if result.outcome == "draft" and result.meal is not None:
+        deps.line.reply(token, [messages.meal_draft(result.meal, deps.settings.liff_id)])
+    else:
+        deps.line.reply(token, [messages.meal_photo_outcome(result.outcome)])
 
 
 def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
@@ -171,8 +220,9 @@ def _handle_event(event: Event, deps: _Deps) -> None:
             return
     text = getattr(getattr(event, "message", None), "text", None)
     is_meal_text = isinstance(text, str) and parse_meal_text(text) is not None
+    is_image = isinstance(getattr(event, "message", None), ImageMessageContent)
     try:
-        deps.line.show_loading(user_id, MEAL_LOADING_SECONDS if is_meal_text else 10)
+        deps.line.show_loading(user_id, MEAL_LOADING_SECONDS if is_meal_text or is_image else 10)
     except Exception:
         logger.warning("loading animation failed event=%s", event.type)
     if isinstance(event, PostbackEvent) and action is not None:

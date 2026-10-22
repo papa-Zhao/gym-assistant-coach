@@ -15,23 +15,13 @@ import {
   AI_MODEL,
 } from "../src/ai/config";
 import { createMealParser } from "../src/ai/meal-parser";
+import { usageCost } from "./eval-cost";
 
 interface Case {
   text: string;
   kcal: [number, number] | null;
   expect?: "not_food";
 }
-
-// USD per million tokens for claude-haiku-5-5 (prompts <= 100K tokens).
-// Cache figures are assumed multipliers of the input price (read 0.1x,
-// write 1.25x), not published rates. Estimate only.
-const INPUT_PRICE = 0.1;
-const PRICE_PER_MTOK = {
-  input: INPUT_PRICE,
-  output: 0.5,
-  cacheRead: INPUT_PRICE * 0.1,
-  cacheWrite: INPUT_PRICE * 1.25,
-};
 
 async function main(): Promise<void> {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -74,12 +64,7 @@ async function main(): Promise<void> {
       const r = await parser.parseText(c.text);
       const u = r.usage;
       tokens = `in ${u.input} out ${u.output} cache ${u.cacheRead}/${u.cacheCreation}`;
-      cost +=
-        (u.input * PRICE_PER_MTOK.input +
-          u.output * PRICE_PER_MTOK.output +
-          u.cacheRead * PRICE_PER_MTOK.cacheRead +
-          u.cacheCreation * PRICE_PER_MTOK.cacheWrite) /
-        1_000_000;
+      cost += usageCost(u);
       if (r.kind === "items") {
         const kcal = Math.round(r.items.reduce((s, i) => s + i.kcal, 0));
         ok = c.kcal !== null && kcal >= c.kcal[0] && kcal <= c.kcal[1];

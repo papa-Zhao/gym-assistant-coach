@@ -5,6 +5,7 @@ import {
   floorKcal,
   isBelowFloor,
   taipeiDate,
+  taipeiHour,
   validateProfile,
   type ProfileInput,
 } from "./targets";
@@ -120,5 +121,12 @@ describe("TARGET_LIMITS", () => {
       kcal: { min: 800, max: 10000 },
       gram: { min: 0, max: 2000 },
     });
+  });
+});
+
+describe("taipeiHour", () => {
+  it("returns the Taipei hour 0-23", () => {
+    expect(taipeiHour(new Date("2026-10-22T16:30:00Z"))).toBe(0);
+    expect(taipeiHour(new Date("2026-10-22T03:00:00Z"))).toBe(11);
   });
 });

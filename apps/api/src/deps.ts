@@ -1,6 +1,7 @@
 import type { FinishSummary } from "@gac/shared";
 import type { MealParser } from "./ai/meal-parser";
 import type { DbStats } from "./db/timing.js";
+import type { PhotoStore } from "./photos/store";
 import type { Db } from "./users/repo";
 
 /** Verifies a Google ID token; rejects on bad signature, audience or unverified email. */
@@ -26,6 +27,10 @@ export interface AppDeps {
   notifyWorkoutFinished: NotifyWorkoutFinished;
   /** Turns meal text into estimated items; tests inject a fake. */
   mealParser: MealParser;
+  /** Meal photo object storage; tests inject an in-memory one. */
+  photoStore: PhotoStore;
+  /** Per-call GCS deadline override; tests only. */
+  photoTimeoutMs?: number;
   sessionSecret: Uint8Array;
   corsOrigin: string;
   /** Current time; injectable so tests can pin the Taipei date. */

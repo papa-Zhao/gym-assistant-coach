@@ -7,6 +7,7 @@ from linebot.v3.messaging import (
     Configuration,
     FlexMessage,
     MessagingApi,
+    MessagingApiBlob,
     PushMessageRequest,
     ReplyMessageRequest,
     ShowLoadingAnimationRequest,
@@ -14,6 +15,8 @@ from linebot.v3.messaging import (
 )
 
 from app.messages import Message
+
+MESSAGE_CONTENT_TIMEOUT_SECONDS = 10
 
 
 class LineReplier(Protocol):
@@ -24,6 +27,8 @@ class LineReplier(Protocol):
     def profile_name(self, user_id: str) -> str | None: ...
 
     def show_loading(self, user_id: str, seconds: int = 10) -> None: ...
+
+    def get_message_content(self, message_id: str) -> bytes: ...
 
 
 def _to_sdk(message: Message) -> FlexMessage | TextMessage:
@@ -63,4 +68,12 @@ class SdkLineReplier:
         with LineApiClient(self._configuration) as client:
             MessagingApi(client).show_loading_animation(
                 ShowLoadingAnimationRequest(chat_id=user_id, loading_seconds=seconds)
+            )
+
+    def get_message_content(self, message_id: str) -> bytes:
+        with LineApiClient(self._configuration) as client:
+            return bytes(
+                MessagingApiBlob(client).get_message_content(
+                    message_id, _request_timeout=MESSAGE_CONTENT_TIMEOUT_SECONDS
+                )
             )

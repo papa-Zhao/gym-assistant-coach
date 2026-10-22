@@ -11,6 +11,7 @@ const full = {
   BOT_URL: "https://bot.example.run.app",
   BOT_AUDIENCE: "gac-bot-internal",
   ANTHROPIC_API_KEY: "sk-ant-test-key",
+  MEAL_PHOTOS_BUCKET: "test-bucket",
 };
 
 describe("loadConfig", () => {
@@ -35,6 +36,13 @@ describe("loadConfig", () => {
     delete rest.ANTHROPIC_API_KEY;
     expect(() => loadConfig(rest)).toThrow(/ANTHROPIC_API_KEY/);
     expect(loadConfig(full).anthropicApiKey).toBe(full.ANTHROPIC_API_KEY);
+  });
+
+  it("requires MEAL_PHOTOS_BUCKET", () => {
+    const rest: Record<string, string> = { ...full };
+    delete rest.MEAL_PHOTOS_BUCKET;
+    expect(() => loadConfig(rest)).toThrow(/MEAL_PHOTOS_BUCKET/);
+    expect(loadConfig(full).mealPhotosBucket).toBe("test-bucket");
   });
 
   it("treats empty values as missing", () => {

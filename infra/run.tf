@@ -20,6 +20,7 @@ locals {
       CORS_ORIGIN           = local.public_site_url
       BOT_URL               = local.bot_url
       BOT_AUDIENCE          = local.bot_aud
+      MEAL_PHOTOS_BUCKET    = google_storage_bucket.meal_photos.name
     }
     bot = {
       API_URL           = local.api_url
