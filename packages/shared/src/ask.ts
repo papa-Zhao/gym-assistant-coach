@@ -16,3 +16,8 @@ export interface Advice {
 export type AskResponse =
   | { outcome: "answer"; advice: Advice }
   | { outcome: "limit" | "refused" | "unavailable" };
+
+export interface SaveProgramDayResponse {
+  outcome: "saved" | "already_saved";
+  templateName: string;
+}

@@ -16,6 +16,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   primaryKey,
@@ -173,16 +174,44 @@ export const exercises = pgTable(
   ],
 );
 
-export const workoutTemplates = pgTable("workout_templates", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const aiPrograms = pgTable(
+  "ai_programs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // StoredProgramDay[] (see ask/programs.ts)
+    days: jsonb("days").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("ai_programs_created_idx").on(t.createdAt)],
+);
+
+export const workoutTemplates = pgTable(
+  "workout_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    sourceProgramId: uuid("source_program_id").references(() => aiPrograms.id, {
+      onDelete: "set null",
+    }),
+    sourceDay: integer("source_day"),
+  },
+  (t) => [
+    uniqueIndex("workout_templates_program_day_unique")
+      .on(t.sourceProgramId, t.sourceDay)
+      .where(sql`${t.sourceProgramId} is not null`),
+  ],
+);
 
 export const templateItems = pgTable(
   "template_items",

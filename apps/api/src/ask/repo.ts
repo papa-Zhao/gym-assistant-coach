@@ -9,7 +9,7 @@ import {
   notExists,
   sql,
 } from "drizzle-orm";
-import { aiConversations, aiMessages } from "../db/schema";
+import { aiConversations, aiMessages, aiPrograms } from "../db/schema";
 import type { Db } from "../users/repo";
 
 export const ASK_HISTORY_MESSAGES = 10;
@@ -118,12 +118,15 @@ export async function endConversation(
     .where(activeConversation(userId));
 }
 
-/** Deletes all users' messages older than 90 days, then ended conversations left empty. */
+/** Deletes all users' messages and AI programs older than 90 days, then ended conversations left empty. Templates already saved from a program are kept. */
 export async function purgeExpiredMessages(db: Db, now: Date): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
       .delete(aiMessages)
       .where(lt(aiMessages.createdAt, retentionCutoff(now)));
+    await tx
+      .delete(aiPrograms)
+      .where(lt(aiPrograms.createdAt, retentionCutoff(now)));
     await tx.delete(aiConversations).where(
       and(
         sql`${aiConversations.endedAt} is not null`,
