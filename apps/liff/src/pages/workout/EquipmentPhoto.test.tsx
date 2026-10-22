@@ -37,7 +37,7 @@ function found(candidates = [BENCH, TREADMILL]): IdentifyEquipmentResponse {
 
 function setup(
   identify: (blob: unknown) => unknown,
-  props: { busy?: boolean } = {},
+  props: { busy?: boolean; error?: string } = {},
 ) {
   const calls = fakeApi(({ path, body }) =>
     path === "/exercises/identify" ? identify(body) : [BENCH],
@@ -266,5 +266,44 @@ describe("ExercisePicker equipment photo", () => {
     await screen.findByRole("alert");
     fireEvent.click(screen.getByRole("button", { name: "重新拍" }));
     expect(click).toHaveBeenCalled();
+  });
+
+  it("disables candidate rows while busy", async () => {
+    setup(() => found(), { busy: true });
+    takePhoto();
+    await screen.findByText("看起來是：槓鈴");
+    const rows = within(screen.getByLabelText("候選動作")).getAllByRole(
+      "button",
+    );
+    for (const row of rows) expect(row).toBeDisabled();
+  });
+
+  it("shows a failed-add error in the found view", async () => {
+    setup(() => found(), { error: "加入失敗" });
+    takePhoto();
+    await screen.findByText("看起來是：槓鈴");
+    expect(screen.getByRole("alert")).toHaveTextContent("加入失敗");
+  });
+
+  it("cancel from a photo-opened form returns to the photo result", async () => {
+    const { calls } = setup(() => found());
+    takePhoto();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "都不是？建立自訂動作" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.getByText("看起來是：槓鈴")).toBeInTheDocument();
+    expect(calls.filter((c) => c.path === "/exercises/identify")).toHaveLength(
+      1,
+    );
+  });
+
+  it("cancel from the normal custom entry returns to search", async () => {
+    setup(() => found());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "新增自訂動作" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.getByRole("search")).toBeInTheDocument();
   });
 });

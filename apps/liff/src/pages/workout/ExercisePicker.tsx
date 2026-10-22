@@ -18,8 +18,8 @@ import {
 import { apiFetch } from "../../api";
 import { isAuthExpired } from "./fields";
 import { Skeleton } from "../../components/Skeleton";
-import { EquipmentPhoto } from "./EquipmentPhoto";
-import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
+import { EquipmentPhoto, type PhotoPhase } from "./EquipmentPhoto";
+import { ExerciseRow } from "./ExerciseRow";
 
 interface ExercisePickerProps {
   onPick: (exercise: Exercise) => void;
@@ -33,15 +33,6 @@ interface ExercisePickerProps {
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
-
-export function ExerciseName({ exercise }: { exercise: Exercise }) {
-  return (
-    <>
-      <span>{exercise.nameZh}</span>
-      {exercise.nameEn && <small className="muted"> {exercise.nameEn}</small>}
-    </>
-  );
-}
 
 export function ExercisePicker({
   onPick,
@@ -58,6 +49,7 @@ export function ExercisePicker({
   const [results, setResults] = useState<Exercise[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [custom, setCustom] = useState(false);
+  const [photo, setPhoto] = useState<PhotoPhase>({ kind: "idle" });
   const [initial, setInitial] = useState<ExerciseSuggestion | undefined>();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -119,7 +111,14 @@ export function ExercisePicker({
   return (
     <main>
       <h1>加動作</h1>
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       <EquipmentPhoto
+        phase={photo}
+        onPhase={setPhoto}
         onPick={onPick}
         onCustom={(suggestion) => {
           setInitial(suggestion);
@@ -195,11 +194,6 @@ export function ExercisePicker({
             </div>
           </>
         )}
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
         <section className="card list picker-list" aria-label="動作列表">
           {failed ? (
             <p className="error-text">載入動作失敗，請再試一次。</p>
@@ -209,21 +203,12 @@ export function ExercisePicker({
             <p className="muted">找不到符合的動作</p>
           ) : (
             results.map((ex) => (
-              <button
+              <ExerciseRow
                 key={ex.id}
-                type="button"
-                className="row"
+                exercise={ex}
                 disabled={busy}
-                onClick={() => onPick(ex)}
-              >
-                <ExerciseIllustration exercise={ex} size={40} />
-                <span className="row-name">
-                  <ExerciseName exercise={ex} />
-                </span>
-                <span className="badge row-tag">
-                  {EQUIPMENT_CATEGORY_LABELS[ex.equipmentCategory]}
-                </span>
-              </button>
+                onPick={onPick}
+              />
             ))
           )}
         </section>

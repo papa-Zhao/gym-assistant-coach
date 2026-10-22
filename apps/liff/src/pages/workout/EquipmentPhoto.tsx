@@ -1,6 +1,5 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useRef, type ChangeEvent, type ReactNode } from "react";
 import {
-  EQUIPMENT_CATEGORY_LABELS,
   EQUIPMENT_LABELS,
   type Equipment,
   type Exercise,
@@ -9,10 +8,9 @@ import {
 } from "@gac/shared";
 import { ApiHttpError, apiFetch } from "../../api";
 import { Skeleton } from "../../components/Skeleton";
-import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
+import { ExerciseRow } from "./ExerciseRow";
 import { PhotoReadError, resizePhoto } from "../../photo";
 import { isAuthExpired } from "./fields";
-import { ExerciseName } from "./ExercisePicker";
 
 const MSG_UNREADABLE = "這張照片沒辦法讀取，請換一張再試。";
 const MSG_BUSY = "AI 暫時忙不過來，請稍後再試。";
@@ -27,7 +25,7 @@ const OUTCOME_MESSAGES = {
   unavailable: MSG_BUSY,
 } as const;
 
-type Phase =
+export type PhotoPhase =
   | { kind: "idle" }
   | { kind: "working" }
   | { kind: "error"; message: string }
@@ -39,6 +37,9 @@ type Phase =
     };
 
 interface EquipmentPhotoProps {
+  /** Lifted so the result survives opening and cancelling the custom form. */
+  phase: PhotoPhase;
+  onPhase: (phase: PhotoPhase) => void;
   onPick: (exercise: Exercise) => void;
   onCustom: (suggestion: ExerciseSuggestion) => void;
   onFatal: () => void;
@@ -54,13 +55,14 @@ function failureMessage(err: unknown): string {
 }
 
 export function EquipmentPhoto({
+  phase,
+  onPhase: setPhase,
   onPick,
   onCustom,
   onFatal,
   busy,
   children,
 }: EquipmentPhotoProps) {
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const input = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
   const working = phase.kind === "working";
@@ -187,7 +189,7 @@ function FoundView({
   onPick,
   onCustom,
 }: {
-  phase: Extract<Phase, { kind: "found" }>;
+  phase: Extract<PhotoPhase, { kind: "found" }>;
   busy: boolean;
   onPick: (exercise: Exercise) => void;
   onCustom: (suggestion: ExerciseSuggestion) => void;
@@ -208,21 +210,12 @@ function FoundView({
       <h2>看起來是：{EQUIPMENT_LABELS[equipment]}</h2>
       <section className="card list picker-list" aria-label="候選動作">
         {candidates.map((ex) => (
-          <button
+          <ExerciseRow
             key={ex.id}
-            type="button"
-            className="row"
+            exercise={ex}
             disabled={busy}
-            onClick={() => onPick(ex)}
-          >
-            <ExerciseIllustration exercise={ex} size={40} />
-            <span className="row-name">
-              <ExerciseName exercise={ex} />
-            </span>
-            <span className="badge row-tag">
-              {EQUIPMENT_CATEGORY_LABELS[ex.equipmentCategory]}
-            </span>
-          </button>
+            onPick={onPick}
+          />
         ))}
       </section>
       <button
