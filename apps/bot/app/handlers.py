@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import parse_qs
 
+import httpx
 from fastapi import FastAPI, Request, Response
 from linebot.v3 import WebhookParser
 from linebot.v3.exceptions import InvalidSignatureError
@@ -70,13 +71,17 @@ def _handle_meal_postback(
         elif postback.action == "meal_type_menu":
             reply = messages.meal_type_menu(postback.meal_id)
         else:
-            assert postback.meal_type is not None
+            if postback.meal_type is None:
+                return
             meal = deps.api.set_meal_type(user_id, postback.meal_id, postback.meal_type)
             reply = messages.meal_type_changed(meal, liff_id)
     except ApiError as err:
         if err.status_code != 404:
             raise
         reply = messages.meal_not_found()
+    except (httpx.TimeoutException, httpx.TransportError):
+        logger.warning("meal api unreachable event=%s", event.type)
+        reply = messages.meal_outcome("unavailable")
     deps.line.reply(token, [reply])
 
 
@@ -112,6 +117,10 @@ def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
         if err.status_code != 404:
             raise
         deps.line.reply(token, [messages.meal_not_found()])
+        return
+    except (httpx.TimeoutException, httpx.TransportError):
+        logger.warning("meal api unreachable event=%s", event.type)
+        deps.line.reply(token, [messages.meal_outcome("unavailable")])
         return
     if result.outcome == "draft" and result.meal is not None:
         deps.line.reply(token, [messages.meal_draft(result.meal, liff_id)])

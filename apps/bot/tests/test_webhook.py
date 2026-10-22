@@ -6,6 +6,7 @@ import logging
 import re
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -59,6 +60,7 @@ class FakeApi:
     ) -> None:
         self.meal_outcome = meal_outcome
         self.meal_fail_status = meal_fail_status
+        self.meal_raises: Exception | None = None
         self.consented = consented
         self.metric_previous = metric_previous
         self.today_result = today
@@ -100,6 +102,8 @@ class FakeApi:
         )
 
     def _meal_fail(self) -> None:
+        if self.meal_raises is not None:
+            raise self.meal_raises
         if self.meal_fail_status is not None:
             raise ApiError(self.meal_fail_status)
 
@@ -590,3 +594,17 @@ def test_metric_text_still_records_metric() -> None:
     assert ("record_metric", USER, "weightKg", 72.0) in api.calls
     assert all(c[0] != "log_meal_text" for c in api.calls)
     assert "已記錄體重" in line.replies[0][1][0]["text"]
+
+
+UNAVAILABLE = [{"type": "text", "text": "AI 暫時忙不過來，請稍後再試。"}]
+
+
+@pytest.mark.parametrize(
+    ("event_payload"),
+    [text_event("午餐 雞腿便當"), menu_postback(f"action=meal_confirm&id={MEAL_ID}")],
+)
+def test_meal_api_timeout_replies_unavailable_once(event_payload: dict[str, Any]) -> None:
+    client, api, line = meal_setup()
+    api.meal_raises = httpx.ReadTimeout("slow")
+    post(client, [event_payload])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
