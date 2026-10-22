@@ -9,6 +9,7 @@ import {
   createTestDb,
   unusedMealParser,
   unusedPhotoStore,
+  unusedAdvisor,
   unusedEquipmentIdentifier,
 } from "./db";
 
@@ -33,6 +34,7 @@ describe("request timing", () => {
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
+      advisor: unusedAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

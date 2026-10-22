@@ -4,6 +4,7 @@ import type { AppDeps } from "../src/deps.js";
 import {
   unusedMealParser,
   unusedPhotoStore,
+  unusedAdvisor,
   unusedEquipmentIdentifier,
 } from "./db";
 
@@ -19,6 +20,7 @@ const deps: AppDeps = {
   notifyWorkoutFinished: async () => {},
   mealParser: unusedMealParser,
   equipmentIdentifier: unusedEquipmentIdentifier,
+  advisor: unusedAdvisor,
   photoStore: unusedPhotoStore,
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",

@@ -1,13 +1,6 @@
+import type { Advice } from "@gac/shared";
 import type { RawAdvice } from "../ai/advisor";
 import { lowKcalWarning, MEDICAL_NOTICE, needsMedicalNotice } from "./safety";
-
-export interface Advice {
-  title: string;
-  items: { name: string; detail: string }[];
-  body: string;
-  todayLine: string | null;
-  notices: string[];
-}
 
 export const DISCLAIMER = "AI 建議僅供參考，不能取代醫師或營養師的專業意見。";
 

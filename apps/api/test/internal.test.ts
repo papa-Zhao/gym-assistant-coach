@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import type { Advisor } from "../src/ai/advisor.js";
 import type { AppDeps } from "../src/deps.js";
 import { CONSENT_VERSION } from "@gac/shared";
 import { saveProfile } from "../src/profile/repo";
@@ -52,6 +53,7 @@ let parser: MealParser = {
 const auth = { authorization: "Bearer good" };
 const photos = memoryPhotoStore();
 let photoCalls = 0;
+const askCalls: Parameters<Advisor["ask"]>[0][] = [];
 
 describe("/internal/users", () => {
   let app: ReturnType<typeof buildApp>;
@@ -78,6 +80,16 @@ describe("/internal/users", () => {
         parsePhoto: (jpeg) => parser.parsePhoto(jpeg),
       },
       equipmentIdentifier: unusedEquipmentIdentifier,
+      advisor: {
+        ask: async (input) => {
+          askCalls.push(input);
+          return {
+            kind: "ok",
+            advice: { title: "建議", items: [], body: "多喝水。" },
+            usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
+          };
+        },
+      },
       photoStore: photos.store,
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",
@@ -569,6 +581,52 @@ describe("/internal/users", () => {
         cardioMinutes: 30,
       }),
     ).toBe("訓練・1 個動作・有氧 30 分鐘");
+  });
+
+  it("ask requires the bot token", async () => {
+    const res = await post(
+      "/internal/ai/ask",
+      { lineUserId: LINE_ID, text: "嗨" },
+      {},
+    );
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("ask rejects empty and over-long text with 400", async () => {
+    for (const text of ["", "字".repeat(501)]) {
+      const res = await post("/internal/ai/ask", { lineUserId: LINE_ID, text });
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
+  it("ask and reset return 404 for an unknown user", async () => {
+    const unknown = `U${"0123456789abcdef".repeat(2)}`;
+    const ask = await post("/internal/ai/ask", {
+      lineUserId: unknown,
+      text: "嗨",
+    });
+    expect(ask.statusCode).toBe(404);
+    expect(ask.json()).toEqual({ error: "not_found" });
+    const reset = await post("/internal/ai/reset", { lineUserId: unknown });
+    expect(reset.statusCode).toBe(404);
+  });
+
+  it("ask answers, and reset clears the history", async () => {
+    const id = `U${"c".repeat(32)}`;
+    await syncUser(db, id, null);
+    askCalls.length = 0;
+    const first = await post("/internal/ai/ask", {
+      lineUserId: id,
+      text: "晚餐？",
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().outcome).toBe("answer");
+    await post("/internal/ai/ask", { lineUserId: id, text: "宵夜？" });
+    expect(askCalls[1]?.history).toHaveLength(2);
+    const reset = await post("/internal/ai/reset", { lineUserId: id });
+    expect(reset.statusCode).toBe(204);
+    await post("/internal/ai/ask", { lineUserId: id, text: "早餐？" });
+    expect(askCalls[2]?.history).toEqual([]);
   });
 
   it("GET /health still works without auth", async () => {

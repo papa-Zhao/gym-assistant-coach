@@ -8,6 +8,7 @@ import {
   createTestDb,
   memoryPhotoStore,
   unusedMealParser,
+  unusedAdvisor,
   unusedEquipmentIdentifier,
 } from "./db";
 
@@ -46,6 +47,7 @@ describe("meal routes", () => {
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
+      advisor: unusedAdvisor,
       photoStore: photos.store,
       photoTimeoutMs: 30,
       sessionSecret: SECRET,
