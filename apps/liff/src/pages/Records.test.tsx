@@ -27,7 +27,15 @@ describe("Records", () => {
       fetchImpl: (async (url: string) => {
         paths.push(url.replace("https://api.test", ""));
         return new Response(
-          JSON.stringify(url.includes("/workouts/week") ? WEEK : DATA_NOW),
+          JSON.stringify(
+            url.includes("/workouts/week")
+              ? WEEK
+              : url.includes("/meals")
+                ? { date: "2026-10-19", meals: [], consumed: { kcal: 0 } }
+                : url.includes("/profile")
+                  ? { profile: null, targets: null }
+                  : DATA_NOW,
+          ),
         );
       }) as unknown as typeof fetch,
       relogin: async () => ({ kind: "error" }),
@@ -38,7 +46,9 @@ describe("Records", () => {
     render(<Records onFatal={vi.fn()} />);
     expect(await screen.findByText("72.4")).toBeInTheDocument();
     expect(screen.getByText("30 天內 −1.2 kg")).toBeInTheDocument();
-    expect(paths).toEqual(["/body-metrics?days=30", "/workouts/week"]);
+    expect(paths).toEqual(
+      expect.arrayContaining(["/body-metrics?days=30", "/workouts/week"]),
+    );
     expect(screen.getByRole("link", { name: /身體數據/ })).toHaveAttribute(
       "href",
       "/records/body",
@@ -56,12 +66,11 @@ describe("Records", () => {
     expect(screen.queryByText(/— kg/)).not.toBeInTheDocument();
   });
 
-  it("diet is coming soon", async () => {
+  it("shows the meals card instead of a coming-soon diet button", async () => {
     render(<Records onFatal={vi.fn()} />);
     await screen.findByText("72.4");
-    const card = screen.getByRole("button", { name: /飲食/ });
-    expect(card).toBeDisabled();
-    expect(card).toHaveTextContent("即將推出");
+    expect(await screen.findAllByText("＋ 記錄")).toHaveLength(3);
+    expect(screen.queryByText("即將推出")).not.toBeInTheDocument();
   });
 
   it("records training card links to /workout", async () => {
