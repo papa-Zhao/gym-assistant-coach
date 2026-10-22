@@ -112,6 +112,19 @@ describe("shapeProgram", () => {
     expect(Array.from(out[0]!.name)).toHaveLength(30);
   });
 
+  it("cuts by code point without splitting emoji", () => {
+    const out = shapeProgram([day("💪".repeat(40), ["bench", 3, 8])], library);
+    expect(out[0]!.name).toBe("💪".repeat(30));
+  });
+
+  it("trims the name after cutting", () => {
+    const out = shapeProgram(
+      [day("a".repeat(29) + " b", ["bench", 3, 8])],
+      library,
+    );
+    expect(out[0]!.name).toBe("a".repeat(29));
+  });
+
   it("returns [] when nothing is valid", () => {
     expect(shapeProgram([], library)).toEqual([]);
     expect(
