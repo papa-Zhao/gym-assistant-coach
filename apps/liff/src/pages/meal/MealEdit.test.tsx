@@ -135,4 +135,26 @@ describe("MealEdit", () => {
       "/records",
     );
   });
+
+  it("shows the meal photo when the API returns a url", async () => {
+    fakeApi(() => ({ ...meal(), photoUrl: "https://photos.test/m1.jpg" }));
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    const img = await screen.findByAltText("這一餐的照片");
+    expect(img).toHaveAttribute("src", "https://photos.test/m1.jpg");
+  });
+
+  it("shows no photo when photoUrl is null", async () => {
+    fakeApi(() => ({ ...meal(), photoUrl: null }));
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    await screen.findByRole("heading", { name: "修改這一餐" });
+    expect(screen.queryByAltText("這一餐的照片")).toBeNull();
+  });
+
+  it("hides the photo quietly when it fails to load", async () => {
+    fakeApi(() => ({ ...meal(), photoUrl: "https://photos.test/old.jpg" }));
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    fireEvent.error(await screen.findByAltText("這一餐的照片"));
+    expect(screen.queryByAltText("這一餐的照片")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

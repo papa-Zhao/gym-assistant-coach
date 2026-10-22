@@ -11,6 +11,7 @@
     "test": "vitest run",
     "tfda:seed": "tsx scripts/tfda-seed.ts",
     "eval:meal-text": "tsx scripts/meal-text-eval.ts",
+    "eval:meal-photo": "tsx scripts/meal-photo-eval.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

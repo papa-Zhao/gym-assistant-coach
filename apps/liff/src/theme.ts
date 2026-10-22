@@ -294,6 +294,7 @@ button.text-button { background: transparent; color: var(--color-primary); }
 button.chip { color: var(--color-text); font-weight: 400; }
 .meal-page { padding-bottom: calc(${minTouchTarget}px * 3 + var(--space-8) + env(safe-area-inset-bottom)); }
 .meal-page .chips { margin-bottom: var(--space-4); }
+.meal-photo { display: block; width: 100%; max-height: 240px; object-fit: cover; border-radius: ${radius.lg}px; margin-bottom: var(--space-4); }
 .meal-items:not(:empty) { margin-bottom: var(--space-4); }
 .meal-item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
 .meal-item + .meal-item { margin-top: 0; }

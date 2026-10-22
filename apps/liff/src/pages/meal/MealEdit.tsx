@@ -12,6 +12,7 @@ import {
   taipeiHour,
   type Food,
   type Meal,
+  type MealDetail,
   type MealType,
   type Nutrition,
 } from "@gac/shared";
@@ -124,17 +125,20 @@ export function MealEdit({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Signed url; expires, so a load failure just hides the photo.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!editing) return;
     let live = true;
-    apiFetch<Meal>(`/meals/${encodeURIComponent(id)}`)
+    apiFetch<MealDetail>(`/meals/${encodeURIComponent(id)}`)
       .then((meal) => {
         if (!live) return;
         setDate(meal.eatenOn);
         setMealType(meal.mealType);
         setDraft(meal.status === "draft");
         setLines(linesFrom(meal));
+        setPhotoUrl(meal.photoUrl ?? null);
         setLoad("ready");
       })
       .catch((err: unknown) => {
@@ -253,6 +257,14 @@ export function MealEdit({
     <main className="meal-page">
       <p className="step">{dateLabel(date)}</p>
       <h1>{editing ? "修改這一餐" : "記錄一餐"}</h1>
+      {photoUrl !== null && (
+        <img
+          className="meal-photo"
+          src={photoUrl}
+          alt="這一餐的照片"
+          onError={() => setPhotoUrl(null)}
+        />
+      )}
       {draft && (
         <p className="muted">AI 估計的草稿，按「儲存並確認」就會記錄</p>
       )}
