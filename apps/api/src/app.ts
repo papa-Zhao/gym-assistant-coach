@@ -10,6 +10,7 @@ import { metricsRoutes } from "./metrics/routes.js";
 import { exerciseRoutes } from "./workouts/exercise-routes.js";
 import { templateRoutes } from "./workouts/template-routes.js";
 import { sessionRoutes } from "./workouts/session-routes.js";
+import { mealRoutes } from "./meals/routes.js";
 import { internalRoutes } from "./internal/routes.js";
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
@@ -56,6 +57,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   app.register(exerciseRoutes(deps));
   app.register(templateRoutes(deps));
   app.register(sessionRoutes(deps));
+  app.register(mealRoutes(deps));
   app.register(internalRoutes(deps), { prefix: "/internal" });
 
   return app;

@@ -11,6 +11,8 @@ import {
   upsertCardio,
   upsertSet,
 } from "../src/workouts/repo";
+import { foods } from "../src/db/schema";
+import { createMeal } from "../src/meals/repo";
 import { formatWorkoutSummary } from "../src/workouts/summary";
 import { createTestDb } from "./db";
 
@@ -178,6 +180,29 @@ describe("/internal/users", () => {
     expect(body.consumed).toEqual({ kcal: 0, proteinG: 0, carbG: 0, fatG: 0 });
     expect(body.workoutSummary).toBeNull();
     expect(body.streakDays).toBe(0);
+  });
+
+  it("today consumed reflects today's meals", async () => {
+    const id = `U${"9".repeat(32)}`;
+    const { userId } = await syncUser(db, id, null);
+    const [food] = await db.select().from(foods).limit(1);
+    if (!food) throw new Error("no seed food");
+    const meal = await createMeal(
+      db,
+      userId,
+      {
+        eatenOn: "2026-10-19",
+        mealType: "lunch",
+        items: [{ foodId: food.id, grams: 200 }],
+      },
+      "manual",
+      new Date(nowIso),
+    );
+    expect(meal.total.kcal).toBeGreaterThan(0);
+    const body = (
+      await post("/internal/users/today", { lineUserId: id })
+    ).json();
+    expect(body.consumed.kcal).toBe(meal.total.kcal);
   });
 
   it("today uses Taipei date", async () => {
