@@ -1,4 +1,5 @@
 import {
+  AI_KINDS,
   CONSENT_DOCS,
   EQUIPMENT,
   EXERCISE_KINDS,
@@ -363,4 +364,24 @@ export const mealItems = pgTable(
     aiConfidence: numeric("ai_confidence", { precision: 3, scale: 2 }),
   },
   (t) => [unique("meal_items_meal_position_unique").on(t.mealId, t.position)],
+);
+
+export const aiUsageDaily = pgTable(
+  "ai_usage_daily",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    kind: text("kind").notNull(),
+    count: integer("count").notNull().default(0),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheCreationTokens: integer("cache_creation_tokens").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.day, t.kind] }),
+    check("ai_usage_daily_kind_check", sql`${t.kind} in (${inList(AI_KINDS)})`),
+  ],
 );
