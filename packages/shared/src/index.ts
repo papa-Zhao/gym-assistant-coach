@@ -14,3 +14,4 @@ export * from "./targets";
 export * from "./profile";
 export * from "./metrics";
 export * from "./workouts";
+export * from "./meals";
