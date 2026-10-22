@@ -248,6 +248,7 @@
 ## 狀態
 
 - 2026-10-22：計畫完成，待使用者確認。
+- 2026-10-23：Task 1–6 實作完成（分支 `pr10-2-rate-limit-monitoring`，尚未 push、尚未開 PR）。全部檢查通過：`npm test --workspaces`、`typecheck`、`eslint`、`prettier`、bot 的 `pytest`／`ruff`、`terraform fmt`／`test`（6 個 run 全過）。部署步驟（`terraform apply`、Anthropic 上限）都還沒做。
 
 ## 交接備註
 
@@ -255,10 +256,24 @@
 - 限流計數在記憶體：instance 重啟或縮到 0 時計數歸零；最多 3 個 instance 時，實際上限最多是 3 倍。這是刻意的取捨，不是 bug。
 - bot 的 webhook 處理失敗仍回 200（避免 LINE 重送），所以 bot 的 5xx 警示幾乎不會觸發，主要靠 ERROR log 警示。
 - `infra/tests/budget.tftest.hcl` 與 `core.tftest.hcl` 加了 `alert_email` 變數；10.1 若也改這兩個檔，合併時可能有小衝突（只是 `variables` 區塊多一行）。
+- 實作時和計畫不同的地方：
+  - **限流 hook 掛在 root 的 `onRequest`**，不是 plugin 預設的每個路由 hook。plugin 的 hook 會排在路由自己的 `onRequest`（`bearerAuth`）之後，未登入或假 token 的請求在 401 就結束，永遠不會被計數。現在用 `global: false` 註冊 plugin，再在 `app.after()` 裡 `app.addHook("onRequest", app.rateLimit())`。副作用：找不到路由（404）的請求也依 IP 計算。
+  - **`trustProxy` 寫成函式** `(_addr, hop) => hop < 1`，意思與 `trustProxy: 1` 相同（只信任 socket 那一跳，取 `X-Forwarded-For` 最後一個）。Fastify 的型別不接受數字。
+  - **`allowList` 多放行 `/jobs/*`**（協調者決定）：10.1 的 Cloud Scheduler 端點是 `POST /jobs/daily`（OIDC），不在 `/internal` 底下。測試用假的 `/jobs/daily` 路由（打 40 次都不是 429），另有 `/jobsx` 對照組會被擋，也直接測 `allowList` 函式。
+  - `session-routes.test.ts` 同一個使用者在同一個 app 打超過 120 次，改成每個測試重建 app（`beforeEach`）。其他既有測試不用改。
+  - LIFF：`onFatal` 改成 `(err?: unknown) => void`，App 把錯誤存起來，錯誤畫面用 `failureMessage(err, "連線出了點問題，請稍後再試。")`。為了讓「開啟時 429」顯示限流訊息，`Records.tsx`、`meal/MealsCard.tsx` 也改成把錯誤傳給 `onFatal`（計畫的 Files 沒列這兩個）。`EquipmentPhoto.tsx` 原本就有一個叫 `failureMessage` 的本地函式，改名為 `photoFailureMessage`，最後再呼叫共用的 `failureMessage`。`ActiveWorkout` 的 409 訊息照舊優先。
+  - bot：`messages.rate_limited()` 回傳 `Message`（dict），和其他訊息函式一致，不是 `TextMessage`。`rate limited event=…` 只在第 21 個事件（回提醒時）記一行，之後被丟掉的事件不記，避免洗版。`create_app` 用 `limiter if limiter is not None else UserRateLimiter()`：`UserRateLimiter` 有 `__len__`，空的時候是 falsy，不能用 `or`。
+  - bot 的 JSON log 用 Python 的 level 名稱當 `severity`（INFO／WARNING／ERROR／CRITICAL 與 Cloud Logging 一致）；DEBUG 不輸出（root level 是 INFO）。
+  - `infra/README.md`：「監控與警示」是第 10 節，「Anthropic 用量上限」是第 11 節。
+- **Cloud Monitoring 費用（2026-10-23 查詢，未完全確認）**：官方價目頁 <https://cloud.google.com/stackdriver/pricing>（及 <https://cloud.google.com/products/observability/pricing>）是動態載入，抓不到全文，只能從搜尋結果的摘要得知：
+  - uptime check：每個專案每月前 100 萬次免費，之後每 1,000 次 US$0.30。本 PR 每月約 17,280 次，免費。
+  - 警示：目前的摘要寫每個警示條件每月 US$0.10，另外依條件回傳的 time series 數量收費；較舊的摘要寫每個 metric 參照每月 US$0.35。兩種說法的生效日期不一致。
+  - 以 US$0.10 計，8 個條件約 US$0.80／月（約 NT$26），低於 NT$30 的門檻，但很接近；time series 的費用（流量小，series 少）沒查到確切數字。log-based metric 與 log 量很小，應在免費額度內（未確認）。
+  - **apply 前請使用者打開價目頁確認一次**；若會超過 NT$30／月，可以把 uptime 和錯誤合併，或拿掉延遲警示（少 2 個條件）。
 
 ## 下一個 PR 需要知道的事
 
-- **10.1（資料權利）**：Cloud Scheduler 若呼叫 api 的排程端點，請放在 `/internal/*` 底下（用 OIDC token），才不會被限流。若用別的路徑，要加進 `rateLimitOptions` 的 `allowList`。排程失敗會寫 ERROR log，api 的錯誤警示會一起抓到，不用另外設警示。
+- **10.1（資料權利）**：Cloud Scheduler 的 `POST /jobs/daily`（OIDC）已經在 `rateLimitOptions` 的 `allowList` 裡（`/health`、`/internal/*`、`/jobs/*` 都不限流），10.1 不用改限流。測試用的是假路由，合併 10.1 後真的路由一樣適用；若 10.1 的路徑不是 `/jobs/` 開頭，要加進 `allowList`。排程失敗會寫 ERROR log，api 的錯誤警示會一起抓到，不用另外設警示。10.1 若也改 `infra/tests/*.tftest.hcl` 的 `variables`，記得保留 `alert_email = "alerts@example.com"`。
 - **10.3（負載與成本檢查）**：
   - 負載測試若用同一個使用者或同一個 IP，會在每分鐘 120／30 次被 429 擋下。要用多個測試使用者，或分散 IP。
   - 成本檢查時一併確認 Cloud Monitoring 的實際費用。

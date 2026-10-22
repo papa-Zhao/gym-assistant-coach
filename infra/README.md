@@ -176,6 +176,7 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
    - 或在 shell 執行 `export TF_VAR_alert_email=<你的警示信箱>`。
 
    換電腦時要重新提供，否則 Terraform 會要求輸入 `alert_email`。
+
 2. **【使用者自行操作】** 執行 `terraform -chdir=infra apply`。
 3. 收到警示信時：
    - 信件標題寫著是哪個服務（`api` 或 `bot`）與哪一種警示（uptime、errors、p95 latency）。
@@ -183,6 +184,16 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
    - 再用瀏覽器打開該服務的 `/health`，應該回 `{"status":"ok",...}`。
    - bot 的 webhook 處理失敗也回 200，所以 bot 的問題主要看 ERROR log。
    - 問題解決後警示會自動關閉（最晚 30 分鐘）。
+
+## 11. Anthropic 用量上限
+
+**【使用者自行操作】**
+
+1. 登入 <https://console.anthropic.com>，到 **Settings → Limits**。
+2. 在每月花費上限（spend limit）設 **US$20**（估算每個活躍使用者約 US$0.2/月，約 100 人的量）。若專案用的是獨立 workspace，也可以在 **Settings → Workspaces →（該 workspace）→ Limits** 設同樣的上限。
+3. 若有用量通知（email notification）選項，設在 US$10。
+4. 超過上限時 Anthropic 會拒絕請求。api 會回「AI 暫時忙不過來」，使用者其他功能照常。要恢復，就調高上限或等下個月。
+5. 實際選單名稱以 Console 畫面為準。設定完在 PR 留言回報「已設定」。
 
 ## 疑難排解
 
