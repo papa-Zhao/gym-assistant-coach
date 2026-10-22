@@ -81,6 +81,7 @@ jobs:
             -e CORS_ORIGIN=https://example.web.app
             -e BOT_URL=https://bot.example.run.app
             -e BOT_AUDIENCE=gac-bot-internal
+            -e ANTHROPIC_API_KEY=ci-fake-key
           )
           for svc in api bot; do
             extra=()
