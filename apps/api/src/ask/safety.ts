@@ -37,9 +37,13 @@ export function needsMedicalNotice(...texts: string[]): boolean {
   return texts.some((t) => MEDICAL_KEYWORDS.some((k) => t.includes(k)));
 }
 
-// A daily marker, up to 20 non-digit chars, then a number followed by a kcal unit.
-const DAILY_KCAL =
-  /(?:每天|每日|一天|一日)[^\d]{0,20}?(\d{1,3}(?:,\d{3})+|\d+)\s*(?:kcal|大卡|卡)/gi;
+const NUM = String.raw`\d{1,3}(?:,\d{3})+|\d+`;
+// Daily marker, up to 20 chars (not crossing a sentence break), then a number
+// or range "N-M" followed by a kcal unit. Group 1 is the lower bound.
+const DAILY_KCAL = new RegExp(
+  String.raw`(?:每天|每日|一天|一日)[^\n。！？；]{0,20}?(?<![\d,])(${NUM})(?:\s*[-–~～至到]\s*(?:${NUM}))?\s*(?:kcal|大卡|卡)`,
+  "gi",
+);
 
 /** Warning when the text suggests a daily intake below floorKcal; else null. */
 export function lowKcalWarning(text: string, floorKcal: number): string | null {

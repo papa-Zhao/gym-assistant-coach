@@ -39,7 +39,9 @@ export function shapeAdvice(
   const texts = [title, ...items.flatMap((i) => [i.name, i.detail]), body];
   const notices: string[] = [];
   if (needsMedicalNotice(opts.question, ...texts)) notices.push(MEDICAL_NOTICE);
-  const kcal = lowKcalWarning(texts.join("\n"), opts.floorKcal);
+  const kcal = texts
+    .map((t) => lowKcalWarning(t, opts.floorKcal))
+    .find((w) => w !== null);
   if (kcal) notices.push(kcal);
   return { title, items, body, todayLine: opts.todayLine, notices };
 }
@@ -48,7 +50,9 @@ export function shapeAdvice(
 export function adviceText(a: Advice): string {
   return [
     a.title,
-    ...a.items.map((i) => `・${i.name}（${i.detail}）`),
+    ...a.items.map((i) =>
+      i.detail ? `・${i.name}（${i.detail}）` : `・${i.name}`,
+    ),
     a.body,
   ].join("\n");
 }

@@ -168,6 +168,15 @@ describe("shapeAdvice", () => {
       "提醒：每天熱量建議不低於 1500 kcal。",
     ]);
     expect(shapeAdvice(GOOD, opts).notices).toEqual([]);
+    const split = shapeAdvice(
+      {
+        title: "每天都吃",
+        items: [{ name: "雞腿", detail: "560 kcal" }],
+        body: "ok",
+      },
+      opts,
+    );
+    expect(split.notices).toEqual([]);
     expect(shapeAdvice(GOOD, opts).todayLine).toBe("今天剩 500");
   });
 });
@@ -180,5 +189,10 @@ describe("adviceText", () => {
       todayLine: null,
     });
     expect(adviceText(a)).toBe("吃便當\n・雞腿（560 kcal）\nok");
+    const blank = shapeAdvice(
+      { ...GOOD, items: [{ name: "雞腿", detail: " " }] },
+      { question: "q", floorKcal: 1500, todayLine: null },
+    );
+    expect(adviceText(blank)).toBe("吃便當\n・雞腿\nok");
   });
 });
