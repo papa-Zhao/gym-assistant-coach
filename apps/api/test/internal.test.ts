@@ -74,6 +74,7 @@ describe("/internal/users", () => {
         throw new Error("invalid token");
       },
       botServiceAccount: BOT,
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: LINE_ID, name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: {

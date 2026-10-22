@@ -60,6 +60,7 @@ const deps: AppDeps = {
   db: drizzle(sql),
   verifyServiceToken,
   botServiceAccount: config.botServiceAccount,
+  schedulerServiceAccount: config.schedulerServiceAccount,
   verifyLineIdToken: createLineVerifier(config.lineLoginChannelId),
   notifyWorkoutFinished: createBotNotifier(config.botUrl, config.botAudience),
   mealParser: createMealParser(anthropic, parserLog),

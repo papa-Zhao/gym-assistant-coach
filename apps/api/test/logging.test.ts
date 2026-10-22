@@ -32,6 +32,7 @@ const deps: AppDeps = {
   db: {} as AppDeps["db"],
   verifyServiceToken: notUsed,
   botServiceAccount: "bot@example.iam.gserviceaccount.com",
+  schedulerServiceAccount: "scheduler@x",
   verifyLineIdToken: notUsed,
   notifyWorkoutFinished: async () => {},
   mealParser: unusedMealParser,

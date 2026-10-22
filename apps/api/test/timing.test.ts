@@ -30,6 +30,7 @@ describe("request timing", () => {
       db: t.db,
       verifyServiceToken: async () => ({ email: "x@y" }),
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: "U", name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,

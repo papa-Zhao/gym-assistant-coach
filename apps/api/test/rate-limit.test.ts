@@ -41,6 +41,7 @@ describe("rate limit", () => {
         throw new Error("invalid token");
       },
       botServiceAccount: BOT,
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: "U", name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
@@ -129,15 +130,14 @@ describe("rate limit", () => {
   });
 
   it("never limits /jobs routes (Cloud Scheduler)", async () => {
-    // PR 10.1 adds POST /jobs/daily; a stand-in route here keeps this test
-    // independent of it, with a control route that is limited.
+    // The real POST /jobs/daily rejects these unauthenticated calls with 401,
+    // but never with 429; /jobsx is a control route that is limited.
     fresh();
-    app.post("/jobs/daily", async () => ({ ok: true }));
     app.post("/jobsx", async () => ({ ok: true }));
     const hit = (url: string) =>
       app.inject({ method: "POST", url, remoteAddress: "10.0.0.5" });
     for (let i = 0; i < 40; i++) {
-      expect((await hit("/jobs/daily")).statusCode).toBe(200);
+      expect((await hit("/jobs/daily")).statusCode).toBe(401);
     }
     let last = 0;
     for (let i = 0; i <= RATE_LIMIT_IP_MAX; i++) {

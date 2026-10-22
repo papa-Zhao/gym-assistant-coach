@@ -40,7 +40,7 @@ export function App({
         case "profile":
           return <Profile today={today} onClose={onClose} onFatal={onFatal} />;
         case "settings":
-          return <Settings />;
+          return <Settings today={today} onClose={onClose} />;
         case "records":
           return <Records onFatal={onFatal} />;
         case "body":

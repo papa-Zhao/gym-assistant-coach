@@ -270,6 +270,11 @@
   - 警示：目前的摘要寫每個警示條件每月 US$0.10，另外依條件回傳的 time series 數量收費；較舊的摘要寫每個 metric 參照每月 US$0.35。兩種說法的生效日期不一致。
   - 以 US$0.10 計，8 個條件約 US$0.80／月（約 NT$26），低於 NT$30 的門檻，但很接近；time series 的費用（流量小，series 少）沒查到確切數字。log-based metric 與 log 量很小，應在免費額度內（未確認）。
   - **apply 前請使用者打開價目頁確認一次**；若會超過 NT$30／月，可以把 uptime 和錯誤合併，或拿掉延遲警示（少 2 個條件）。
+- **2026-10-23 合併 PR 10.1（`pr10-1-data-rights`）進本分支**，本 PR 要在 10.1 合併後才合併。整合時的修正：
+  - `apps/api/src/app.ts`：同時 import `jobRoutes` 與 `rateLimitOptions`。
+  - `rate-limit.test.ts`、`logging.test.ts` 的 deps 加上 10.1 新增的 `schedulerServiceAccount`。
+  - `rate-limit.test.ts` 的 `/jobs` 測試改打 10.1 的真路由 `POST /jobs/daily`：40 次都是 401（沒有 OIDC token），沒有 429。
+  - `infra/tests/scheduler.tftest.hcl` 的 `variables` 加 `alert_email`。
 
 ## 下一個 PR 需要知道的事
 

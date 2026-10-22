@@ -1,14 +1,25 @@
-import type { ApiError, LiffAuthResponse, MeResponse } from "@gac/shared";
+import type {
+  ApiError,
+  DataExport,
+  LiffAuthResponse,
+  MeResponse,
+} from "@gac/shared";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
+import { exportUserData } from "../users/export";
 import type { AppDeps } from "../deps.js";
 import {
   findById,
   findByLineUserId,
   hasCurrentConsent,
+  requestAccountDeletion,
   updateDisplayName,
 } from "../users/repo";
-import { issueSession, SESSION_TTL_SECONDS, verifySession } from "./session";
+import {
+  issueSession,
+  SESSION_TTL_SECONDS,
+  verifyActiveSession,
+} from "./session";
 
 const liffSchema = {
   body: {
@@ -28,7 +39,7 @@ declare module "fastify" {
 export const authRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
-    const { db, verifyLineIdToken, sessionSecret } = deps;
+    const { db, verifyLineIdToken, sessionSecret, now } = deps;
 
     app.setErrorHandler(apiErrorHandler);
 
@@ -63,7 +74,7 @@ export const authRoutes =
     );
 
     const authenticate = bearerAuth(
-      (token) => verifySession(sessionSecret, token),
+      (token) => verifyActiveSession(db, sessionSecret, token),
       (req, { userId }) => {
         req.sessionUserId = userId;
       },
@@ -84,4 +95,16 @@ export const authRoutes =
         return { displayName: user.displayName ?? "" };
       },
     );
+
+    app.get(
+      "/me/export",
+      { onRequest: authenticate },
+      async (req): Promise<DataExport> =>
+        exportUserData(db, req.sessionUserId as string, now()),
+    );
+
+    app.delete("/me", { onRequest: authenticate }, async (req, reply) => {
+      await requestAccountDeletion(db, req.sessionUserId as string, now());
+      return reply.code(204).send();
+    });
   };
