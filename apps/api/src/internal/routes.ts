@@ -1,16 +1,20 @@
 import {
+  MEAL_TYPES,
   isValidMetric,
   roundMetric,
   taipeiDate,
   type ApiError,
   type MetricKey,
+  type Meal,
+  type MealType,
   type MetricRecordedResponse,
   type TodayResponse,
 } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
-import { consumedOn } from "../meals/repo";
+import { confirmMeal, consumedOn, setMealType } from "../meals/repo";
+import { logMealFromText } from "../meals/text";
 import { todayWorkoutSummary } from "../workouts/repo";
 import { formatWorkoutSummary } from "../workouts/summary";
 import { previousMetric, recordMetric } from "../metrics/repo";
@@ -67,6 +71,41 @@ const bodyMetricSchema = {
   },
 } as const;
 
+const mealTypeSchema = { enum: [...MEAL_TYPES] } as const;
+
+const mealTextSchema = {
+  body: {
+    type: "object",
+    required: ["lineUserId", "mealType", "text"],
+    additionalProperties: false,
+    properties: {
+      lineUserId,
+      mealType: mealTypeSchema,
+      text: { type: "string", minLength: 1, maxLength: 200 },
+    },
+  },
+} as const;
+
+const mealIdParams = {
+  type: "object",
+  required: ["id"],
+  properties: { id: { type: "string", format: "uuid" } },
+} as const;
+
+const mealConfirmSchema = { ...unfollowSchema, params: mealIdParams } as const;
+
+const mealTypeChangeSchema = {
+  params: mealIdParams,
+  body: {
+    type: "object",
+    required: ["lineUserId", "mealType"],
+    additionalProperties: false,
+    properties: { lineUserId, mealType: mealTypeSchema },
+  },
+} as const;
+
+const notFound = { error: "not_found" } satisfies ApiError;
+
 export const internalRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
@@ -81,6 +120,29 @@ export const internalRoutes =
     );
 
     app.setErrorHandler(apiErrorHandler);
+
+    async function todayFor(
+      userId: string | null,
+      clock: Date,
+    ): Promise<TodayResponse> {
+      const profile = userId ? await getProfile(db, userId) : null;
+      const date = taipeiDate(clock);
+      const workout = userId
+        ? await todayWorkoutSummary(db, userId, date)
+        : null;
+      const consumed = userId
+        ? await consumedOn(db, userId, date, clock)
+        : { kcal: 0, proteinG: 0, carbG: 0, fatG: 0 };
+      return {
+        hasProfile: profile !== null,
+        date,
+        targets: profile?.targets ?? null,
+        consumed,
+        workoutSummary: workout ? formatWorkoutSummary(workout) : null,
+        weightKg: profile?.weightKg ?? null,
+        streakDays: 0,
+      };
+    }
 
     app.post<{ Body: { lineUserId: string; displayName?: string | null } }>(
       "/users/sync",
@@ -114,24 +176,70 @@ export const internalRoutes =
       { schema: unfollowSchema },
       async (req): Promise<TodayResponse> => {
         const user = await findByLineUserId(db, req.body.lineUserId);
-        const profile = user ? await getProfile(db, user.id) : null;
+        return todayFor(user?.id ?? null, now());
+      },
+    );
+
+    app.post<{
+      Body: { lineUserId: string; mealType: MealType; text: string };
+    }>("/meals/text", { schema: mealTextSchema }, async (req, reply) => {
+      const user = await findByLineUserId(db, req.body.lineUserId);
+      if (!user) return reply.code(404).send(notFound);
+      const outcome = await logMealFromText(
+        { db, parser: deps.mealParser, now },
+        user.id,
+        req.body.mealType,
+        req.body.text,
+      );
+      return outcome.kind === "draft"
+        ? { outcome: "draft", meal: outcome.meal }
+        : { outcome: outcome.kind };
+    });
+
+    app.post<{ Params: { id: string }; Body: { lineUserId: string } }>(
+      "/meals/:id/confirm",
+      { schema: mealConfirmSchema },
+      async (req, reply) => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        if (!user) return reply.code(404).send(notFound);
         const clock = now();
-        const date = taipeiDate(clock);
-        const workout = user
-          ? await todayWorkoutSummary(db, user.id, date)
-          : null;
-        const consumed = user
-          ? await consumedOn(db, user.id, date, clock)
-          : { kcal: 0, proteinG: 0, carbG: 0, fatG: 0 };
+        const meal: Meal | null = await confirmMeal(
+          db,
+          user.id,
+          req.params.id,
+          clock,
+        );
+        if (!meal) return reply.code(404).send(notFound);
+        const today = await todayFor(user.id, clock);
         return {
-          hasProfile: profile !== null,
-          date,
-          targets: profile?.targets ?? null,
-          consumed,
-          workoutSummary: workout ? formatWorkoutSummary(workout) : null,
-          weightKg: profile?.weightKg ?? null,
-          streakDays: 0,
+          meal,
+          today: {
+            date: today.date,
+            consumed: today.consumed,
+            targets: today.targets,
+          },
         };
+      },
+    );
+
+    app.post<{
+      Params: { id: string };
+      Body: { lineUserId: string; mealType: MealType };
+    }>(
+      "/meals/:id/type",
+      { schema: mealTypeChangeSchema },
+      async (req, reply) => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        if (!user) return reply.code(404).send(notFound);
+        const meal = await setMealType(
+          db,
+          user.id,
+          req.params.id,
+          req.body.mealType,
+          now(),
+        );
+        if (!meal) return reply.code(404).send(notFound);
+        return { meal };
       },
     );
 

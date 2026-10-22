@@ -1,4 +1,5 @@
 import type { FinishSummary } from "@gac/shared";
+import type { MealParser } from "./ai/meal-parser";
 import type { DbStats } from "./db/timing.js";
 import type { Db } from "./users/repo";
 
@@ -23,6 +24,8 @@ export interface AppDeps {
   botServiceAccount: string;
   verifyLineIdToken: VerifyLineIdToken;
   notifyWorkoutFinished: NotifyWorkoutFinished;
+  /** Turns meal text into estimated items; tests inject a fake. */
+  mealParser: MealParser;
   sessionSecret: Uint8Array;
   corsOrigin: string;
   /** Current time; injectable so tests can pin the Taipei date. */

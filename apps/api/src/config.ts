@@ -8,6 +8,7 @@ export interface Config {
   corsOrigin: string;
   botUrl: string;
   botAudience: string;
+  anthropicApiKey: string;
 }
 
 const REQUIRED = [
@@ -19,6 +20,7 @@ const REQUIRED = [
   "CORS_ORIGIN",
   "BOT_URL",
   "BOT_AUDIENCE",
+  "ANTHROPIC_API_KEY",
 ] as const;
 
 const MIN_SECRET_BYTES = 32;
@@ -70,6 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     corsOrigin,
     botUrl,
     botAudience: get("BOT_AUDIENCE"),
+    anthropicApiKey: get("ANTHROPIC_API_KEY"),
   };
 }
 

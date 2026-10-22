@@ -5,7 +5,7 @@ import { issueSession } from "../src/auth/session";
 import { instrument, newDbStats, withDbStats } from "../src/db/timing.js";
 import type { AppDeps } from "../src/deps.js";
 import { syncUser } from "../src/users/repo";
-import { createTestDb } from "./db";
+import { createTestDb, unusedMealParser } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 
@@ -26,6 +26,7 @@ describe("request timing", () => {
       botServiceAccount: "bot@x",
       verifyLineIdToken: async () => ({ sub: "U", name: null }),
       notifyWorkoutFinished: async () => {},
+      mealParser: unusedMealParser,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),

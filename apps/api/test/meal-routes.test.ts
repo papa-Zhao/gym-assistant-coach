@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { issueSession } from "../src/auth/session";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb } from "./db";
+import { createTestDb, unusedMealParser } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const ZERO = "00000000-0000-4000-8000-000000000000";
@@ -37,6 +37,7 @@ describe("meal routes", () => {
         name: null,
       }),
       notifyWorkoutFinished: async () => {},
+      mealParser: unusedMealParser,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),

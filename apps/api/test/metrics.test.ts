@@ -4,7 +4,7 @@ import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { listMetrics, previousMetric, recordMetric } from "../src/metrics/repo";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb } from "./db";
+import { createTestDb, unusedMealParser } from "./db";
 
 const BOT = "bot-runtime@x.iam.gserviceaccount.com";
 const SECRET = new Uint8Array(32).fill(9);
@@ -84,6 +84,7 @@ describe("metrics routes", () => {
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: async () => {},
+      mealParser: unusedMealParser,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),

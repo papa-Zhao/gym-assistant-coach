@@ -59,6 +59,8 @@ export interface MealItem extends Nutrition {
   foodId: string | null;
   name: string;
   grams: number;
+  /** AI estimate confidence 0-1; null for database and manual items. */
+  aiConfidence: number | null;
 }
 
 export interface Meal {
