@@ -10,7 +10,7 @@ import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { createBotNotifier } from "../src/notify/bot.js";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb, unusedMealParser } from "./db";
+import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const U1 = `U${"a".repeat(32)}`;
@@ -48,6 +48,7 @@ describe("workout session routes", () => {
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: (...args) => notify(...args),
       mealParser: unusedMealParser,
+      photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),

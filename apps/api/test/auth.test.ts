@@ -3,7 +3,7 @@ import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { recordConsent, syncUser, type Db } from "../src/users/repo";
-import { createTestDb, unusedMealParser } from "./db";
+import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
 import { CONSENT_VERSION } from "@gac/shared";
 
 const SECRET = new Uint8Array(32).fill(7);
@@ -39,6 +39,7 @@ describe("auth", () => {
       },
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
       now: () => new Date("2026-10-19T04:00:00Z"),
@@ -193,6 +194,7 @@ describe("error handling", () => {
         },
         notifyWorkoutFinished: async () => {},
         mealParser: unusedMealParser,
+        photoStore: unusedPhotoStore,
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,
         now: () => new Date("2026-10-19T04:00:00Z"),

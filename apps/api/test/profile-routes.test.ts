@@ -3,7 +3,7 @@ import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb, unusedMealParser } from "./db";
+import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const U1 = `U${"a".repeat(32)}`;
@@ -42,6 +42,7 @@ describe("profile routes", () => {
       verifyLineIdToken: unused,
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),

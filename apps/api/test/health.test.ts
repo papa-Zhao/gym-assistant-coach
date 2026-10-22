@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
-import { unusedMealParser } from "./db";
+import { unusedMealParser, unusedPhotoStore } from "./db";
 
 const notUsed = async (): Promise<never> => {
   throw new Error("not used in this test");
@@ -14,6 +14,7 @@ const deps: AppDeps = {
   verifyLineIdToken: notUsed,
   notifyWorkoutFinished: async () => {},
   mealParser: unusedMealParser,
+  photoStore: unusedPhotoStore,
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",
   now: () => new Date("2026-10-19T04:00:00Z"),

@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { fileURLToPath } from "node:url";
 import type { Db } from "../src/users/repo";
 import type { MealParser } from "../src/ai/meal-parser";
+import type { PhotoStore } from "../src/photos/store";
 
 const migrationsFolder = fileURLToPath(
   new URL("../../../db/migrations/", import.meta.url),
@@ -42,3 +43,40 @@ export const unusedMealParser: MealParser = {
     throw new Error("meal parser should not be called");
   },
 };
+
+/** For suites that never touch meal photos. */
+export const unusedPhotoStore: PhotoStore = {
+  put: async () => {
+    throw new Error("photo store should not be called");
+  },
+  signedUrl: async () => {
+    throw new Error("photo store should not be called");
+  },
+  delete: async () => {
+    throw new Error("photo store should not be called");
+  },
+};
+
+/** In-memory store recording calls; set `fail` to make an operation throw. */
+export function memoryPhotoStore() {
+  const objects = new Map<string, Buffer>();
+  const calls = { put: [] as string[], delete: [] as string[] };
+  const fail = { put: false, signedUrl: false, delete: false };
+  const store: PhotoStore = {
+    async put(key, jpeg) {
+      calls.put.push(key);
+      if (fail.put) throw new Error("boom");
+      objects.set(key, jpeg);
+    },
+    async signedUrl(key) {
+      if (fail.signedUrl) throw new Error("boom");
+      return `https://signed.test/${key}?sig=1`;
+    },
+    async delete(key) {
+      calls.delete.push(key);
+      if (fail.delete) throw new Error("boom");
+      objects.delete(key);
+    },
+  };
+  return { store, objects, calls, fail };
+}

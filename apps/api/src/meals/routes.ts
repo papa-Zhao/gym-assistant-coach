@@ -7,12 +7,13 @@ import {
   type ApiError,
   type DayMeals,
   type Food,
-  type Meal,
+  type MealDetail,
   type MealInput,
 } from "@gac/shared";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { apiErrorHandler } from "../http.js";
 import type { AppDeps } from "../deps.js";
+import { errName } from "./photo";
 import { workoutAuth } from "../workouts/http";
 import {
   MealInputError,
@@ -20,6 +21,7 @@ import {
   deleteMeal,
   getMeal,
   listDayMeals,
+  mealPhotoKey,
   searchFoods,
   updateMeal,
 } from "./repo";
@@ -122,7 +124,7 @@ async function requireNumericGrams(req: FastifyRequest, reply: FastifyReply) {
 export const mealRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
-    const { db, sessionSecret, now } = deps;
+    const { db, sessionSecret, now, photoStore } = deps;
     app.setErrorHandler(apiErrorHandler);
     const auth = { onRequest: workoutAuth(sessionSecret) };
     const write = { ...auth, preValidation: requireNumericGrams };
@@ -162,8 +164,23 @@ export const mealRoutes =
     app.get<{ Params: { id: string } }>(
       "/meals/:id",
       { ...auth, schema: idSchema },
-      async (req, reply): Promise<Meal | FastifyReply> =>
-        (await getMeal(db, uid(req), req.params.id)) ?? notFound(reply),
+      async (req, reply): Promise<MealDetail | FastifyReply> => {
+        const meal = await getMeal(db, uid(req), req.params.id);
+        if (!meal) return notFound(reply);
+        const key = await mealPhotoKey(db, uid(req), req.params.id);
+        let photoUrl: string | null = null;
+        if (key !== null) {
+          try {
+            photoUrl = await photoStore.signedUrl(key);
+          } catch (err) {
+            req.log.warn(
+              { event: "meal_photo_sign_failed", errName: errName(err) },
+              "meal photo signing failed",
+            );
+          }
+        }
+        return { ...meal, photoUrl };
+      },
     );
 
     app.post<{ Body: MealInput }>(
@@ -213,9 +230,20 @@ export const mealRoutes =
     app.delete<{ Params: { id: string } }>(
       "/meals/:id",
       { ...auth, schema: idSchema },
-      async (req, reply) =>
-        (await deleteMeal(db, uid(req), req.params.id)) !== null
-          ? reply.code(204).send()
-          : notFound(reply),
+      async (req, reply) => {
+        const deleted = await deleteMeal(db, uid(req), req.params.id);
+        if (!deleted) return notFound(reply);
+        for (const key of deleted.photoKeys) {
+          try {
+            await photoStore.delete(key);
+          } catch (err) {
+            req.log.warn(
+              { event: "meal_photo_delete_failed", errName: errName(err) },
+              "meal photo delete failed",
+            );
+          }
+        }
+        return reply.code(204).send();
+      },
     );
   };

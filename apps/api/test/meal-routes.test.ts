@@ -1,13 +1,15 @@
-import type { DayMeals, Food, Meal } from "@gac/shared";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { DayMeals, Food, Meal, MealDetail } from "@gac/shared";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { issueSession } from "../src/auth/session";
+import { addMealPhoto } from "../src/meals/repo";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb, unusedMealParser } from "./db";
+import { createTestDb, memoryPhotoStore, unusedMealParser } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const ZERO = "00000000-0000-4000-8000-000000000000";
 const DAY = "2026-10-22";
+const photos = memoryPhotoStore();
 let nowIso = "2026-10-22T04:00:00Z";
 
 describe("meal routes", () => {
@@ -38,6 +40,7 @@ describe("meal routes", () => {
       }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      photoStore: photos.store,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -272,5 +275,66 @@ describe("meal routes", () => {
     expect((await req("DELETE", `/meals/${meal.id}`)).statusCode).toBe(204);
     expect((await req("GET", `/meals/${meal.id}`)).statusCode).toBe(404);
     expect((await req("DELETE", `/meals/${meal.id}`)).statusCode).toBe(404);
+  });
+
+  it("public routes do not accept octet-stream bodies", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/meals",
+      headers: { ...hA, "content-type": "application/octet-stream" },
+      payload: Buffer.from("x"),
+    });
+    expect(res.statusCode).toBe(415);
+  });
+
+  describe("photos", () => {
+    let n = 0;
+    let KEY = "";
+    const withPhoto = async (headers = hA) => {
+      KEY = `meals/u/${++n}.jpg`;
+      const meal = await create(headers);
+      await addMealPhoto(db, meal.id, KEY, new Date(nowIso));
+      return meal;
+    };
+    afterEach(() => {
+      photos.fail.signedUrl = false;
+      photos.fail.delete = false;
+      photos.calls.delete.length = 0;
+    });
+
+    it("GET returns the signed url, or null without a photo", async () => {
+      const meal = await withPhoto();
+      const got = (await req("GET", `/meals/${meal.id}`)).json<MealDetail>();
+      expect(got.photoUrl).toBe(`https://signed.test/${KEY}?sig=1`);
+      const plain = await create();
+      const none = (await req("GET", `/meals/${plain.id}`)).json<MealDetail>();
+      expect(none.photoUrl).toBeNull();
+    });
+
+    it("GET still returns 200 with photoUrl null when signing fails", async () => {
+      const meal = await withPhoto();
+      photos.fail.signedUrl = true;
+      const res = await req("GET", `/meals/${meal.id}`);
+      expect(res.statusCode).toBe(200);
+      expect(res.json<MealDetail>().photoUrl).toBeNull();
+    });
+
+    it("DELETE removes the photo object; a delete failure still succeeds", async () => {
+      const meal = await withPhoto();
+      expect((await req("DELETE", `/meals/${meal.id}`)).statusCode).toBe(204);
+      expect(photos.calls.delete).toEqual([KEY]);
+      const again = await withPhoto();
+      photos.fail.delete = true;
+      expect((await req("DELETE", `/meals/${again.id}`)).statusCode).toBe(204);
+    });
+
+    it("hides another user's photo meal and deletes nothing", async () => {
+      const meal = await withPhoto();
+      expect((await req("GET", `/meals/${meal.id}`, hB)).statusCode).toBe(404);
+      expect((await req("DELETE", `/meals/${meal.id}`, hB)).statusCode).toBe(
+        404,
+      );
+      expect(photos.calls.delete).toEqual([]);
+    });
   });
 });

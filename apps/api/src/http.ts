@@ -29,7 +29,7 @@ export function bearerAuth<T>(
 
 /**
  * Maps errors to fixed, content-free API bodies. Validation and other 4xx
- * errors become 400 bad_request; anything else is a 500 "internal". The 5xx
+ * errors become 400 bad_request (except 413 and 415, which are kept); anything else is a 500 "internal". The 5xx
  * path logs only the error name/code: DB driver messages embed SQL text and
  * params (LINE userIds), which must reach neither the client nor the logs.
  */
@@ -39,6 +39,17 @@ export function apiErrorHandler(
   reply: FastifyReply,
 ) {
   const status = err.statusCode;
+  // Size and media-type rejections keep their own status for the caller.
+  if (status === 413) {
+    return reply
+      .code(413)
+      .send({ error: "payload_too_large" } satisfies ApiError);
+  }
+  if (status === 415) {
+    return reply
+      .code(415)
+      .send({ error: "unsupported_media_type" } satisfies ApiError);
+  }
   if (
     err.validation ||
     (status !== undefined && status >= 400 && status < 500)

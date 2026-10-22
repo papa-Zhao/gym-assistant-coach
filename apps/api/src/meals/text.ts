@@ -8,18 +8,20 @@ import {
 import {
   MealParserUnavailable,
   type MealParser,
+  type ParseResult,
   type ParsedItem,
 } from "../ai/meal-parser";
 import { addAiTokens, releaseAiUse, reserveAiUse } from "../ai/usage";
 import type { Db } from "../users/repo";
 import { createDraftMeal, type DraftItem } from "./repo";
 
-export type TextMealOutcome =
+export type AiMealOutcome =
   | { kind: "draft"; meal: Meal }
   | { kind: "limit" }
   | { kind: "not_food" }
   | { kind: "refused" }
   | { kind: "unavailable" };
+export type TextMealOutcome = AiMealOutcome;
 
 const MAX_NAME_CHARS = 30;
 // Columns are numeric(6,1) and integer; anything larger cannot be stored.
@@ -68,28 +70,33 @@ export function sanitizeItems(items: ParsedItem[]): DraftItem[] {
   return out;
 }
 
-export async function logMealFromText(
-  deps: { db: Db; parser: MealParser; now: () => Date },
+/**
+ * Shared by text and photo logging: reserve a use, parse, record tokens,
+ * sanitize, create the draft. A parser outage gives the use back.
+ */
+export async function runAiMeal(
+  deps: { db: Db },
   userId: string,
+  kind: "text" | "photo",
+  now: Date,
   mealType: MealType,
-  text: string,
-): Promise<TextMealOutcome> {
-  const { db, parser } = deps;
-  const now = deps.now();
+  parse: () => Promise<ParseResult>,
+): Promise<AiMealOutcome> {
+  const { db } = deps;
   const day = taipeiDate(now);
-  if (!(await reserveAiUse(db, userId, "text", day))) return { kind: "limit" };
+  if (!(await reserveAiUse(db, userId, kind, day))) return { kind: "limit" };
 
   let result;
   try {
-    result = await parser.parseText(text);
+    result = await parse();
   } catch (err) {
     if (err instanceof MealParserUnavailable) {
-      await releaseAiUse(db, userId, "text", day);
+      await releaseAiUse(db, userId, kind, day);
       return { kind: "unavailable" };
     }
     throw err;
   }
-  await addAiTokens(db, userId, "text", day, result.usage);
+  await addAiTokens(db, userId, kind, day, result.usage);
 
   if (result.kind === "refused") return { kind: "refused" };
   if (result.kind === "not_food") return { kind: "not_food" };
@@ -99,8 +106,19 @@ export async function logMealFromText(
     db,
     userId,
     { eatenOn: day, mealType, items },
-    "text",
+    kind,
     now,
   );
   return { kind: "draft", meal };
+}
+
+export function logMealFromText(
+  deps: { db: Db; parser: MealParser; now: () => Date },
+  userId: string,
+  mealType: MealType,
+  text: string,
+): Promise<TextMealOutcome> {
+  return runAiMeal(deps, userId, "text", deps.now(), mealType, () =>
+    deps.parser.parseText(text),
+  );
 }
