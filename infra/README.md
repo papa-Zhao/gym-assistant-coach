@@ -150,6 +150,25 @@ push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon
 
 反過來（先合併）會讓新版 api 因為缺少 `MEAL_PHOTOS_BUCKET` 而啟動失敗。
 
+### 每日排程（PR 10.1）
+
+Cloud Scheduler 的 `daily` 工作每天台北時間 04:00 以 `scheduler-invoker` 服務帳號簽 OIDC token（audience `gac-api-internal`）呼叫 api 的 `POST /jobs/daily`：刪除已申請刪除滿 6 天的帳號（含照片物件，每次最多 100 個），並清理超過 90 天的 AI 對話與課表。api 只接受 `SCHEDULER_SA_EMAIL` 這個帳號的 token。失敗會重試 1 次。
+
+部署順序：
+
+1. **【使用者自行操作】** 先在本機執行 `terraform -chdir=infra apply`。plan 會啟用 Cloud Scheduler API、新增 `scheduler-invoker` 服務帳號與 `daily` 排程，並在 api Cloud Run 新增 `SCHEDULER_SA_EMAIL` 環境變數。舊版 api 會忽略這個環境變數。
+2. 再合併 PR。部署時會先備份資料庫，再套用 migration 0012。
+
+反過來（先合併）會讓新版 api 因為缺少 `SCHEDULER_SA_EMAIL` 而啟動失敗。
+
+手動觸發一次（例如部署後確認可以執行）：
+
+```sh
+gcloud scheduler jobs run daily --location=asia-southeast1
+```
+
+到 Cloud Logging 搜尋 `daily_job`，會看到刪除的帳號數與耗時。
+
 ## 9. 回滾：migration 出錯時
 
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
