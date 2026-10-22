@@ -20,12 +20,15 @@ interface Case {
   expect?: "not_food";
 }
 
-// Rough USD per million tokens; adjust if pricing changes. Estimate only.
+// USD per million tokens for claude-haiku-5-5 (prompts <= 100K tokens).
+// Cache figures are assumed multipliers of the input price (read 0.1x,
+// write 1.25x), not published rates. Estimate only.
+const INPUT_PRICE = 0.1;
 const PRICE_PER_MTOK = {
-  input: 1,
-  output: 5,
-  cacheRead: 0.1,
-  cacheWrite: 1.25,
+  input: INPUT_PRICE,
+  output: 0.5,
+  cacheRead: INPUT_PRICE * 0.1,
+  cacheWrite: INPUT_PRICE * 1.25,
 };
 
 async function main(): Promise<void> {
