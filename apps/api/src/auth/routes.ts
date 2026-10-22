@@ -1,6 +1,12 @@
-import type { ApiError, LiffAuthResponse, MeResponse } from "@gac/shared";
+import type {
+  ApiError,
+  DataExport,
+  LiffAuthResponse,
+  MeResponse,
+} from "@gac/shared";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
+import { exportUserData } from "../users/export";
 import type { AppDeps } from "../deps.js";
 import {
   findById,
@@ -88,6 +94,13 @@ export const authRoutes =
         }
         return { displayName: user.displayName ?? "" };
       },
+    );
+
+    app.get(
+      "/me/export",
+      { onRequest: authenticate },
+      async (req): Promise<DataExport> =>
+        exportUserData(db, req.sessionUserId as string, now()),
     );
 
     app.delete("/me", { onRequest: authenticate }, async (req, reply) => {
