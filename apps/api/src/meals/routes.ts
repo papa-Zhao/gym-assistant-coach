@@ -214,7 +214,7 @@ export const mealRoutes =
       "/meals/:id",
       { ...auth, schema: idSchema },
       async (req, reply) =>
-        (await deleteMeal(db, uid(req), req.params.id))
+        (await deleteMeal(db, uid(req), req.params.id)) !== null
           ? reply.code(204).send()
           : notFound(reply),
     );

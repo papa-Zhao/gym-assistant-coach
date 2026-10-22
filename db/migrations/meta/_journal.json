@@ -64,6 +64,13 @@
       "when": 1792635322520,
       "tag": "0008_ai_usage_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792654886703,
+      "tag": "0009_meal_photos",
+      "breakpoints": true
     }
   ]
 }

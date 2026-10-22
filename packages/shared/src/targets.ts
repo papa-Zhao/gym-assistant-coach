@@ -123,6 +123,17 @@ export function validateProfile(input: ProfileInput, today: string): string[] {
   return bad;
 }
 
+/** Hour (0-23) of the given instant in Asia/Taipei. */
+export function taipeiHour(now: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Taipei",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(now),
+  );
+}
+
 /** `YYYY-MM-DD` of the given instant in Asia/Taipei. */
 export function taipeiDate(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", {

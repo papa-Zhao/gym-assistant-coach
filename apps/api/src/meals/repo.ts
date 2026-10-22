@@ -1,5 +1,6 @@
 import {
   MAX_MEAL_ITEMS,
+  MEAL_PHOTO_RETENTION_DAYS,
   MEAL_TYPES,
   nutritionFor,
   scaleNutrition,
@@ -15,8 +16,8 @@ import {
   type MealType,
   type Nutrition,
 } from "@gac/shared";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { foods, mealItems, meals } from "../db/schema";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { foods, mealItems, mealPhotos, meals } from "../db/schema";
 import type { Db } from "../users/repo";
 
 export type MealInputErrorCode =
@@ -320,16 +321,59 @@ export async function updateMeal(
   });
 }
 
+/** Deletes the user's meal; returns photo keys for object cleanup, null if none. */
 export async function deleteMeal(
   db: Db,
   userId: string,
   mealId: string,
-): Promise<boolean> {
-  const rows = await db
-    .delete(meals)
+): Promise<{ photoKeys: string[] } | null> {
+  return db.transaction(async (tx) => {
+    const photos = await tx
+      .select({ objectKey: mealPhotos.objectKey })
+      .from(mealPhotos)
+      .innerJoin(meals, eq(meals.id, mealPhotos.mealId))
+      .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
+      .orderBy(asc(mealPhotos.createdAt));
+    const rows = await tx
+      .delete(meals)
+      .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
+      .returning({ id: meals.id });
+    return rows.length > 0
+      ? { photoKeys: photos.map((p) => p.objectKey) }
+      : null;
+  });
+}
+
+export async function addMealPhoto(
+  db: Db,
+  mealId: string,
+  objectKey: string,
+  now: Date,
+): Promise<void> {
+  await db.insert(mealPhotos).values({
+    mealId,
+    objectKey,
+    createdAt: now,
+    expiresAt: new Date(
+      now.getTime() + MEAL_PHOTO_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+    ),
+  });
+}
+
+/** Newest photo key of the user's meal; null when none or not owner. */
+export async function mealPhotoKey(
+  db: Db,
+  userId: string,
+  mealId: string,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ objectKey: mealPhotos.objectKey })
+    .from(mealPhotos)
+    .innerJoin(meals, eq(meals.id, mealPhotos.mealId))
     .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
-    .returning({ id: meals.id });
-  return rows.length > 0;
+    .orderBy(desc(mealPhotos.createdAt))
+    .limit(1);
+  return row?.objectKey ?? null;
 }
 
 export interface DraftItem extends Nutrition {

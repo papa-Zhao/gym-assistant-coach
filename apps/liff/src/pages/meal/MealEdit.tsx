@@ -9,6 +9,7 @@ import {
   nutritionFor,
   scaleNutrition,
   sumNutrition,
+  taipeiHour,
   type Food,
   type Meal,
   type MealType,
@@ -49,16 +50,6 @@ const STEP_G = 10;
 const GRAMS_ERROR = `克數要在 ${GRAMS_LIMITS.min}–${GRAMS_LIMITS.max} 之間`;
 const DECIMALS_ERROR = "克數最多小數 1 位";
 const NOT_FOUND = "找不到這一餐";
-
-function taipeiHour(now: Date): number {
-  return Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Taipei",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(now),
-  );
-}
 
 function dateLabel(date: string): string {
   return new Intl.DateTimeFormat("zh-TW", {
