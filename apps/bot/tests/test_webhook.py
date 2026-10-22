@@ -11,7 +11,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api_client import (
+    Advice,
+    AdviceItem,
     ApiError,
+    AskResult,
     Macros,
     Meal,
     MealConfirmed,
@@ -48,6 +51,15 @@ MEAL = Meal(
 )
 
 
+ADVICE = Advice(
+    title="晚餐建議",
+    items=[AdviceItem("雞胸沙拉", "約 450 kcal")],
+    body="先吃蛋白質。",
+    today_line="今天還能吃 700 kcal",
+    notices=["提醒：有不適請就醫"],
+)
+
+
 class FakeApi:
     def __init__(
         self,
@@ -61,6 +73,8 @@ class FakeApi:
         self.meal_outcome = meal_outcome
         self.meal_fail_status = meal_fail_status
         self.meal_raises: Exception | None = None
+        self.ask_result = AskResult(outcome="answer", advice=ADVICE)
+        self.ask_raises: Exception | None = None
         self.consented = consented
         self.metric_previous = metric_previous
         self.today_result = today
@@ -128,6 +142,15 @@ class FakeApi:
         self.calls.append(("set_meal_type", meal_id, meal_type))
         self._meal_fail()
         return MEAL
+
+    def ask(self, line_user_id: str, text: str) -> AskResult:
+        self.calls.append(("ask", line_user_id, text))
+        if self.ask_raises is not None:
+            raise self.ask_raises
+        return self.ask_result
+
+    def reset_conversation(self, line_user_id: str) -> None:
+        self.calls.append(("reset_conversation", line_user_id))
 
 
 class FakeLine:
@@ -305,10 +328,14 @@ def test_message_before_consent_replies_welcome_again(client, api, line) -> None
     assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
 
 
-def test_message_after_consent_replies_placeholder() -> None:
+def test_message_after_consent_asks_ai_and_replies_advice_card() -> None:
+    from app import messages
+
     api, line = FakeApi(consented=True), FakeLine()
-    post(TestClient(create_app(SETTINGS, api, line)), [text_event()])
-    assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    post(TestClient(create_app(SETTINGS, api, line)), [text_event("晚餐吃什麼")])
+    assert api.calls == [("sync", USER, "小明"), ("ask", USER, "晚餐吃什麼")]
+    assert line.replies[0][1] == [messages.advice_card(ADVICE)]
+    assert line.loading_seconds == [30]
     assert len(line.replies) == 1
 
 
@@ -373,7 +400,11 @@ def test_messages_are_valid_for_the_line_sdk() -> None:
         messages.welcome("https://site.test"),
         messages.consent_done("1234-abcd"),
         messages.welcome_back(),
-        messages.placeholder_reply(),
+        messages.ask_menu(),
+        messages.advice_card(ADVICE),
+        messages.ask_outcome("limit"),
+        messages.ask_too_long(),
+        messages.conversation_reset(),
     ):
         assert _to_sdk(message).to_dict()["type"] == message["type"]
 
@@ -404,13 +435,15 @@ def test_today_with_profile_replies_flex_with_targets() -> None:
     assert "https://liff.line.me/1234-abcd/records" in dumped
 
 
-def test_photo_replies_prompt_and_ask_coming_soon() -> None:
+def test_photo_replies_prompt_and_ask_menu() -> None:
     from app import messages
 
     client, _, line = menu_setup()
     post(client, [menu_postback("action=photo"), menu_postback("action=ask")])
     assert line.replies[0][1] == [messages.photo_prompt()]
-    assert line.replies[1][1] == [{"type": "text", "text": "問 AI 功能即將開放，敬請期待！"}]
+    assert line.replies[1][1] == [messages.ask_menu()]
+    items = line.replies[1][1][0]["quickReply"]["items"]
+    assert [i["action"]["text"] for i in items] == list(messages.ASK_QUICK_QUESTIONS)
 
 
 def test_menu_before_consent_replies_welcome() -> None:
@@ -493,11 +526,11 @@ def test_invalid_weight_replies_range_and_does_not_call_api() -> None:
     assert len(line.replies) == 1
 
 
-def test_non_command_text_keeps_placeholder() -> None:
+def test_non_command_text_asks_ai() -> None:
     client, api, line = _metric_setup()
     post(client, [text_event("今天吃了雞腿便當")])
-    assert [c[0] for c in api.calls] == ["sync"]
-    assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    assert [c[0] for c in api.calls] == ["sync", "ask"]
+    assert line.replies[0][1][0]["type"] == "flex"
     assert len(line.replies) == 1
 
 
@@ -774,3 +807,110 @@ def test_image_logs_do_not_leak_ids(caplog: pytest.LogCaptureFixture) -> None:
     text = " ".join(r.getMessage() for r in caplog.records)
     assert "img-1" not in text
     assert "outcome=not_food" in text
+
+
+def ask_setup(consented: bool = True):
+    api, line = FakeApi(consented=consented), FakeLine()
+    return TestClient(create_app(SETTINGS, api, line)), api, line
+
+
+def test_ask_flow_does_not_hijack_meal_or_metric_text() -> None:
+    client, api, _ = ask_setup()
+    post(client, [text_event("午餐 雞腿便當"), text_event("體重 72.5")])
+    names = [c[0] for c in api.calls]
+    assert "ask" not in names
+    assert "log_meal_text" in names
+    assert "record_metric" in names
+
+
+def test_ask_text_is_stripped_before_sending() -> None:
+    client, api, _ = ask_setup()
+    post(client, [text_event("  晚餐吃什麼\n")])
+    assert ("ask", USER, "晚餐吃什麼") in api.calls
+
+
+def test_restart_resets_conversation_without_asking() -> None:
+    from app import messages
+
+    client, api, line = ask_setup()
+    post(client, [text_event(" 重新開始 ")])
+    assert api.calls == [("sync", USER, "小明"), ("reset_conversation", USER)]
+    assert line.replies[0][1] == [messages.conversation_reset()]
+
+
+def test_restart_before_consent_replies_welcome() -> None:
+    client, api, line = ask_setup(consented=False)
+    post(client, [text_event("重新開始")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_restart_not_found_replies_unavailable() -> None:
+    client, api, line = ask_setup()
+
+    def boom(line_user_id: str) -> None:
+        raise ApiError(404)
+
+    api.reset_conversation = boom  # type: ignore[method-assign]
+    post(client, [text_event("重新開始")])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+def test_too_long_question_is_rejected_without_calling_api() -> None:
+    from app import messages
+
+    client, api, line = ask_setup()
+    post(client, [text_event("問" * 501)])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.replies[0][1] == [messages.ask_too_long()]
+    assert line.loading_seconds == [10]
+
+
+def test_question_of_exactly_500_chars_is_asked() -> None:
+    client, api, _ = ask_setup()
+    post(client, [text_event("問" * 500)])
+    assert [c[0] for c in api.calls] == ["sync", "ask"]
+
+
+def test_blank_text_replies_ask_menu_without_calling_api() -> None:
+    from app import messages
+
+    client, api, line = ask_setup()
+    post(client, [text_event("   ")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.replies[0][1] == [messages.ask_menu()]
+
+
+@pytest.mark.parametrize("outcome", ["limit", "refused", "unavailable"])
+def test_ask_non_answer_outcomes(outcome: str) -> None:
+    from app import messages
+
+    client, api, line = ask_setup()
+    api.ask_result = AskResult(outcome=outcome, advice=None)
+    post(client, [text_event("晚餐吃什麼")])
+    assert line.replies[0][1] == [messages.ask_outcome(outcome)]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [ApiError(404), ApiError(503), httpx.ReadTimeout("slow"), httpx.ConnectError("down")],
+)
+def test_ask_api_failures_reply_unavailable_once(failure: Exception) -> None:
+    client, api, line = ask_setup()
+    api.ask_raises = failure
+    post(client, [text_event("晚餐吃什麼")])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+def test_ask_api_client_error_is_not_swallowed() -> None:
+    client, api, line = ask_setup()
+    api.ask_raises = ApiError(400)
+    post(client, [text_event("晚餐吃什麼")])
+    assert line.replies == []
+
+
+def test_ask_before_consent_replies_welcome() -> None:
+    client, api, line = ask_setup(consented=False)
+    post(client, [text_event("晚餐吃什麼")])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)

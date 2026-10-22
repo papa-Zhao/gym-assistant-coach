@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from app.api_client import (
+    Advice,
     Macros,
     Meal,
     MealConfirmed,
@@ -142,10 +143,6 @@ def welcome_back() -> Message:
     return {"type": "text", "text": "歡迎回來！你的紀錄都還在。"}
 
 
-def placeholder_reply() -> Message:
-    return {"type": "text", "text": "收到！記錄功能下個版本就會開放。"}
-
-
 def photo_prompt() -> Message:
     return {
         "type": "text",
@@ -157,10 +154,6 @@ def photo_prompt() -> Message:
             ]
         },
     }
-
-
-def ask_coming_soon() -> Message:
-    return {"type": "text", "text": "問 AI 功能即將開放，敬請期待！"}
 
 
 def profile_needed(liff_id: str) -> Message:
@@ -713,3 +706,127 @@ MEAL_PHOTO_OUTCOME_TEXT = {
 
 def meal_photo_outcome(outcome: str) -> Message:
     return {"type": "text", "text": MEAL_PHOTO_OUTCOME_TEXT[outcome]}
+
+
+ASK_MAX_CHARS = 500
+ASK_QUICK_QUESTIONS = ("今天練什麼", "晚餐吃什麼", "幫我排一週課表")
+DISCLAIMER = "AI 建議僅供參考，不能取代醫師或營養師的專業意見。"
+
+ASK_OUTCOME_TEXT = {
+    "limit": "今天的 AI 提問次數（20 次）用完了，明天再來問我吧！",
+    "refused": "這個問題我沒辦法回答，換個方式問問看？",
+    "unavailable": MEAL_OUTCOME_TEXT["unavailable"],
+}
+
+
+def ask_menu() -> Message:
+    return {
+        "type": "text",
+        "text": "想問什麼？直接打字問我，或選一個常見問題。",
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {"type": "message", "label": question, "text": question},
+                }
+                for question in ASK_QUICK_QUESTIONS
+            ]
+        },
+    }
+
+
+def ask_outcome(outcome: str) -> Message:
+    return {"type": "text", "text": ASK_OUTCOME_TEXT[outcome]}
+
+
+def ask_too_long() -> Message:
+    return {"type": "text", "text": f"問題有點長，請精簡到 {ASK_MAX_CHARS} 字以內再問一次。"}
+
+
+def conversation_reset() -> Message:
+    return {"type": "text", "text": "好，我們重新開始，之前的對話不會再當作參考。"}
+
+
+def _advice_item_block(name: str, detail: str) -> dict[str, Any]:
+    return {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "xs",
+        "backgroundColor": SURFACE_ALT,
+        "cornerRadius": "8px",
+        "paddingAll": "12px",
+        "contents": [
+            {
+                "type": "text",
+                "text": name,
+                "size": "sm",
+                "weight": "bold",
+                "color": TEXT,
+                "wrap": True,
+            },
+            {"type": "text", "text": detail, "size": "xs", "color": MUTED, "wrap": True},
+        ],
+    }
+
+
+def advice_card(advice: Advice) -> Message:
+    body: list[dict[str, Any]] = []
+    if advice.today_line is not None:
+        body.append(
+            {"type": "text", "text": advice.today_line, "size": "xs", "color": MUTED, "wrap": True}
+        )
+    body.append(
+        {
+            "type": "text",
+            "text": advice.title,
+            "weight": "bold",
+            "size": "xl",
+            "color": TEXT,
+            "wrap": True,
+        }
+    )
+    if advice.items:
+        body.append(
+            {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [_advice_item_block(i.name, i.detail) for i in advice.items],
+            }
+        )
+    body.append({"type": "text", "text": advice.body, "size": "sm", "color": TEXT, "wrap": True})
+    body.extend(
+        {"type": "text", "text": notice, "size": "xs", "color": PRIMARY, "wrap": True}
+        for notice in advice.notices
+    )
+    body.append({"type": "separator"})
+    body.append({"type": "text", "text": DISCLAIMER, "size": "xs", "color": MUTED, "wrap": True})
+    return {
+        "type": "flex",
+        "altText": advice.title,
+        "contents": {
+            "type": "bubble",
+            "styles": {
+                "body": {"backgroundColor": SURFACE},
+                "footer": {"backgroundColor": SURFACE},
+            },
+            "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": body},
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "height": "md",
+                        "action": {
+                            "type": "postback",
+                            "label": "再問一個問題",
+                            "data": "action=ask",
+                            "displayText": "再問一個問題",
+                        },
+                    }
+                ],
+            },
+        },
+    }
