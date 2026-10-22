@@ -20,7 +20,7 @@ from app.api_client import ApiClient, ApiError
 from app.commands import InvalidMetric, MetricCommand, parse_metric_command
 from app.internal import VerifyApiToken, google_verifier, internal_router
 from app.line_replier import LineReplier
-from app.meal_commands import MealPostback, MealText, parse_meal_postback, parse_meal_text
+from app.meal_commands import MealPostback, MealText, parse_meal_log, parse_meal_postback
 from app.settings import CONSENT_VERSION, Settings
 
 logger = logging.getLogger("gac.bot")
@@ -165,7 +165,7 @@ def _is_ask_question(text: str) -> bool:
     stripped = text.strip()
     if parse_metric_command(text) is not None:
         return False
-    if parse_meal_text(text) is not None and stripped not in messages.ASK_QUICK_QUESTIONS:
+    if parse_meal_log(text) is not None:
         return False
     return bool(stripped) and stripped != RESTART_TEXT and len(stripped) <= messages.ASK_MAX_CHARS
 
@@ -182,9 +182,8 @@ def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
     if isinstance(command, InvalidMetric):
         deps.line.reply(token, [messages.metric_range_error(command.key, liff_id)])
         return
-    # The quick question "晚餐吃什麼" starts with a meal prefix but is a question, not a log.
-    is_quick_question = isinstance(text, str) and text.strip() in messages.ASK_QUICK_QUESTIONS
-    meal = parse_meal_text(text) if isinstance(text, str) and not is_quick_question else None
+    # Meal-prefixed questions ("晚餐吃什麼好？") go to the AI, not meal logging.
+    meal = parse_meal_log(text) if isinstance(text, str) else None
     if meal is not None:
         _reply_to_meal_text(event, meal, user_id, deps)
         return
@@ -283,7 +282,7 @@ def _handle_event(event: Event, deps: _Deps) -> None:
             return
     text = getattr(getattr(event, "message", None), "text", None)
     is_slow_text = isinstance(text, str) and (
-        parse_meal_text(text) is not None or _is_ask_question(text)
+        parse_meal_log(text) is not None or _is_ask_question(text)
     )
     is_image = isinstance(getattr(event, "message", None), ImageMessageContent)
     try:

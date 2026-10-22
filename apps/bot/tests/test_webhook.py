@@ -823,6 +823,26 @@ def test_ask_flow_does_not_hijack_meal_or_metric_text() -> None:
     assert "record_metric" in names
 
 
+@pytest.mark.parametrize(
+    "question", ["晚餐吃什麼好？", "宵夜可以吃什麼", "早餐推薦", "午餐要吃什麼"]
+)
+def test_meal_prefixed_question_goes_to_ask(question: str) -> None:
+    client, api, _ = ask_setup()
+    post(client, [text_event(question)])
+    names = [c[0] for c in api.calls]
+    assert "ask" in names
+    assert "log_meal_text" not in names
+
+
+@pytest.mark.parametrize("text", ["晚餐 雞腿便當", "午餐 雞腿便當 滷蛋"])
+def test_meal_prefixed_food_is_logged(text: str) -> None:
+    client, api, _ = ask_setup()
+    post(client, [text_event(text)])
+    names = [c[0] for c in api.calls]
+    assert "log_meal_text" in names
+    assert "ask" not in names
+
+
 def test_ask_text_is_stripped_before_sending() -> None:
     client, api, _ = ask_setup()
     post(client, [text_event("  晚餐吃什麼\n")])
