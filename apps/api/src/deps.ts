@@ -29,6 +29,8 @@ export interface AppDeps {
   mealParser: MealParser;
   /** Meal photo object storage; tests inject an in-memory one. */
   photoStore: PhotoStore;
+  /** Per-call GCS deadline override; tests only. */
+  photoTimeoutMs?: number;
   sessionSecret: Uint8Array;
   corsOrigin: string;
   /** Current time; injectable so tests can pin the Taipei date. */

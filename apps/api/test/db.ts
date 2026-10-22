@@ -62,9 +62,13 @@ export function memoryPhotoStore() {
   const objects = new Map<string, Buffer>();
   const calls = { put: [] as string[], delete: [] as string[] };
   const fail = { put: false, signedUrl: false, delete: false };
+  /** Calls that never settle. */
+  const hang = { put: false, delete: false };
+  const never = () => new Promise<never>(() => {});
   const store: PhotoStore = {
     async put(key, jpeg) {
       calls.put.push(key);
+      if (hang.put) await never();
       if (fail.put) throw new Error("boom");
       objects.set(key, jpeg);
     },
@@ -74,9 +78,10 @@ export function memoryPhotoStore() {
     },
     async delete(key) {
       calls.delete.push(key);
+      if (hang.delete) await never();
       if (fail.delete) throw new Error("boom");
       objects.delete(key);
     },
   };
-  return { store, objects, calls, fail };
+  return { store, objects, calls, fail, hang };
 }

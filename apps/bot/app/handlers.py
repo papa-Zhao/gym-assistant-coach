@@ -131,7 +131,7 @@ def _reply_to_image(
         result = deps.api.log_meal_photo(user_id, image)
     except ApiError as err:
         if err.status_code == 404:
-            reply = messages.meal_not_found()
+            reply = messages.meal_photo_outcome("unavailable")
         elif err.status_code == 413:
             reply = messages.meal_photo_outcome("invalid_image")
         elif err.status_code >= 500:

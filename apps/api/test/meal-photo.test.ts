@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import sharp from "sharp";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MealParserUnavailable,
   type MealParser,
@@ -9,6 +9,18 @@ import {
 import { aiUsageDaily, meals } from "../src/db/schema";
 import { logMealFromPhoto } from "../src/meals/photo";
 import { mealPhotoKey } from "../src/meals/repo";
+
+const repoFail = vi.hoisted(() => ({ addMealPhoto: false }));
+vi.mock("../src/meals/repo", async (orig) => {
+  const real = await orig<typeof import("../src/meals/repo")>();
+  return {
+    ...real,
+    addMealPhoto: (...a: Parameters<typeof real.addMealPhoto>) => {
+      if (repoFail.addMealPhoto) throw new Error("boom");
+      return real.addMealPhoto(...a);
+    },
+  };
+});
 import { syncUser } from "../src/users/repo";
 import { createTestDb, memoryPhotoStore } from "./db";
 
@@ -44,6 +56,7 @@ const testJpeg = () =>
 describe("logMealFromPhoto", () => {
   let close: (() => Promise<void>) | undefined;
   afterEach(async () => {
+    repoFail.addMealPhoto = false;
     await close?.();
     close = undefined;
   });
@@ -69,7 +82,14 @@ describe("logMealFromPhoto", () => {
     const image = await testJpeg();
     const run = (img: Buffer = image) =>
       logMealFromPhoto(
-        { db: t.db, parser, photos: photos.store, now: () => clock, log },
+        {
+          db: t.db,
+          parser,
+          photos: photos.store,
+          now: () => clock,
+          log,
+          photoTimeoutMs: 30,
+        },
         userId,
         img,
       );
@@ -165,5 +185,34 @@ describe("logMealFromPhoto", () => {
     expect(logged).not.toContain("meals/");
     expect(logged).not.toContain("boom");
     expect(logged).not.toContain(s.userId);
+  });
+
+  it("returns the draft when the upload never settles", async () => {
+    const s = await setup();
+    s.photos.hang.put = true;
+    const out = await s.run();
+    if (out.kind !== "draft") throw new Error(out.kind);
+    expect(await mealPhotoKey(s.db, s.userId, out.meal.id)).toBeNull();
+    expect(s.warns).toHaveLength(1);
+    expect(JSON.stringify(s.warns)).not.toContain("meals/");
+  });
+
+  it("deletes the object and returns the draft when linking fails", async () => {
+    const s = await setup();
+    repoFail.addMealPhoto = true;
+    const out = await s.run();
+    if (out.kind !== "draft") throw new Error(out.kind);
+    expect(s.photos.calls.delete).toEqual(s.photos.calls.put);
+    expect(s.photos.objects.size).toBe(0);
+    expect(JSON.stringify(s.warns)).not.toContain("meals/");
+  });
+
+  it("still returns the draft when the cleanup delete hangs", async () => {
+    const s = await setup();
+    repoFail.addMealPhoto = true;
+    s.photos.hang.delete = true;
+    const out = await s.run();
+    expect(out.kind).toBe("draft");
+    expect(s.warns).toHaveLength(2);
   });
 });

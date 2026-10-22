@@ -722,20 +722,17 @@ def test_external_image_is_invalid_without_download() -> None:
 @pytest.mark.parametrize(
     ("setup", "outcome"),
     [
-        ({"meal_fail_status": 404}, None),
+        ({"meal_fail_status": 404}, "unavailable"),
         ({"meal_fail_status": 413}, "invalid_image"),
         ({"meal_fail_status": 500}, "unavailable"),
     ],
 )
-def test_image_api_errors(setup: dict[str, Any], outcome: str | None) -> None:
+def test_image_api_errors(setup: dict[str, Any], outcome: str) -> None:
     from app import messages
 
     client, _, line = meal_setup(**setup)
     post(client, [image_event()])
-    expected = (
-        messages.meal_not_found() if outcome is None else messages.meal_photo_outcome(outcome)
-    )
-    assert [r[1] for r in line.replies] == [[expected]]
+    assert [r[1] for r in line.replies] == [[messages.meal_photo_outcome(outcome)]]
 
 
 def test_image_api_timeout_replies_unavailable_once() -> None:

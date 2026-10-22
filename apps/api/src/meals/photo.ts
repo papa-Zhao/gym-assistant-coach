@@ -2,7 +2,11 @@ import { defaultMealType, taipeiHour, type Meal } from "@gac/shared";
 import type { FastifyBaseLogger } from "fastify";
 import type { MealParser } from "../ai/meal-parser";
 import { InvalidImage, normalizeMealImage } from "../photos/image";
-import { newMealPhotoKey, type PhotoStore } from "../photos/store";
+import {
+  newMealPhotoKey,
+  withPhotoDeadline,
+  type PhotoStore,
+} from "../photos/store";
 import type { Db } from "../users/repo";
 import { addMealPhoto } from "./repo";
 import { runAiMeal } from "./text";
@@ -31,6 +35,8 @@ export async function logMealFromPhoto(
     photos: PhotoStore;
     now: () => Date;
     log: FastifyBaseLogger;
+    /** Per-call GCS deadline; tests shorten it. */
+    photoTimeoutMs?: number;
   },
   userId: string,
   image: Buffer,
@@ -56,7 +62,10 @@ export async function logMealFromPhoto(
 
   const key = newMealPhotoKey(userId);
   try {
-    await deps.photos.put(key, jpeg);
+    await withPhotoDeadline(
+      () => deps.photos.put(key, jpeg),
+      deps.photoTimeoutMs,
+    );
   } catch (err) {
     deps.log.warn(
       { event: "meal_photo_put_failed", errName: errName(err) },
@@ -64,6 +73,24 @@ export async function logMealFromPhoto(
     );
     return outcome;
   }
-  await addMealPhoto(deps.db, outcome.meal.id, key, now);
+  try {
+    await addMealPhoto(deps.db, outcome.meal.id, key, now);
+  } catch (err) {
+    deps.log.warn(
+      { event: "meal_photo_link_failed", errName: errName(err) },
+      "meal photo link failed",
+    );
+    try {
+      await withPhotoDeadline(
+        () => deps.photos.delete(key),
+        deps.photoTimeoutMs,
+      );
+    } catch (cleanupErr) {
+      deps.log.warn(
+        { event: "meal_photo_cleanup_failed", errName: errName(cleanupErr) },
+        "meal photo cleanup failed",
+      );
+    }
+  }
   return outcome;
 }

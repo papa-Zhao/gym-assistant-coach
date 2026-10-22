@@ -18,6 +18,7 @@ WORKDIR /app
 COPY --from=build /repo/apps/api/package.json /tmp/api-package.json
 RUN SHARP_VERSION="$(node -p "require('/tmp/api-package.json').dependencies.sharp")" \
  && npm install --omit=dev --no-save --no-audit --no-fund "sharp@${SHARP_VERSION}" \
+ && npm cache clean --force \
  && rm /tmp/api-package.json
 COPY --from=build /repo/apps/api/dist dist
 USER node

@@ -41,6 +41,7 @@ describe("meal routes", () => {
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
       photoStore: photos.store,
+      photoTimeoutMs: 30,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -299,6 +300,7 @@ describe("meal routes", () => {
     afterEach(() => {
       photos.fail.signedUrl = false;
       photos.fail.delete = false;
+      photos.hang.delete = false;
       photos.calls.delete.length = 0;
     });
 
@@ -326,6 +328,13 @@ describe("meal routes", () => {
       const again = await withPhoto();
       photos.fail.delete = true;
       expect((await req("DELETE", `/meals/${again.id}`)).statusCode).toBe(204);
+    });
+
+    it("DELETE answers 204 even when the object delete never settles", async () => {
+      const meal = await withPhoto();
+      photos.hang.delete = true;
+      expect((await req("DELETE", `/meals/${meal.id}`)).statusCode).toBe(204);
+      expect(photos.calls.delete).toEqual([KEY]);
     });
 
     it("hides another user's photo meal and deletes nothing", async () => {

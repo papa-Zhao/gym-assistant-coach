@@ -16,6 +16,8 @@ from linebot.v3.messaging import (
 
 from app.messages import Message
 
+MESSAGE_CONTENT_TIMEOUT_SECONDS = 10
+
 
 class LineReplier(Protocol):
     def reply(self, reply_token: str, messages: list[Message]) -> None: ...
@@ -70,4 +72,8 @@ class SdkLineReplier:
 
     def get_message_content(self, message_id: str) -> bytes:
         with LineApiClient(self._configuration) as client:
-            return bytes(MessagingApiBlob(client).get_message_content(message_id))
+            return bytes(
+                MessagingApiBlob(client).get_message_content(
+                    message_id, _request_timeout=MESSAGE_CONTENT_TIMEOUT_SECONDS
+                )
+            )

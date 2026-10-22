@@ -230,6 +230,7 @@ export const internalRoutes =
             db,
             parser: deps.mealParser,
             photos: deps.photoStore,
+            photoTimeoutMs: deps.photoTimeoutMs,
             now,
             log: req.log,
           },
