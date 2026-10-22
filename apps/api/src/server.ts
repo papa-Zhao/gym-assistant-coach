@@ -9,6 +9,8 @@ import { createMealParser } from "./ai/meal-parser.js";
 import { instrument } from "./db/timing.js";
 import { createLineVerifier } from "./auth/line.js";
 import { loadConfig } from "./config.js";
+// Loads sharp at startup so a missing native module fails the container smoke test.
+import "./photos/image.js";
 import { createBotNotifier } from "./notify/bot.js";
 import type { AppDeps, VerifyServiceToken } from "./deps.js";
 

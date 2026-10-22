@@ -13,6 +13,12 @@ RUN npm run build -w @gac/api
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
+# sharp is native and external to the bundle; install exactly the version
+# pinned in apps/api/package.json.
+COPY --from=build /repo/apps/api/package.json /tmp/api-package.json
+RUN SHARP_VERSION="$(node -p "require('/tmp/api-package.json').dependencies.sharp")" \
+ && npm install --omit=dev --no-save --no-audit --no-fund "sharp@${SHARP_VERSION}" \
+ && rm /tmp/api-package.json
 COPY --from=build /repo/apps/api/dist dist
 USER node
 EXPOSE 8080
