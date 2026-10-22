@@ -1,6 +1,6 @@
 {
-  "id": "536c99b4-c64d-4a84-81a4-b9742d545470",
-  "prevId": "12bf6864-1f9d-4113-926f-22654f79c94c",
+  "id": "47b80d91-f57d-40f5-b944-e197d512dd08",
+  "prevId": "e0f57fbb-7680-471e-99e2-d36dbb4457a6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -499,7 +499,7 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -620,7 +620,7 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -735,7 +735,7 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},

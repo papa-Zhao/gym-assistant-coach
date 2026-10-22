@@ -300,7 +300,9 @@ export const foods = pgTable(
     carbPer100g: numeric("carb_per_100g", { precision: 6, scale: 1 }),
     fatPer100g: numeric("fat_per_100g", { precision: 6, scale: 1 }),
     servingDesc: text("serving_desc"),
-    ownerUserId: uuid("owner_user_id").references(() => users.id),
+    ownerUserId: uuid("owner_user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -317,7 +319,7 @@ export const meals = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     eatenOn: date("eaten_on").notNull(),
     mealType: text("meal_type").notNull(),
     status: text("status").notNull(),
@@ -349,7 +351,9 @@ export const mealItems = pgTable(
       .notNull()
       .references(() => meals.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
-    foodId: uuid("food_id").references(() => foods.id),
+    foodId: uuid("food_id").references(() => foods.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     grams: numeric("grams", { precision: 6, scale: 1 }).notNull(),
     kcal: integer("kcal").notNull(),
