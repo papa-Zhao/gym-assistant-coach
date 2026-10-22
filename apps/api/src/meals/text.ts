@@ -34,7 +34,10 @@ const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, n));
 
 function sanitizeItem(item: ParsedItem): DraftItem | null {
-  const name = Array.from(item.name.trim()).slice(0, MAX_NAME_CHARS).join("");
+  const name = Array.from(item.name.trim())
+    .slice(0, MAX_NAME_CHARS)
+    .join("")
+    .trimEnd();
   if (name === "") return null;
   if (!Number.isFinite(item.grams)) return null;
   const macros = [item.proteinG, item.carbG, item.fatG];

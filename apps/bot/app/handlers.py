@@ -24,6 +24,9 @@ from app.settings import CONSENT_VERSION, Settings
 
 logger = logging.getLogger("gac.bot")
 
+# The AI meal path can take ~20 s; LINE accepts 5-60 in steps of 5.
+MEAL_LOADING_SECONDS = 30
+
 
 def _is_consent_postback(data: str) -> bool:
     fields = parse_qs(data)
@@ -76,9 +79,13 @@ def _handle_meal_postback(
             meal = deps.api.set_meal_type(user_id, postback.meal_id, postback.meal_type)
             reply = messages.meal_type_changed(meal, liff_id)
     except ApiError as err:
-        if err.status_code != 404:
+        if err.status_code == 404:
+            reply = messages.meal_not_found()
+        elif err.status_code >= 500:
+            logger.warning("meal api error event=%s status=%s", event.type, err.status_code)
+            reply = messages.meal_outcome("unavailable")
+        else:
             raise
-        reply = messages.meal_not_found()
     except (httpx.TimeoutException, httpx.TransportError):
         logger.warning("meal api unreachable event=%s", event.type)
         reply = messages.meal_outcome("unavailable")
@@ -104,7 +111,8 @@ def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
     if isinstance(command, MetricCommand):
         recorded = deps.api.record_metric(user_id, command.key, command.value)
         deps.line.reply(token, [messages.metric_recorded(recorded, liff_id)])
-    elif isinstance(command, InvalidMetric):
+        return
+    if isinstance(command, InvalidMetric):
         deps.line.reply(token, [messages.metric_range_error(command.key, liff_id)])
         return
     meal = parse_meal_text(text) if isinstance(text, str) else None
@@ -114,9 +122,13 @@ def _reply_to_text(event: MessageEvent, user_id: str, deps: "_Deps") -> None:
     try:
         result = deps.api.log_meal_text(user_id, meal.meal_type, meal.text)
     except ApiError as err:
-        if err.status_code != 404:
+        if err.status_code == 404:
+            deps.line.reply(token, [messages.meal_not_found()])
+        elif err.status_code >= 500:
+            logger.warning("meal api error event=%s status=%s", event.type, err.status_code)
+            deps.line.reply(token, [messages.meal_outcome("unavailable")])
+        else:
             raise
-        deps.line.reply(token, [messages.meal_not_found()])
         return
     except (httpx.TimeoutException, httpx.TransportError):
         logger.warning("meal api unreachable event=%s", event.type)
@@ -157,8 +169,10 @@ def _handle_event(event: Event, deps: _Deps) -> None:
             and not _is_consent_postback(event.postback.data)
         ):
             return
+    text = getattr(getattr(event, "message", None), "text", None)
+    is_meal_text = isinstance(text, str) and parse_meal_text(text) is not None
     try:
-        deps.line.show_loading(user_id)
+        deps.line.show_loading(user_id, MEAL_LOADING_SECONDS if is_meal_text else 10)
     except Exception:
         logger.warning("loading animation failed event=%s", event.type)
     if isinstance(event, PostbackEvent) and action is not None:

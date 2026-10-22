@@ -70,6 +70,11 @@ describe("sanitizeItems", () => {
     expect(b?.aiConfidence).toBe(0.46);
   });
 
+  it("drops trailing whitespace left by truncation", () => {
+    const [a] = sanitizeItems([item({ name: `${"飯".repeat(29)} 湯` })]);
+    expect(a?.name).toBe("飯".repeat(29));
+  });
+
   it("keeps at most 30 items", () => {
     expect(
       sanitizeItems(Array.from({ length: 40 }, () => item())),

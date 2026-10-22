@@ -1,7 +1,9 @@
 // Manual regression check: runs the fixture phrasings through the real
 // meal parser (real Anthropic API, costs a few cents). Not part of CI or
 // `npm test`.
-//   ANTHROPIC_API_KEY=... npm run eval:meal-text -w @gac/api
+//   read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
+//   npm run eval:meal-text -w @gac/api
+//   unset ANTHROPIC_API_KEY
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +39,10 @@ async function main(): Promise<void> {
       "ANTHROPIC_API_KEY is not set, so nothing was run.\n" +
         "This script calls the real Anthropic API (about 10 requests to " +
         `${AI_MODEL}).\n` +
-        "Run it with: ANTHROPIC_API_KEY=<key> npm run eval:meal-text -w @gac/api",
+        "Run it with:\n" +
+        "  read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY\n" +
+        "  npm run eval:meal-text -w @gac/api\n" +
+        "  unset ANTHROPIC_API_KEY",
     );
     return;
   }

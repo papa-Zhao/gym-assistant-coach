@@ -129,6 +129,7 @@ class FakeLine:
         self.name = name
         self.replies: list[tuple[str, list[dict[str, Any]]]] = []
         self.loading: list[str] = []
+        self.loading_seconds: list[int] = []
 
     def reply(self, reply_token: str, messages: list[dict[str, Any]]) -> None:
         self.replies.append((reply_token, messages))
@@ -136,8 +137,9 @@ class FakeLine:
     def profile_name(self, user_id: str) -> str | None:
         return self.name
 
-    def show_loading(self, user_id: str) -> None:
+    def show_loading(self, user_id: str, seconds: int = 10) -> None:
         self.loading.append(user_id)
+        self.loading_seconds.append(seconds)
 
 
 def sign(body: bytes) -> str:
@@ -292,6 +294,7 @@ def test_message_after_consent_replies_placeholder() -> None:
     api, line = FakeApi(consented=True), FakeLine()
     post(TestClient(create_app(SETTINGS, api, line)), [text_event()])
     assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    assert len(line.replies) == 1
 
 
 def test_unfollow_calls_api_and_does_not_reply(client, api, line) -> None:
@@ -470,6 +473,7 @@ def test_invalid_weight_replies_range_and_does_not_call_api() -> None:
         _reply_text(line) == "體重的數字好像不太對，請輸入 30–300 之間的數字，例如「體重 72.5」。"
     )
     assert "quickReply" in line.replies[0][1][0]
+    assert len(line.replies) == 1
 
 
 def test_non_command_text_keeps_placeholder() -> None:
@@ -477,6 +481,7 @@ def test_non_command_text_keeps_placeholder() -> None:
     post(client, [text_event("今天吃了雞腿便當")])
     assert [c[0] for c in api.calls] == ["sync"]
     assert line.replies[0][1] == [{"type": "text", "text": "收到！記錄功能下個版本就會開放。"}]
+    assert len(line.replies) == 1
 
 
 def test_command_before_consent_replies_welcome() -> None:
@@ -522,6 +527,8 @@ def test_meal_text_replies_draft_card() -> None:
     post(client, [text_event("午餐 雞腿便當")])
     assert api.calls == [("sync", USER, "小明"), ("log_meal_text", "lunch", "雞腿便當")]
     assert line.loading == [USER]
+    assert line.loading_seconds == [30]
+    assert len(line.replies) == 1
     card = line.replies[0][1][0]
     assert card["type"] == "flex"
     assert "午餐・AI 估計" in json.dumps(card, ensure_ascii=False)
@@ -594,6 +601,8 @@ def test_metric_text_still_records_metric() -> None:
     assert ("record_metric", USER, "weightKg", 72.0) in api.calls
     assert all(c[0] != "log_meal_text" for c in api.calls)
     assert "已記錄體重" in line.replies[0][1][0]["text"]
+    assert len(line.replies) == 1
+    assert line.loading_seconds == [10]
 
 
 UNAVAILABLE = [{"type": "text", "text": "AI 暫時忙不過來，請稍後再試。"}]
@@ -606,5 +615,16 @@ UNAVAILABLE = [{"type": "text", "text": "AI 暫時忙不過來，請稍後再試
 def test_meal_api_timeout_replies_unavailable_once(event_payload: dict[str, Any]) -> None:
     client, api, line = meal_setup()
     api.meal_raises = httpx.ReadTimeout("slow")
+    post(client, [event_payload])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+@pytest.mark.parametrize(
+    ("event_payload"),
+    [text_event("午餐 雞腿便當"), menu_postback(f"action=meal_confirm&id={MEAL_ID}")],
+)
+def test_meal_api_5xx_replies_unavailable_once(event_payload: dict[str, Any]) -> None:
+    client, api, line = meal_setup()
+    api.meal_fail_status = 500
     post(client, [event_payload])
     assert [r[1] for r in line.replies] == [UNAVAILABLE]
