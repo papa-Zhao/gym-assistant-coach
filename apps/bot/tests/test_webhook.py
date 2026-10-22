@@ -113,6 +113,12 @@ class FakeApi:
         meal = MEAL if self.meal_outcome == "draft" else None
         return MealTextResult(outcome=self.meal_outcome, meal=meal)
 
+    def log_meal_photo(self, line_user_id: str, image: bytes) -> MealTextResult:
+        self.calls.append(("log_meal_photo", line_user_id, image))
+        self._meal_fail()
+        meal = MEAL if self.meal_outcome == "draft" else None
+        return MealTextResult(outcome=self.meal_outcome, meal=meal)
+
     def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed:
         self.calls.append(("confirm_meal", meal_id))
         self._meal_fail()
@@ -130,6 +136,15 @@ class FakeLine:
         self.replies: list[tuple[str, list[dict[str, Any]]]] = []
         self.loading: list[str] = []
         self.loading_seconds: list[int] = []
+        self.content = b"\xff\xd8jpeg"
+        self.content_error: Exception | None = None
+        self.downloads: list[str] = []
+
+    def get_message_content(self, message_id: str) -> bytes:
+        self.downloads.append(message_id)
+        if self.content_error is not None:
+            raise self.content_error
+        return self.content
 
     def reply(self, reply_token: str, messages: list[dict[str, Any]]) -> None:
         self.replies.append((reply_token, messages))
@@ -389,10 +404,12 @@ def test_today_with_profile_replies_flex_with_targets() -> None:
     assert "https://liff.line.me/1234-abcd/records" in dumped
 
 
-def test_photo_and_ask_reply_coming_soon() -> None:
+def test_photo_replies_prompt_and_ask_coming_soon() -> None:
+    from app import messages
+
     client, _, line = menu_setup()
     post(client, [menu_postback("action=photo"), menu_postback("action=ask")])
-    assert line.replies[0][1] == [{"type": "text", "text": "拍照記錄飲食即將開放，敬請期待！"}]
+    assert line.replies[0][1] == [messages.photo_prompt()]
     assert line.replies[1][1] == [{"type": "text", "text": "問 AI 功能即將開放，敬請期待！"}]
 
 
@@ -628,3 +645,135 @@ def test_meal_api_5xx_replies_unavailable_once(event_payload: dict[str, Any]) ->
     api.meal_fail_status = 500
     post(client, [event_payload])
     assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+def image_event(provider: str = "line", token: str = "reply-token") -> dict[str, Any]:
+    ev = event(
+        "message",
+        message={
+            "type": "image",
+            "id": "img-1",
+            "quoteToken": "q",
+            "contentProvider": {"type": provider},
+        },
+    )
+    ev["replyToken"] = token
+    return ev
+
+
+def test_image_message_logs_photo_and_replies_draft() -> None:
+    client, api, line = meal_setup()
+    post(client, [image_event()])
+    assert api.calls == [("sync", USER, "小明"), ("log_meal_photo", USER, line.content)]
+    assert line.downloads == ["img-1"]
+    assert line.loading_seconds == [30]
+    card = line.replies[0][1][0]
+    assert card["type"] == "flex"
+    assert "午餐・AI 估計" in json.dumps(card, ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    "outcome", ["invalid_image", "limit", "not_food", "refused", "unavailable"]
+)
+def test_image_message_outcomes(outcome: str) -> None:
+    from app import messages
+
+    client, _, line = meal_setup(meal_outcome=outcome)
+    post(client, [image_event()])
+    assert line.replies[0][1] == [messages.meal_photo_outcome(outcome)]
+
+
+def test_image_before_consent_replies_welcome_without_download() -> None:
+    client, api, line = meal_setup()
+    api.consented = False
+    post(client, [image_event()])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.downloads == []
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_image_over_10mb_is_not_sent_to_api() -> None:
+    from app import messages
+
+    client, api, line = meal_setup()
+    line.content = b"x" * (10 * 1024 * 1024 + 1)
+    post(client, [image_event()])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.replies[0][1] == [messages.meal_photo_outcome("invalid_image")]
+
+
+def test_image_exactly_10mb_is_sent() -> None:
+    client, api, line = meal_setup()
+    line.content = b"x" * (10 * 1024 * 1024)
+    post(client, [image_event()])
+    assert api.calls[-1][0] == "log_meal_photo"
+
+
+def test_external_image_is_invalid_without_download() -> None:
+    from app import messages
+
+    client, api, line = meal_setup()
+    post(client, [image_event(provider="external")])
+    assert line.downloads == []
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert line.replies[0][1] == [messages.meal_photo_outcome("invalid_image")]
+
+
+@pytest.mark.parametrize(
+    ("setup", "outcome"),
+    [
+        ({"meal_fail_status": 404}, None),
+        ({"meal_fail_status": 413}, "invalid_image"),
+        ({"meal_fail_status": 500}, "unavailable"),
+    ],
+)
+def test_image_api_errors(setup: dict[str, Any], outcome: str | None) -> None:
+    from app import messages
+
+    client, _, line = meal_setup(**setup)
+    post(client, [image_event()])
+    expected = (
+        messages.meal_not_found() if outcome is None else messages.meal_photo_outcome(outcome)
+    )
+    assert [r[1] for r in line.replies] == [[expected]]
+
+
+def test_image_api_timeout_replies_unavailable_once() -> None:
+    client, api, line = meal_setup()
+    api.meal_raises = httpx.ReadTimeout("slow")
+    post(client, [image_event()])
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+def test_image_download_failure_replies_unavailable() -> None:
+    client, api, line = meal_setup()
+    line.content_error = RuntimeError("boom")
+    post(client, [image_event()])
+    assert [c[0] for c in api.calls] == ["sync"]
+    assert [r[1] for r in line.replies] == [UNAVAILABLE]
+
+
+def test_two_images_one_fails_each_gets_reply() -> None:
+    client, api, line = meal_setup()
+    results = [ApiError(500), None]
+
+    def flaky(line_user_id: str, image: bytes) -> MealTextResult:
+        err = results.pop(0)
+        if err:
+            raise err
+        return MealTextResult(outcome="draft", meal=MEAL)
+
+    api.log_meal_photo = flaky  # type: ignore[method-assign]
+    post(client, [image_event(token="t1"), image_event(token="t2")])
+    assert [r[0] for r in line.replies] == ["t1", "t2"]
+    assert line.replies[0][1] == UNAVAILABLE
+    assert line.replies[1][1][0]["type"] == "flex"
+
+
+def test_image_logs_do_not_leak_ids(caplog: pytest.LogCaptureFixture) -> None:
+    client, _, line = meal_setup(meal_outcome="not_food")
+    with caplog.at_level(logging.INFO, logger="gac.bot"):
+        post(client, [image_event()])
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "img-1" not in text
+    assert "outcome=not_food" in text

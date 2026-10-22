@@ -146,8 +146,17 @@ def placeholder_reply() -> Message:
     return {"type": "text", "text": "收到！記錄功能下個版本就會開放。"}
 
 
-def photo_coming_soon() -> Message:
-    return {"type": "text", "text": "拍照記錄飲食即將開放，敬請期待！"}
+def photo_prompt() -> Message:
+    return {
+        "type": "text",
+        "text": "直接在聊天室傳一張餐點照片，我會幫你估算熱量。",
+        "quickReply": {
+            "items": [
+                {"type": "action", "action": {"type": "camera", "label": "拍照"}},
+                {"type": "action", "action": {"type": "cameraRoll", "label": "從相簿選"}},
+            ]
+        },
+    }
 
 
 def ask_coming_soon() -> Message:
@@ -689,3 +698,18 @@ def meal_outcome(outcome: str) -> Message:
 
 def meal_not_found() -> Message:
     return {"type": "text", "text": "找不到這一餐，可能已經刪除了。"}
+
+
+# Largest original the bot forwards to the api; the api enforces the same cap.
+MEAL_PHOTO_MAX_BYTES = 10 * 1024 * 1024
+
+MEAL_PHOTO_OUTCOME_TEXT = {
+    **MEAL_OUTCOME_TEXT,
+    "limit": "今天的照片辨識次數用完了，明天再試，或改用文字記錄，例如「午餐 雞腿便當」。",
+    "not_food": "這張照片看不太出是什麼食物，可以換一張清楚一點的，或改用文字記錄。",
+    "invalid_image": "這張照片沒辦法讀取，請換一張再試。",
+}
+
+
+def meal_photo_outcome(outcome: str) -> Message:
+    return {"type": "text", "text": MEAL_PHOTO_OUTCOME_TEXT[outcome]}

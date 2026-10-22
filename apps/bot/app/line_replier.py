@@ -7,6 +7,7 @@ from linebot.v3.messaging import (
     Configuration,
     FlexMessage,
     MessagingApi,
+    MessagingApiBlob,
     PushMessageRequest,
     ReplyMessageRequest,
     ShowLoadingAnimationRequest,
@@ -24,6 +25,8 @@ class LineReplier(Protocol):
     def profile_name(self, user_id: str) -> str | None: ...
 
     def show_loading(self, user_id: str, seconds: int = 10) -> None: ...
+
+    def get_message_content(self, message_id: str) -> bytes: ...
 
 
 def _to_sdk(message: Message) -> FlexMessage | TextMessage:
@@ -64,3 +67,7 @@ class SdkLineReplier:
             MessagingApi(client).show_loading_animation(
                 ShowLoadingAnimationRequest(chat_id=user_id, loading_seconds=seconds)
             )
+
+    def get_message_content(self, message_id: str) -> bytes:
+        with LineApiClient(self._configuration) as client:
+            return bytes(MessagingApiBlob(client).get_message_content(message_id))
