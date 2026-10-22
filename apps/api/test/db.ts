@@ -38,4 +38,7 @@ export const unusedMealParser: MealParser = {
   parseText: async () => {
     throw new Error("meal parser should not be called");
   },
+  parsePhoto: async () => {
+    throw new Error("meal parser should not be called");
+  },
 };

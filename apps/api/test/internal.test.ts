@@ -38,6 +38,9 @@ let parser: MealParser = {
     ],
     usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
   }),
+  parsePhoto: async () => {
+    throw new Error("unused");
+  },
 };
 const auth = { authorization: "Bearer good" };
 
@@ -61,7 +64,10 @@ describe("/internal/users", () => {
       botServiceAccount: BOT,
       verifyLineIdToken: async () => ({ sub: LINE_ID, name: null }),
       notifyWorkoutFinished: async () => {},
-      mealParser: { parseText: (text) => parser.parseText(text) },
+      mealParser: {
+        parseText: (text) => parser.parseText(text),
+        parsePhoto: (jpeg) => parser.parsePhoto(jpeg),
+      },
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",
       now: () => new Date(nowIso),
@@ -298,11 +304,17 @@ describe("/internal/users", () => {
             kind: "refused",
             usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
           }),
+          parsePhoto: async () => {
+            throw new Error("unused");
+          },
         };
         expect((await text(id)).json()).toEqual({ outcome: "refused" });
         parser = {
           parseText: async () => {
             throw new MealParserUnavailable("down");
+          },
+          parsePhoto: async () => {
+            throw new Error("unused");
           },
         };
         expect((await text(id)).json()).toEqual({ outcome: "unavailable" });

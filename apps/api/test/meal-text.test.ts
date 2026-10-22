@@ -99,6 +99,9 @@ describe("logMealFromText", () => {
         calls += 1;
         return result();
       },
+      parsePhoto: async () => {
+        throw new Error("unused");
+      },
     };
     let clock = new Date("2026-10-22T04:00:00Z");
     const run = (text = "午餐 雞腿便當") =>

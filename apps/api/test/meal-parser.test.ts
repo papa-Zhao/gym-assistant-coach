@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { FastifyBaseLogger } from "fastify";
 import { describe, expect, it } from "vitest";
-import { MEAL_TEXT_MAX_TOKENS } from "../src/ai/config";
+import { MEAL_PHOTO_MAX_TOKENS, MEAL_TEXT_MAX_TOKENS } from "../src/ai/config";
 import { createMealParser, MealParserUnavailable } from "../src/ai/meal-parser";
-import { MEAL_TEXT_SYSTEM } from "../src/ai/prompts";
+import { MEAL_PHOTO_SYSTEM, MEAL_TEXT_SYSTEM } from "../src/ai/prompts";
 
 const USER_TEXT = "午餐 秘密牛肉麵";
 
@@ -226,6 +226,110 @@ describe("meal parser", () => {
       cacheRead: 80,
       cacheCreation: 0,
     });
+  });
+});
+
+describe("meal parser photo", () => {
+  const JPEG = Buffer.from("fake-jpeg-bytes-for-photo-test-0123456789");
+  const B64 = JPEG.toString("base64");
+
+  it("sends the expected image request", async () => {
+    const { parser, calls } = setup(() =>
+      message([{ type: "text", text: GOOD_JSON }]),
+    );
+    await parser.parsePhoto(JPEG);
+    const req = calls[0] as unknown as {
+      model: string;
+      max_tokens: number;
+      output_config: { effort: string; format: { type: string } };
+      system: { text: string; cache_control: unknown }[];
+      messages: unknown;
+    };
+    expect(req.model).toBe("claude-haiku-5-5");
+    expect(req.max_tokens).toBe(MEAL_PHOTO_MAX_TOKENS);
+    expect(req.output_config.effort).toBe("low");
+    expect(req.output_config.format.type).toBe("json_schema");
+    expect(req.system[0]!.cache_control).toEqual({ type: "ephemeral" });
+    expect(req.system[0]!.text).toBe(MEAL_PHOTO_SYSTEM);
+    expect(req.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: B64 },
+          },
+          { type: "text", text: "這是我這一餐。" },
+        ],
+      },
+    ]);
+    expect("temperature" in req).toBe(false);
+    expect("top_p" in req).toBe(false);
+    expect("top_k" in req).toBe(false);
+  });
+
+  it("parses items", async () => {
+    const { parser } = setup(() =>
+      message([{ type: "text", text: GOOD_JSON }]),
+    );
+    const r = await parser.parsePhoto(JPEG);
+    expect(r.kind).toBe("items");
+    if (r.kind === "items") expect(r.items[0]!.name).toBe("秘密牛肉麵");
+  });
+
+  it("returns refused on refusal stop reason", async () => {
+    const { parser } = setup(() => message([], { stop_reason: "refusal" }));
+    expect((await parser.parsePhoto(JPEG)).kind).toBe("refused");
+  });
+
+  it("returns not_food on max_tokens, non-JSON and is_food false", async () => {
+    const cases = [
+      message([{ type: "text", text: GOOD_JSON }], {
+        stop_reason: "max_tokens",
+      }),
+      message([{ type: "text", text: "not json" }]),
+      message([
+        { type: "text", text: JSON.stringify({ is_food: false, items: [] }) },
+      ]),
+    ];
+    for (const c of cases) {
+      const { parser } = setup(() => c);
+      expect((await parser.parsePhoto(JPEG)).kind).toBe("not_food");
+    }
+  });
+
+  it("throws MealParserUnavailable on connection errors", async () => {
+    const { parser } = setup(() => {
+      throw new Anthropic.APIConnectionError({ message: "down" });
+    });
+    await expect(parser.parsePhoto(JPEG)).rejects.toBeInstanceOf(
+      MealParserUnavailable,
+    );
+  });
+
+  it("logs kind photo and imageBytes but never image data or item names", async () => {
+    const { parser, logs } = setup(() =>
+      message([{ type: "text", text: GOOD_JSON }]),
+    );
+    await parser.parsePhoto(JPEG);
+    const out = JSON.stringify(logs);
+    expect(out).not.toContain(B64.slice(0, 20));
+    expect(out).not.toContain("牛肉麵");
+    expect(logs).toHaveLength(1);
+    expect((logs[0] as unknown[])[0]).toMatchObject({
+      event: "ai_call",
+      kind: "photo",
+      imageBytes: JPEG.length,
+      stopReason: "end_turn",
+      inputTokens: 100,
+    });
+  });
+});
+
+describe("MEAL_PHOTO_SYSTEM", () => {
+  it("is static: no dates or times", () => {
+    expect(MEAL_PHOTO_SYSTEM).not.toContain(String(new Date().getFullYear()));
+    expect(MEAL_PHOTO_SYSTEM).not.toMatch(/\d{4}-\d{2}-\d{2}|\d{1,2}:\d{2}/);
   });
 });
 
