@@ -22,7 +22,7 @@ export type ParseResult =
 
 export interface MealParser {
   parseText(text: string): Promise<ParseResult>;
-  /** `jpeg` is the normalized image from normalizeMealImage. */
+  /** `jpeg` is the normalized image from normalizePhoto. */
   parsePhoto(jpeg: Buffer): Promise<ParseResult>;
 }
 

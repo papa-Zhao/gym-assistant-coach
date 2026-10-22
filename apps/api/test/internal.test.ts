@@ -17,7 +17,11 @@ import { formatWorkoutSummary } from "../src/workouts/summary";
 import { MealParserUnavailable, type MealParser } from "../src/ai/meal-parser";
 import { meals } from "../src/db/schema";
 import { eq } from "drizzle-orm";
-import { createTestDb, memoryPhotoStore } from "./db";
+import {
+  createTestDb,
+  memoryPhotoStore,
+  unusedEquipmentIdentifier,
+} from "./db";
 import sharp from "sharp";
 import { MEAL_PHOTO_MAX_BYTES } from "@gac/shared";
 
@@ -73,6 +77,7 @@ describe("/internal/users", () => {
         parseText: (text) => parser.parseText(text),
         parsePhoto: (jpeg) => parser.parsePhoto(jpeg),
       },
+      equipmentIdentifier: unusedEquipmentIdentifier,
       photoStore: photos.store,
       sessionSecret: new Uint8Array(32),
       corsOrigin: "http://localhost",

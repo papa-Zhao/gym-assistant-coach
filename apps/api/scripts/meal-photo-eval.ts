@@ -18,7 +18,7 @@ import {
   AI_MODEL,
 } from "../src/ai/config";
 import { createMealParser } from "../src/ai/meal-parser";
-import { normalizeMealImage } from "../src/photos/image";
+import { normalizePhoto } from "../src/photos/image";
 import { usageCost } from "./eval-cost";
 
 interface Case {
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     let ok = false;
     let tokens = "";
     try {
-      const jpeg = await normalizeMealImage(
+      const jpeg = await normalizePhoto(
         readFileSync(path.join(folder, c.file)),
       );
       const r = await parser.parsePhoto(jpeg);

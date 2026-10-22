@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { InvalidImage, normalizeMealImage } from "../src/photos/image.js";
+import { InvalidImage, normalizePhoto } from "../src/photos/image.js";
 import { newMealPhotoKey } from "../src/photos/store.js";
 
 function solid(width: number, height: number) {
@@ -39,11 +39,9 @@ function hugePng(): Buffer {
   ]);
 }
 
-describe("normalizeMealImage", () => {
+describe("normalizePhoto", () => {
   it("fits a large JPEG within 1024x1024", async () => {
-    const out = await normalizeMealImage(
-      await solid(2000, 1500).jpeg().toBuffer(),
-    );
+    const out = await normalizePhoto(await solid(2000, 1500).jpeg().toBuffer());
     const meta = await sharp(out).metadata();
     expect([meta.width, meta.height, meta.format]).toEqual([1024, 768, "jpeg"]);
   });
@@ -57,7 +55,7 @@ describe("normalizeMealImage", () => {
       })
       .toBuffer();
     expect((await sharp(input).metadata()).orientation).toBe(6);
-    const out = await normalizeMealImage(input);
+    const out = await normalizePhoto(input);
     const meta = await sharp(out).metadata();
     expect([meta.width, meta.height]).toEqual([400, 600]);
     expect(meta.exif).toBeUndefined();
@@ -66,9 +64,7 @@ describe("normalizeMealImage", () => {
   });
 
   it("does not upscale and converts PNG to JPEG", async () => {
-    const out = await normalizeMealImage(
-      await solid(300, 200).png().toBuffer(),
-    );
+    const out = await normalizePhoto(await solid(300, 200).png().toBuffer());
     const meta = await sharp(out).metadata();
     expect([meta.width, meta.height, meta.format]).toEqual([300, 200, "jpeg"]);
   });
@@ -84,14 +80,12 @@ describe("normalizeMealImage", () => {
       Buffer.from("hello"),
       jpeg.subarray(0, Math.floor(jpeg.length / 2)),
     ]) {
-      await expect(normalizeMealImage(bad)).rejects.toBeInstanceOf(
-        InvalidImage,
-      );
+      await expect(normalizePhoto(bad)).rejects.toBeInstanceOf(InvalidImage);
     }
   });
 
   it("rejects an image over the pixel limit", async () => {
-    await expect(normalizeMealImage(hugePng())).rejects.toBeInstanceOf(
+    await expect(normalizePhoto(hugePng())).rejects.toBeInstanceOf(
       InvalidImage,
     );
   });

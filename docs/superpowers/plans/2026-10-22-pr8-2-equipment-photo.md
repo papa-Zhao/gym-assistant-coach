@@ -29,7 +29,7 @@
 
 - 使用者看得到的文字一律是繁體中文。
 - 模型、AI 呼叫規則、`refusal` 處理、log 規則都同 8.1：structured output、`effort: "low"`、系統提示 `cache_control`、不設 `temperature`／`top_p`／`top_k`、不用 prefill；log 只記 token、耗時、`stop_reason`、圖片位元組數、錯誤類別名稱，不記照片、AI 回傳內容、動作名稱或使用者 ID。
-- 照片處理同 8.1：`normalizePhoto`（原 `normalizeMealImage`）轉正、長邊 1024px、JPEG q80、不保留 metadata；壞圖回 `invalid_image` 且**不扣次數**。
+- 照片處理同 8.1：`normalizePhoto`（原 `normalizePhoto`）轉正、長邊 1024px、JPEG q80、不保留 metadata；壞圖回 `invalid_image` 且**不扣次數**。
 - 上傳上限沿用 `MEAL_PHOTO_MAX_BYTES`（10 MB），超過回 413。
 - 每日上限：與餐點照片共用 `AI_DAILY_LIMITS.photo`（10 次，台北日期）。拒答、不是器材都算一次；AI 服務出錯退回。
 - 器材照片不上傳 GCS、不寫資料庫（`ai_usage_daily` 的次數與 token 除外）。
@@ -131,7 +131,7 @@
 
 - Create: `apps/api/src/workouts/identify.ts`、`apps/api/test/exercise-identify.test.ts`
 - Modify:
-  - `apps/api/src/photos/image.ts`（`normalizeMealImage` 改名 `normalizePhoto`，更新所有引用與測試）
+  - `apps/api/src/photos/image.ts`（`normalizePhoto` 改名 `normalizePhoto`，更新所有引用與測試）
   - `apps/api/src/ai/usage.ts`（`withAiUse`）、`apps/api/src/meals/text.ts`（`runAiMeal` 改用 `withAiUse`，`meal-text.test.ts`、`meal-photo.test.ts` 不改內容照常通過）
   - `apps/api/src/workouts/exercise-routes.ts`、`apps/api/src/deps.ts`、`apps/api/src/server.ts`、測試用的 deps 建立函式（加假的 `equipmentIdentifier`）
   - `packages/shared/src/workouts.ts`（回應型別）

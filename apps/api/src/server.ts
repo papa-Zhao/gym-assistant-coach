@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { buildApp } from "./app.js";
 import { AI_CLIENT_MAX_RETRIES, AI_CLIENT_TIMEOUT_MS } from "./ai/config.js";
+import { createEquipmentIdentifier } from "./ai/equipment-identifier.js";
 import { createMealParser } from "./ai/meal-parser.js";
 import { instrument } from "./db/timing.js";
 import { createLineVerifier } from "./auth/line.js";
@@ -60,6 +61,7 @@ const deps: AppDeps = {
   verifyLineIdToken: createLineVerifier(config.lineLoginChannelId),
   notifyWorkoutFinished: createBotNotifier(config.botUrl, config.botAudience),
   mealParser: createMealParser(anthropic, parserLog),
+  equipmentIdentifier: createEquipmentIdentifier(anthropic, parserLog),
   photoStore: createGcsPhotoStore(config.mealPhotosBucket),
   sessionSecret: config.sessionSecret,
   corsOrigin: config.corsOrigin,

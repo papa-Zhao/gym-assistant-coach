@@ -3,7 +3,12 @@ import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { recordConsent, syncUser, type Db } from "../src/users/repo";
-import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
+import {
+  createTestDb,
+  unusedMealParser,
+  unusedPhotoStore,
+  unusedEquipmentIdentifier,
+} from "./db";
 import { CONSENT_VERSION } from "@gac/shared";
 
 const SECRET = new Uint8Array(32).fill(7);
@@ -39,6 +44,7 @@ describe("auth", () => {
       },
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      equipmentIdentifier: unusedEquipmentIdentifier,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
@@ -194,6 +200,7 @@ describe("error handling", () => {
         },
         notifyWorkoutFinished: async () => {},
         mealParser: unusedMealParser,
+        equipmentIdentifier: unusedEquipmentIdentifier,
         photoStore: unusedPhotoStore,
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,

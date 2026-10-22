@@ -11,7 +11,12 @@ import {
   startSession,
   upsertSet,
 } from "../src/workouts/repo";
-import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
+import {
+  createTestDb,
+  unusedMealParser,
+  unusedPhotoStore,
+  unusedEquipmentIdentifier,
+} from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const U1 = `U${"a".repeat(32)}`;
@@ -44,6 +49,7 @@ describe("exercise and template routes", () => {
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      equipmentIdentifier: unusedEquipmentIdentifier,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

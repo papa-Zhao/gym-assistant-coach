@@ -1,4 +1,5 @@
 import type { FinishSummary } from "@gac/shared";
+import type { EquipmentIdentifier } from "./ai/equipment-identifier";
 import type { MealParser } from "./ai/meal-parser";
 import type { DbStats } from "./db/timing.js";
 import type { PhotoStore } from "./photos/store";
@@ -27,6 +28,8 @@ export interface AppDeps {
   notifyWorkoutFinished: NotifyWorkoutFinished;
   /** Turns meal text into estimated items; tests inject a fake. */
   mealParser: MealParser;
+  /** Names gym equipment from a photo; tests inject a fake. */
+  equipmentIdentifier: EquipmentIdentifier;
   /** Meal photo object storage; tests inject an in-memory one. */
   photoStore: PhotoStore;
   /** Per-call GCS deadline override; tests only. */

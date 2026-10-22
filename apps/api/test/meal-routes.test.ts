@@ -4,7 +4,12 @@ import { buildApp } from "../src/app.js";
 import { issueSession } from "../src/auth/session";
 import { addMealPhoto } from "../src/meals/repo";
 import { syncUser, type Db } from "../src/users/repo";
-import { createTestDb, memoryPhotoStore, unusedMealParser } from "./db";
+import {
+  createTestDb,
+  memoryPhotoStore,
+  unusedMealParser,
+  unusedEquipmentIdentifier,
+} from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const ZERO = "00000000-0000-4000-8000-000000000000";
@@ -40,6 +45,7 @@ describe("meal routes", () => {
       }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
+      equipmentIdentifier: unusedEquipmentIdentifier,
       photoStore: photos.store,
       photoTimeoutMs: 30,
       sessionSecret: SECRET,
