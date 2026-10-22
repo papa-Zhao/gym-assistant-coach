@@ -3,6 +3,7 @@ import {
   MUSCLE_GROUPS,
   type Exercise,
 } from "@gac/shared";
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   WorkoutError,
@@ -15,6 +16,7 @@ import {
   finishSession,
   getActiveSession,
   getSessionById,
+  listBuiltinExercises,
   listExercises,
   listTemplates,
   removeItem,
@@ -67,6 +69,28 @@ describe("workouts repo", () => {
     }
     return { id: s.id, summary: await finishSession(db, userId, s.id) };
   }
+
+  it("listBuiltinExercises is sorted by slug, built-in and not archived", async () => {
+    const { db, userId, slug } = await setup();
+    await createCustomExercise(db, userId, {
+      nameZh: "自訂動作",
+      kind: "strength",
+      muscleGroup: "chest",
+      equipment: "dumbbell",
+    });
+    const archived = slug("barbell-bench-press");
+    await db
+      .update(exercises)
+      .set({ archivedAt: new Date() })
+      .where(eq(exercises.id, archived.id));
+    const list = await listBuiltinExercises(db);
+    expect(list.every((e) => !e.isCustom)).toBe(true);
+    expect(list.some((e) => e.id === archived.id)).toBe(false);
+    expect(list.some((e) => e.nameZh === "自訂動作")).toBe(false);
+    const slugs = list.map((e) => e.slug!);
+    expect(slugs).toEqual([...slugs].sort());
+    expect(list).toHaveLength(56);
+  });
 
   it("seed has at least 3 exercises per muscle group and unique names", async () => {
     const { db, userId } = await setup();

@@ -126,6 +126,16 @@ export async function listExercises(
   return rows.map(toExercise);
 }
 
+/** Built-in, non-archived exercises ordered by slug. */
+export async function listBuiltinExercises(db: Db): Promise<Exercise[]> {
+  const rows = await db
+    .select()
+    .from(exercises)
+    .where(and(eq(exercises.isCustom, false), isNull(exercises.archivedAt)))
+    .orderBy(asc(exercises.slug));
+  return rows.map(toExercise);
+}
+
 export interface CustomExerciseInput {
   nameZh: string;
   nameEn?: string | null;
