@@ -298,3 +298,7 @@ def test_program_messages() -> None:
         "type": "text",
         "text": "這份課表已過期，請重新問 AI。",
     }
+
+
+def test_rate_limited_text() -> None:
+    assert messages.rate_limited() == {"type": "text", "text": "訊息太多了，請稍等一分鐘再傳。"}

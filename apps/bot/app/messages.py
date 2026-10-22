@@ -145,6 +145,10 @@ def welcome_back() -> Message:
     return {"type": "text", "text": "歡迎回來！你的紀錄都還在。"}
 
 
+def rate_limited() -> Message:
+    return {"type": "text", "text": "訊息太多了，請稍等一分鐘再傳。"}
+
+
 def photo_prompt() -> Message:
     return {
         "type": "text",
