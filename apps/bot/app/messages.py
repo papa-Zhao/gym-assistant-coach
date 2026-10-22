@@ -13,7 +13,7 @@ from app.api_client import (
     WorkoutSummary,
 )
 from app.commands import METRIC_LIMITS
-from app.program_commands import program_save_data
+from app.program_commands import PROGRAM_MAX_DAYS, program_save_data
 from app.settings import CONSENT_VERSION
 
 PRIMARY = "#B4492A"
@@ -897,7 +897,7 @@ def advice_card(advice: Advice) -> Message:
         return {"type": "flex", "altText": title, "contents": bubble}
     days = [
         _program_day_bubble(program, n)
-        for n in range(1, min(len(program.days), MAX_CAROUSEL_BUBBLES - 1, 7) + 1)
+        for n in range(1, min(len(program.days), MAX_CAROUSEL_BUBBLES - 1, PROGRAM_MAX_DAYS) + 1)
     ]
     return {
         "type": "flex",

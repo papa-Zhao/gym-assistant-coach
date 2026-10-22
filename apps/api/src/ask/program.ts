@@ -40,7 +40,7 @@ export function shapeProgram(
       });
     }
     if (items.length === 0) continue;
-    const name = Array.from(day.name.trim())
+    const name = Array.from(day.name.replace(/[\p{Cc}\s]+/gu, " ").trim())
       .slice(0, MAX_TEMPLATE_NAME)
       .join("")
       .trimEnd();

@@ -125,6 +125,21 @@ describe("shapeProgram", () => {
     expect(out[0]!.name).toBe("a".repeat(29));
   });
 
+  it("collapses newlines and whitespace runs in the name", () => {
+    const out = shapeProgram([day("推\n日", ["bench", 3, 8])], library);
+    expect(out[0]!.name).toBe("推 日");
+  });
+
+  it("strips NUL and other control characters from the name", () => {
+    const out = shapeProgram([day("推\u0000日", ["bench", 3, 8])], library);
+    expect(out[0]!.name).not.toContain("\u0000");
+  });
+
+  it("falls back to the day number when the name is only whitespace", () => {
+    const out = shapeProgram([day("\n\t", ["bench", 3, 8])], library);
+    expect(out[0]!.name).toBe("第 1 天");
+  });
+
   it("returns [] when nothing is valid", () => {
     expect(shapeProgram([], library)).toEqual([]);
     expect(

@@ -61,7 +61,7 @@ export function parseSeed(sql: string): Exercise[] {
   return out.sort(bySlugOrder);
 }
 
-/** Built-in strength exercises in slug order, as the API passes to the advisor. */
+/** All built-in seed exercises (any kind) in slug order; callers filter, e.g. to strength for the advisor. */
 export function loadSeedLibrary(): Exercise[] {
   return parseSeed(readFileSync(SEED_PATH, "utf8"));
 }

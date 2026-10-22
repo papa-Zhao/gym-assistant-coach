@@ -3,7 +3,8 @@ import uuid
 from dataclasses import dataclass
 from urllib.parse import parse_qs
 
-_DAY = re.compile(r"^[1-7]$")
+PROGRAM_MAX_DAYS = 7
+_DAY = re.compile(rf"^[1-{PROGRAM_MAX_DAYS}]$")
 
 
 @dataclass(frozen=True)
