@@ -6,6 +6,7 @@ import {
   MealInputError,
   consumedOn,
   createMeal,
+  dailyConsumed,
   deleteMeal,
   getMeal,
   listDayMeals,
@@ -439,6 +440,45 @@ describe("meals repo", () => {
       expect(
         await db.select().from(foods).where(eq(foods.id, chicken.id)),
       ).toHaveLength(1);
+    });
+  });
+  describe("dailyConsumed", () => {
+    it("sums confirmed meals per day inside the range, ascending", async () => {
+      const { db, userId, otherId, chicken } = await setup();
+      const make = (uid: string, eatenOn: string, grams: number) =>
+        createMeal(
+          db,
+          uid,
+          {
+            eatenOn,
+            mealType: "lunch",
+            items: [{ foodId: chicken.id, grams }],
+          },
+          "manual",
+          NOW,
+        );
+      await make(userId, "2026-10-21", 100);
+      await make(userId, "2026-10-19", 100);
+      await make(userId, "2026-10-19", 100);
+      await make(userId, "2026-10-15", 100);
+      await make(userId, "2026-10-23", 100);
+      await make(otherId, "2026-10-20", 100);
+      const draft = await make(userId, "2026-10-20", 100);
+      await db
+        .update(meals)
+        .set({ status: "draft", confirmedAt: null })
+        .where(eq(meals.id, draft.id));
+
+      const rows = await dailyConsumed(db, userId, "2026-10-16", "2026-10-22");
+      expect(rows.map((r) => r.date)).toEqual(["2026-10-19", "2026-10-21"]);
+      expect(rows[0]).toEqual({
+        date: "2026-10-19",
+        kcal: 240,
+        proteinG: 47,
+        carbG: 0,
+        fatG: 4.2,
+      });
+      expect(rows[1]?.kcal).toBe(120);
     });
   });
 });

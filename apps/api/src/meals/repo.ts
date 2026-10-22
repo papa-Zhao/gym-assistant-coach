@@ -16,7 +16,7 @@ import {
   type MealType,
   type Nutrition,
 } from "@gac/shared";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { foods, mealItems, mealPhotos, meals } from "../db/schema";
 import type { Db } from "../users/repo";
 
@@ -188,6 +188,42 @@ export async function consumedOn(
   now: Date,
 ): Promise<Nutrition> {
   return (await listDayMeals(db, userId, date, now)).consumed;
+}
+
+/** Confirmed meals only: one row per day in [from, to] that has any, ascending. */
+export async function dailyConsumed(
+  db: Db,
+  userId: string,
+  from: string,
+  to: string,
+): Promise<({ date: string } & Nutrition)[]> {
+  const rows = await db
+    .select({
+      date: meals.eatenOn,
+      kcal: sql<number>`coalesce(sum(${mealItems.kcal}), 0)::int`,
+      proteinG: sql<string>`round(coalesce(sum(${mealItems.proteinG}), 0), 1)`,
+      carbG: sql<string>`round(coalesce(sum(${mealItems.carbG}), 0), 1)`,
+      fatG: sql<string>`round(coalesce(sum(${mealItems.fatG}), 0), 1)`,
+    })
+    .from(meals)
+    .innerJoin(mealItems, eq(mealItems.mealId, meals.id))
+    .where(
+      and(
+        eq(meals.userId, userId),
+        eq(meals.status, "confirmed"),
+        gte(meals.eatenOn, from),
+        lte(meals.eatenOn, to),
+      ),
+    )
+    .groupBy(meals.eatenOn)
+    .orderBy(asc(meals.eatenOn));
+  return rows.map((r) => ({
+    date: r.date,
+    kcal: r.kcal,
+    proteinG: Number(r.proteinG),
+    carbG: Number(r.carbG),
+    fatG: Number(r.fatG),
+  }));
 }
 
 type NewItem = Nutrition & {
