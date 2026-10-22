@@ -100,7 +100,9 @@ export function MealsCard({ onFatal }: MealsCardProps) {
             >
               <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
               <span className="row-name">{mealSummary(meal)}</span>
-              <span className="meal-row-kcal">{meal.total.kcal} kcal ›</span>
+              <span className="meal-row-kcal">
+                {meal.total.kcal} kcal{meal.status === "draft" ? " 草稿" : ""} ›
+              </span>
             </a>
           ) : (
             <a key={type} className="row meal-row" href={`/meal?type=${type}`}>

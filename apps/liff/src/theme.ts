@@ -298,6 +298,7 @@ button.chip { color: var(--color-text); font-weight: 400; }
 .meal-item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
 .meal-item + .meal-item { margin-top: 0; }
 .meal-item-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.ai-tag { margin-left: var(--space-2); padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--color-primary-soft); color: var(--color-text); font-size: var(--font-size-caption); font-weight: 400; white-space: nowrap; }
 .meal-item-controls { display: flex; align-items: center; gap: var(--space-2); }
 .step-btn { min-width: ${minTouchTarget}px; padding: 0; }
 .grams-input {

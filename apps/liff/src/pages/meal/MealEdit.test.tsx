@@ -1,3 +1,4 @@
+import type { Meal } from "@gac/shared";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, type Call } from "../workout/testHelpers";
@@ -34,6 +35,32 @@ describe("MealEdit", () => {
       mealType: "lunch",
       items: [{ foodId: "f-rice", grams: 100 }],
     });
+  });
+
+  it("explains a draft meal and marks AI-estimated items only", async () => {
+    const base = meal().items[0] as Meal["items"][number];
+    fakeApi(() =>
+      meal({
+        status: "draft",
+        source: "text",
+        items: [
+          { ...base, foodId: null, name: "雞腿便當", aiConfidence: 0.6 },
+          { ...base, id: "i2" },
+        ],
+      }),
+    );
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    expect(
+      await screen.findByText("AI 估計的草稿，按「儲存並確認」就會記錄"),
+    ).toBeVisible();
+    expect(screen.getAllByText("AI 估計")).toHaveLength(1);
+  });
+
+  it("shows no draft note or AI tag for a confirmed TFDA meal", async () => {
+    fakeApi(() => meal());
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    await screen.findByLabelText("白飯 克數");
+    expect(screen.queryByText(/AI 估計/)).toBeNull();
   });
 
   it("edits grams and sends the item by id", async () => {

@@ -38,6 +38,8 @@ interface Line {
   id?: string;
   foodId?: string | undefined;
   name: string;
+  /** AI estimate not matched to a TFDA food. */
+  aiEstimated?: boolean;
   grams: string;
   /** How to preview nutrition for any grams. */
   calc: (grams: number) => Nutrition;
@@ -80,6 +82,7 @@ function linesFrom(meal: Meal): Line[] {
     id: item.id,
     foodId: item.foodId ?? undefined,
     name: item.name,
+    aiEstimated: item.foodId === null && item.aiConfidence !== null,
     grams: String(item.grams),
     calc: (g) => scaleNutrition(item, item.grams, g),
   }));
@@ -125,6 +128,7 @@ export function MealEdit({
   const [mealType, setMealType] = useState<MealType>(() =>
     isMealType(type) ? type : defaultMealType(taipeiHour(new Date())),
   );
+  const [draft, setDraft] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +142,7 @@ export function MealEdit({
         if (!live) return;
         setDate(meal.eatenOn);
         setMealType(meal.mealType);
+        setDraft(meal.status === "draft");
         setLines(linesFrom(meal));
         setLoad("ready");
       })
@@ -257,6 +262,9 @@ export function MealEdit({
     <main className="meal-page">
       <p className="step">{dateLabel(date)}</p>
       <h1>{editing ? "修改這一餐" : "記錄一餐"}</h1>
+      {draft && (
+        <p className="muted">AI 估計的草稿，按「儲存並確認」就會記錄</p>
+      )}
       <div className="chips" role="group" aria-label="餐別">
         {MEAL_TYPES.map((t) => (
           <button
@@ -280,7 +288,10 @@ export function MealEdit({
           return (
             <section key={line.key} className="card meal-item">
               <div className="meal-item-head">
-                <strong className="row-name">{line.name}</strong>
+                <strong className="row-name">
+                  {line.name}
+                  {line.aiEstimated && <span className="ai-tag">AI 估計</span>}
+                </strong>
                 <span className="muted">
                   {n ? `${n.kcal} kcal · 蛋白質 ${n.proteinG} g` : "—"}
                 </span>
