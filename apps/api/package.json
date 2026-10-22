@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "tfda:seed": "tsx scripts/tfda-seed.ts",
+    "eval:ask": "tsx scripts/ask-eval.ts",
     "eval:meal-text": "tsx scripts/meal-text-eval.ts",
     "eval:meal-photo": "tsx scripts/meal-photo-eval.ts",
     "eval:equipment-photo": "tsx scripts/equipment-photo-eval.ts",
