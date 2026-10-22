@@ -37,7 +37,7 @@ describe("MealEdit", () => {
   });
 
   it("edits grams and sends the item by id", async () => {
-    const calls = fakeApi((c) => (c.method === "PUT" ? meal() : meal()));
+    const calls = fakeApi(() => meal());
     const onDone = vi.fn();
     render(
       <MealEdit id="m1" today={today} onFatal={vi.fn()} onDone={onDone} />,
@@ -73,6 +73,16 @@ describe("MealEdit", () => {
       target: { value },
     });
     expect(screen.getByText("克數要在 1–2000 之間")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "儲存並確認" })).toBeDisabled();
+  });
+
+  it("explains the one-decimal rule for in-range values", async () => {
+    fakeApi(() => meal());
+    render(<MealEdit id="m1" today={today} onFatal={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("白飯 克數"), {
+      target: { value: "150.55" },
+    });
+    expect(screen.getByText("克數最多小數 1 位")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "儲存並確認" })).toBeDisabled();
   });
 

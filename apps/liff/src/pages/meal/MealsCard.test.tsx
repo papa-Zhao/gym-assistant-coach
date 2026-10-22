@@ -1,7 +1,8 @@
+import type { Meal } from "@gac/shared";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi } from "../workout/testHelpers";
-import { MealsCard } from "./MealsCard";
+import { MealsCard, mealSummary } from "./MealsCard";
 import { meal } from "./testData";
 
 function api(targetKcal: number | null) {
@@ -35,6 +36,31 @@ describe("MealsCard", () => {
       "234",
     );
     expect(screen.getByText("／ 2000 kcal")).toBeInTheDocument();
+  });
+
+  it("orders rows breakfast, lunch, dinner with empty rows in place", async () => {
+    api(2000);
+    render(<MealsCard onFatal={vi.fn()} />);
+    await screen.findByRole("link", { name: /午餐/ });
+    const labels = screen
+      .getAllByRole("link")
+      .map((a) => a.querySelector(".meal-type")?.textContent);
+    expect(labels).toEqual(["早餐", "午餐", "晚餐"]);
+  });
+
+  it("summarises 3+ items with 等", () => {
+    const item = meal().items[0] as Meal["items"][number];
+    const three = meal({
+      items: [
+        { ...item, name: "甲" },
+        { ...item, name: "乙" },
+        { ...item, name: "丙" },
+      ],
+    });
+    expect(mealSummary(three)).toBe("甲＋乙等");
+    expect(mealSummary(meal({ items: three.items.slice(0, 2) }))).toBe(
+      "甲＋乙",
+    );
   });
 
   it("shows only intake when there is no target", async () => {

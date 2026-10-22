@@ -85,6 +85,7 @@ export async function searchFoods(
   q: string,
   limit = 20,
 ): Promise<Food[]> {
+  // TODO(7.2): custom/AI foods (owner_user_id set) must be scoped to their owner here.
   const term = q.trim();
   if (!term) return [];
   const escaped = term.replace(/[\\%_]/g, "\\$&");
@@ -288,6 +289,14 @@ export async function updateMeal(
   now: Date,
 ): Promise<Meal | null> {
   return db.transaction(async (tx) => {
+    // Row lock serialises overlapping PUTs on one meal so the
+    // (meal_id, position) key is never hit by interleaved delete/insert.
+    const locked = await tx
+      .select({ id: meals.id })
+      .from(meals)
+      .where(and(eq(meals.id, mealId), eq(meals.userId, userId)))
+      .for("update");
+    if (locked.length === 0) return null;
     const current = await getMeal(tx, userId, mealId);
     if (!current) return null;
     const items = await buildItems(tx, input.items, current.items);

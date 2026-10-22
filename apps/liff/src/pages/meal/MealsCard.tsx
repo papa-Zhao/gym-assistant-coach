@@ -56,10 +56,13 @@ export function MealsCard({ onFatal }: MealsCardProps) {
     );
   }
 
-  const meals = [...day.meals].sort(
-    (a, b) => ORDER.indexOf(a.mealType) - ORDER.indexOf(b.mealType),
+  const rows = ORDER.flatMap(
+    (type): { type: MealType; meal: Meal | null }[] => {
+      const logged = day.meals.filter((m) => m.mealType === type);
+      if (logged.length > 0) return logged.map((meal) => ({ type, meal }));
+      return ROW_TYPES.includes(type) ? [{ type, meal: null }] : [];
+    },
   );
-  const missing = ROW_TYPES.filter((t) => !meals.some((m) => m.mealType === t));
   const eaten = day.consumed.kcal;
   const pct =
     target && target > 0
@@ -88,24 +91,25 @@ export function MealsCard({ onFatal }: MealsCardProps) {
         </div>
       )}
       <div className="list meal-list">
-        {meals.map((meal) => (
-          <a
-            key={meal.id}
-            className="row meal-row"
-            href={`/meal?id=${meal.id}`}
-          >
-            <span className="meal-type">{MEAL_TYPE_LABELS[meal.mealType]}</span>
-            <span className="row-name">{mealSummary(meal)}</span>
-            <span className="meal-row-kcal">{meal.total.kcal} kcal ›</span>
-          </a>
-        ))}
-        {missing.map((type) => (
-          <a key={type} className="row meal-row" href={`/meal?type=${type}`}>
-            <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
-            <span className="row-name muted">還沒記錄</span>
-            <span className="meal-add">＋ 記錄</span>
-          </a>
-        ))}
+        {rows.map(({ type, meal }) =>
+          meal ? (
+            <a
+              key={meal.id}
+              className="row meal-row"
+              href={`/meal?id=${meal.id}`}
+            >
+              <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
+              <span className="row-name">{mealSummary(meal)}</span>
+              <span className="meal-row-kcal">{meal.total.kcal} kcal ›</span>
+            </a>
+          ) : (
+            <a key={type} className="row meal-row" href={`/meal?type=${type}`}>
+              <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
+              <span className="row-name muted">還沒記錄</span>
+              <span className="meal-add">＋ 記錄</span>
+            </a>
+          ),
+        )}
       </div>
     </section>
   );

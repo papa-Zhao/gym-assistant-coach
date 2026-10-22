@@ -205,6 +205,44 @@ describe("/internal/users", () => {
     expect(body.consumed.kcal).toBe(meal.total.kcal);
   });
 
+  it("today consumed switches day at Taipei midnight", async () => {
+    const id = `U${"8".repeat(32)}`;
+    const { userId } = await syncUser(db, id, null);
+    const [food] = await db.select().from(foods).limit(1);
+    if (!food) throw new Error("no seed food");
+    const log = (eatenOn: string) =>
+      createMeal(
+        db,
+        userId,
+        {
+          eatenOn,
+          mealType: "dinner",
+          items: [{ foodId: food.id, grams: 200 }],
+        },
+        "manual",
+        new Date(nowIso),
+      );
+    const oct21 = await log("2026-10-21");
+    const oct22 = await log("2026-10-22");
+    expect(oct21.total.kcal).toBeGreaterThan(0);
+    try {
+      nowIso = "2026-10-21T15:59:59Z";
+      const before = (
+        await post("/internal/users/today", { lineUserId: id })
+      ).json();
+      expect(before.date).toBe("2026-10-21");
+      expect(before.consumed.kcal).toBe(oct21.total.kcal);
+      nowIso = "2026-10-21T16:00:00Z";
+      const after = (
+        await post("/internal/users/today", { lineUserId: id })
+      ).json();
+      expect(after.date).toBe("2026-10-22");
+      expect(after.consumed.kcal).toBe(oct22.total.kcal);
+    } finally {
+      nowIso = "2026-10-19T04:00:00Z";
+    }
+  });
+
   it("today uses Taipei date", async () => {
     nowIso = "2026-10-18T16:30:00Z";
     try {

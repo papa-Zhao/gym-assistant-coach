@@ -8,6 +8,7 @@ import { createTestDb } from "./db";
 const SECRET = new Uint8Array(32).fill(9);
 const ZERO = "00000000-0000-4000-8000-000000000000";
 const DAY = "2026-10-22";
+let nowIso = "2026-10-22T04:00:00Z";
 
 describe("meal routes", () => {
   let app: ReturnType<typeof buildApp>;
@@ -38,7 +39,7 @@ describe("meal routes", () => {
       notifyWorkoutFinished: async () => {},
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
-      now: () => new Date("2026-10-22T04:00:00Z"),
+      now: () => new Date(nowIso),
     });
     const found = await app.inject({
       method: "GET",
@@ -72,6 +73,25 @@ describe("meal routes", () => {
   });
   const create = async (headers = hA, grams = 150) =>
     (await req("POST", "/meals", headers, body(grams))).json<Meal>();
+
+  it("GET /meals switches day at Taipei midnight", async () => {
+    const m = await create(hB);
+    expect(m.eatenOn).toBe(DAY);
+    try {
+      nowIso = "2026-10-21T15:59:59Z";
+      const before = (await req("GET", "/meals", hB)).json<DayMeals>();
+      expect(before.date).toBe("2026-10-21");
+      expect(before.meals).toEqual([]);
+      nowIso = "2026-10-21T16:00:00Z";
+      const after = (await req("GET", "/meals", hB)).json<DayMeals>();
+      expect(after.date).toBe("2026-10-22");
+      expect(after.meals.map((x) => x.id)).toContain(m.id);
+      expect(after.meals.every((x) => x.eatenOn === "2026-10-22")).toBe(true);
+    } finally {
+      nowIso = "2026-10-22T04:00:00Z";
+    }
+    await req("DELETE", `/meals/${m.id}`, hB);
+  });
 
   it("requires a session on every route", async () => {
     for (const [m, u] of [

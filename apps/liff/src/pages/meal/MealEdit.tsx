@@ -45,6 +45,7 @@ interface Line {
 
 const STEP_G = 10;
 const GRAMS_ERROR = `克數要在 ${GRAMS_LIMITS.min}–${GRAMS_LIMITS.max} 之間`;
+const DECIMALS_ERROR = "克數最多小數 1 位";
 const NOT_FOUND = "找不到這一餐";
 
 function taipeiHour(now: Date): number {
@@ -97,6 +98,14 @@ function lineFromFood(food: Food): Line {
 function gramsOf(line: Line): number | null {
   const n = Number(line.grams);
   return line.grams.trim() !== "" && isValidGrams(n) ? n : null;
+}
+
+/** In-range values that fail only on precision get the decimals hint. */
+function gramsError(raw: string): string {
+  const n = Number(raw);
+  const inRange =
+    raw.trim() !== "" && n >= GRAMS_LIMITS.min && n <= GRAMS_LIMITS.max;
+  return inRange ? DECIMALS_ERROR : GRAMS_ERROR;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -317,7 +326,7 @@ export function MealEdit({
               </div>
               {g === null && (
                 <p className="error-text field-error" role="alert">
-                  {GRAMS_ERROR}
+                  {gramsError(line.grams)}
                 </p>
               )}
             </section>

@@ -1,7 +1,7 @@
 import { nutritionFor } from "@gac/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { foods, mealItems, meals } from "../src/db/schema";
+import { foods, mealItems, meals, users } from "../src/db/schema";
 import {
   MealInputError,
   consumedOn,
@@ -421,6 +421,24 @@ describe("meals repo", () => {
       expect(await deleteMeal(db, userId, meal.id)).toBe(true);
       expect(await getMeal(db, userId, meal.id)).toBeNull();
       expect(await db.select().from(mealItems)).toEqual([]);
+    });
+
+    it("deleting the user removes their meals and items, keeping foods", async () => {
+      const { db, userId, otherId, chicken } = await setup();
+      const input = {
+        eatenOn: "2026-10-22",
+        mealType: "lunch" as const,
+        items: [{ foodId: chicken.id, grams: 100 }],
+      };
+      await createMeal(db, userId, input, "manual", NOW);
+      const kept = await createMeal(db, otherId, input, "manual", NOW);
+      await db.delete(users).where(eq(users.id, userId));
+      const left = await db.select().from(meals);
+      expect(left.map((m) => m.id)).toEqual([kept.id]);
+      expect(await db.select().from(mealItems)).toHaveLength(1);
+      expect(
+        await db.select().from(foods).where(eq(foods.id, chicken.id)),
+      ).toHaveLength(1);
     });
   });
 });
