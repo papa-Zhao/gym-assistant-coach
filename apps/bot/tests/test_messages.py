@@ -3,7 +3,17 @@ import json
 from linebot.v3.messaging import FlexMessage
 
 from app import messages
-from app.api_client import Advice, AdviceItem, Macros, Meal, MealConfirmed, MealItem
+from app.api_client import (
+    Advice,
+    AdviceItem,
+    Macros,
+    Meal,
+    MealConfirmed,
+    MealItem,
+    Program,
+    ProgramDay,
+    ProgramItem,
+)
 from app.line_replier import _to_sdk
 
 
@@ -203,3 +213,88 @@ def test_advice_card_skips_blank_text_components() -> None:
     assert "提醒" in texts
     assert card["altText"] == "AI 建議"
     assert isinstance(_to_sdk(card), FlexMessage)
+
+
+PROGRAM_ID = "0b0e7c9e-3f55-4c0a-9a43-2d4a5f6c7d8e"
+
+
+def _program(names: list[str]) -> Program:
+    return Program(
+        id=PROGRAM_ID,
+        days=[
+            ProgramDay(n, [ProgramItem("槓鈴臥推", 4, 8), ProgramItem("伏地挺身", 3, 12)])
+            for n in names
+        ],
+    )
+
+
+def _with_program(program: Program | None) -> Advice:
+    base = _advice()
+    return Advice(base.title, base.items, base.body, base.today_line, base.notices, program)
+
+
+def test_advice_card_without_program_is_single_bubble() -> None:
+    plain = messages.advice_card(_advice())
+    assert plain["contents"]["type"] == "bubble"
+    assert messages.advice_card(_with_program(None)) == plain
+    assert messages.advice_card(_with_program(Program(PROGRAM_ID, []))) == plain
+
+
+def test_advice_card_with_program_is_carousel() -> None:
+    card = messages.advice_card(_with_program(_program(["推日", "拉日", "腿日"])))
+    assert card["altText"] == "晚餐建議"
+    carousel = card["contents"]
+    assert carousel["type"] == "carousel"
+    assert len(carousel["contents"]) == 4
+    assert carousel["contents"][0] == messages.advice_card(_advice())["contents"]
+    day1 = carousel["contents"][1]
+    body = day1["body"]["contents"]
+    assert body[0]["text"] == "第 1 天"
+    assert body[0]["size"] == "xs"
+    assert body[0]["color"] == messages.MUTED
+    assert body[1]["text"] == "推日"
+    assert body[1]["weight"] == "bold"
+    assert body[1]["size"] == "lg"
+    assert body[1]["color"] == messages.TEXT
+    assert body[2]["text"] == "槓鈴臥推 4×8"
+    assert body[2]["size"] == "sm"
+    assert body[2]["wrap"] is True
+    button = day1["footer"]["contents"][0]
+    assert button["style"] == "primary"
+    assert button["action"]["label"] == "存成範本"
+    assert button["action"]["data"] == f"action=program_save&id={PROGRAM_ID}&day=1"
+    assert button["action"]["displayText"] == "存成範本：推日"
+    last = carousel["contents"][3]["footer"]["contents"][0]["action"]["data"]
+    assert last.endswith("&day=3")
+    assert isinstance(_to_sdk(card), FlexMessage)
+
+
+def test_advice_card_program_blank_day_name_and_no_empty_text() -> None:
+    card = messages.advice_card(_with_program(_program(["  "])))
+    day1 = card["contents"]["contents"][1]
+    assert day1["body"]["contents"][1]["text"] == "第 1 天"
+    assert day1["footer"]["contents"][0]["action"]["displayText"] == "存成範本：第 1 天"
+    assert all(t.strip() for t in _texts(card["contents"]))
+    assert all(t != "" for t in _all_strings(card))
+
+
+def _all_strings(node: object) -> list[str]:
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [s for v in node.values() for s in _all_strings(v)]
+    if isinstance(node, list):
+        return [s for v in node for s in _all_strings(v)]
+    return []
+
+
+def test_program_messages() -> None:
+    assert messages.program_saved("推日") == {"type": "text", "text": "「推日」範本已經儲存"}
+    assert messages.program_already_saved("推日") == {
+        "type": "text",
+        "text": "「推日」範本已經存過了",
+    }
+    assert messages.program_expired() == {
+        "type": "text",
+        "text": "這份課表已過期，請重新問 AI。",
+    }

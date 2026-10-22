@@ -87,12 +87,38 @@ class AdviceItem:
 
 
 @dataclass(frozen=True)
+class ProgramItem:
+    name: str
+    sets: int
+    reps: int
+
+
+@dataclass(frozen=True)
+class ProgramDay:
+    name: str
+    items: list[ProgramItem]
+
+
+@dataclass(frozen=True)
+class Program:
+    id: str
+    days: list[ProgramDay]
+
+
+@dataclass(frozen=True)
+class ProgramSaved:
+    outcome: str  # saved | already_saved
+    template_name: str
+
+
+@dataclass(frozen=True)
 class Advice:
     title: str
     items: list[AdviceItem]
     body: str
     today_line: str | None
     notices: list[str]
+    program: Program | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +128,24 @@ class AskResult:
     advice: Advice | None
 
 
+def _program(data: dict | None) -> Program | None:
+    if not data:
+        return None
+    return Program(
+        id=data["id"],
+        days=[
+            ProgramDay(
+                name=d["name"],
+                items=[
+                    ProgramItem(name=i["nameZh"], sets=int(i["sets"]), reps=int(i["reps"]))
+                    for i in d["items"]
+                ],
+            )
+            for d in data["days"]
+        ],
+    )
+
+
 def _advice(data: dict) -> Advice:
     return Advice(
         title=data["title"],
@@ -109,6 +153,7 @@ def _advice(data: dict) -> Advice:
         body=data["body"],
         today_line=data.get("todayLine"),
         notices=list(data["notices"]),
+        program=_program(data.get("program")),
     )
 
 
@@ -170,6 +215,8 @@ class ApiClient(Protocol):
     def ask(self, line_user_id: str, text: str) -> AskResult: ...
 
     def reset_conversation(self, line_user_id: str) -> None: ...
+
+    def save_program_day(self, line_user_id: str, program_id: str, day: int) -> ProgramSaved: ...
 
 
 class HttpApiClient:
@@ -299,6 +346,13 @@ class HttpApiClient:
 
     def reset_conversation(self, line_user_id: str) -> None:
         self._post("/internal/ai/reset", {"lineUserId": line_user_id})
+
+    def save_program_day(self, line_user_id: str, program_id: str, day: int) -> ProgramSaved:
+        data = self._post(
+            "/internal/ai/program-save",
+            {"lineUserId": line_user_id, "programId": program_id, "day": day},
+        ).json()
+        return ProgramSaved(outcome=data["outcome"], template_name=data["templateName"])
 
 
 class WorkoutPr(BaseModel):

@@ -357,3 +357,42 @@ def test_reset_conversation_request(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sent[0]["url"] == "https://api.test/internal/ai/reset"
     assert sent[0]["json"] == {"lineUserId": USER}
     assert sent[0]["timeout"] == 5.0
+
+
+PROGRAM_ADVICE_JSON = {"title": "t", "items": [], "body": "b", "notices": []}
+PROGRAM_JSON = {
+    "id": "0b0e7c9e-3f55-4c0a-9a43-2d4a5f6c7d8e",
+    "days": [{"name": "推日", "items": [{"nameZh": "槓鈴臥推", "sets": 4, "reps": 8}]}],
+}
+
+
+def test_ask_parses_program(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _http_client(
+        monkeypatch,
+        {"outcome": "answer", "advice": {**PROGRAM_ADVICE_JSON, "program": PROGRAM_JSON}},
+    )
+    advice = client.ask(USER, "q").advice
+    assert advice is not None
+    assert advice.program == api_client.Program(
+        id=PROGRAM_JSON["id"],
+        days=[api_client.ProgramDay("推日", [api_client.ProgramItem("槓鈴臥推", 4, 8)])],
+    )
+
+
+@pytest.mark.parametrize("extra", [{"program": None}, {}])
+def test_ask_program_null_or_missing(monkeypatch: pytest.MonkeyPatch, extra: dict) -> None:
+    client, _ = _http_client(
+        monkeypatch, {"outcome": "answer", "advice": {**PROGRAM_ADVICE_JSON, **extra}}
+    )
+    advice = client.ask(USER, "q").advice
+    assert advice is not None
+    assert advice.program is None
+
+
+def test_save_program_day_request_and_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {"outcome": "already_saved", "templateName": "推日"})
+    result = client.save_program_day(USER, PROGRAM_JSON["id"], 2)
+    assert sent[0]["url"] == "https://api.test/internal/ai/program-save"
+    assert sent[0]["json"] == {"lineUserId": USER, "programId": PROGRAM_JSON["id"], "day": 2}
+    assert sent[0]["timeout"] == 5.0
+    assert result == api_client.ProgramSaved("already_saved", "推日")

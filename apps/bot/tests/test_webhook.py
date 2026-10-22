@@ -10,6 +10,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app import messages
 from app.api_client import (
     Advice,
     AdviceItem,
@@ -22,6 +23,7 @@ from app.api_client import (
     MealTextResult,
     MetricRecorded,
     PreviousMetric,
+    ProgramSaved,
     SyncResult,
     TodayResult,
 )
@@ -75,6 +77,8 @@ class FakeApi:
         self.meal_raises: Exception | None = None
         self.ask_result = AskResult(outcome="answer", advice=ADVICE)
         self.ask_raises: Exception | None = None
+        self.program_saved = ProgramSaved("saved", "推日")
+        self.program_raises: Exception | None = None
         self.consented = consented
         self.metric_previous = metric_previous
         self.today_result = today
@@ -151,6 +155,12 @@ class FakeApi:
 
     def reset_conversation(self, line_user_id: str) -> None:
         self.calls.append(("reset_conversation", line_user_id))
+
+    def save_program_day(self, line_user_id: str, program_id: str, day: int) -> ProgramSaved:
+        self.calls.append(("save_program_day", line_user_id, program_id, day))
+        if self.program_raises is not None:
+            raise self.program_raises
+        return self.program_saved
 
 
 class FakeLine:
@@ -934,3 +944,49 @@ def test_ask_before_consent_replies_welcome() -> None:
     post(client, [text_event("晚餐吃什麼")])
     assert [c[0] for c in api.calls] == ["sync"]
     assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+PROGRAM_POSTBACK = f"action=program_save&id={MEAL_ID}&day=1"
+
+
+def test_program_save_postback_saved() -> None:
+    client, api, line = meal_setup()
+    post(client, [menu_postback(PROGRAM_POSTBACK)])
+    assert ("save_program_day", USER, MEAL_ID, 1) in api.calls
+    assert line.replies[0][1] == [{"type": "text", "text": "「推日」範本已經儲存"}]
+
+
+def test_program_save_postback_already_saved() -> None:
+    client, api, line = meal_setup()
+    api.program_saved = ProgramSaved("already_saved", "推日")
+    post(client, [menu_postback(PROGRAM_POSTBACK)])
+    assert line.replies[0][1] == [{"type": "text", "text": "「推日」範本已經存過了"}]
+
+
+def test_program_save_postback_expired() -> None:
+    client, api, line = meal_setup()
+    api.program_raises = ApiError(404)
+    post(client, [menu_postback(PROGRAM_POSTBACK)])
+    assert line.replies[0][1] == [{"type": "text", "text": "這份課表已過期，請重新問 AI。"}]
+
+
+@pytest.mark.parametrize("error", [ApiError(500), httpx.ReadTimeout("slow")])
+def test_program_save_postback_unavailable(error: Exception) -> None:
+    client, api, line = meal_setup()
+    api.program_raises = error
+    post(client, [menu_postback(PROGRAM_POSTBACK)])
+    assert line.replies[0][1] == [messages.meal_outcome("unavailable")]
+
+
+def test_program_save_postback_before_consent_replies_welcome() -> None:
+    api, line = FakeApi(consented=False), FakeLine()
+    post(TestClient(create_app(SETTINGS, api, line)), [menu_postback(PROGRAM_POSTBACK)])
+    assert all(c[0] != "save_program_day" for c in api.calls)
+    assert "我已滿 18 歲，同意並開始" in json.dumps(line.replies[0][1], ensure_ascii=False)
+
+
+def test_program_save_postback_malformed_is_ignored() -> None:
+    client, api, line = meal_setup()
+    post(client, [menu_postback(f"action=program_save&id={MEAL_ID}&day=8")])
+    assert api.calls == []
+    assert line.replies == []
