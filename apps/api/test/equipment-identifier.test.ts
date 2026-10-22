@@ -152,6 +152,29 @@ describe("equipment identifier", () => {
     expect(prompt).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
+  it("rebuilds when a name changes and drops null-slug rows", () => {
+    const renamed = [
+      { ...LIBRARY[0]!, nameZh: "改名臥推" },
+      ...LIBRARY.slice(1),
+    ];
+    expect(equipmentSystemPrompt(renamed)).not.toBe(
+      equipmentSystemPrompt(LIBRARY),
+    );
+    expect(equipmentSystemPrompt(renamed)).toContain("改名臥推");
+    const withNull = [
+      ...LIBRARY,
+      { ...LIBRARY[0]!, slug: null, nameZh: "無代號" },
+    ];
+    const schema = equipmentSchema(withNull) as {
+      properties: { candidates: { items: { enum: string[] } } };
+    };
+    expect(schema.properties.candidates.items.enum).toEqual(
+      LIBRARY.map((e) => e.slug),
+    );
+    expect(equipmentSystemPrompt(withNull)).not.toContain("無代號");
+    expect(Object.isFrozen(schema.properties.candidates.items.enum)).toBe(true);
+  });
+
   it("schema lists the enums and requires every field", () => {
     const schema = equipmentSchema(LIBRARY) as {
       properties: Record<string, { enum?: string[] }>;
@@ -163,7 +186,7 @@ describe("equipment identifier", () => {
       ...MUSCLE_GROUPS,
       "none",
     ]);
-    expect(schema.required.sort()).toEqual(
+    expect([...schema.required].sort()).toEqual(
       [
         "candidates",
         "equipment",

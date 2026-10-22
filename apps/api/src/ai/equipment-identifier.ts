@@ -34,20 +34,32 @@ export interface EquipmentIdentifier {
 }
 
 interface Built {
+  key: string;
   system: string;
   schema: object;
 }
 
-// Keyed by the joined slug list so the same library always yields the same
-// strings and objects (stable prompt cache prefix).
-const cache = new Map<string, Built>();
+// Single entry, replaced when the library content changes, so the same
+// library always yields the same strings and objects (stable cache prefix).
+let cached: Built | undefined;
+
+function deepFreeze<T extends object>(o: T): T {
+  for (const v of Object.values(o)) {
+    if (typeof v === "object" && v !== null) deepFreeze(v);
+  }
+  return Object.freeze(o);
+}
 
 function build(library: Exercise[]): Built {
-  const slugs = library.map((e) => e.slug ?? "");
-  const key = slugs.join(",");
-  const hit = cache.get(key);
-  if (hit) return hit;
-  const lines = library.map((e) =>
+  const rows = library.filter(
+    (e): e is Exercise & { slug: string } => e.slug !== null,
+  );
+  const key = rows
+    .map((e) => [e.slug, e.nameZh, e.equipment, e.muscleGroup ?? ""].join("|"))
+    .join("\n");
+  if (cached?.key === key) return cached;
+  const slugs = rows.map((e) => e.slug);
+  const lines = rows.map((e) =>
     [
       e.slug,
       e.nameZh,
@@ -55,9 +67,10 @@ function build(library: Exercise[]): Built {
       e.muscleGroup ? MUSCLE_GROUP_LABELS[e.muscleGroup] : "—",
     ].join("｜"),
   );
-  const built: Built = {
+  cached = {
+    key,
     system: `${EQUIPMENT_SYSTEM_HEAD}\n${lines.join("\n")}`,
-    schema: {
+    schema: deepFreeze({
       type: "object",
       properties: {
         is_equipment: { type: "boolean" },
@@ -77,10 +90,9 @@ function build(library: Exercise[]): Built {
         "candidates",
       ],
       additionalProperties: false,
-    },
+    }),
   };
-  cache.set(key, built);
-  return built;
+  return cached;
 }
 
 export function equipmentSystemPrompt(library: Exercise[]): string {
