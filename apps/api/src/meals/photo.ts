@@ -36,7 +36,7 @@ export async function logMealFromPhoto(
     now: () => Date;
     log: FastifyBaseLogger;
     /** Per-call GCS deadline; tests shorten it. */
-    photoTimeoutMs?: number;
+    photoTimeoutMs?: number | undefined;
   },
   userId: string,
   image: Buffer,

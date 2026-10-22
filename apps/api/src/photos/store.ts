@@ -53,9 +53,7 @@ export function createGcsPhotoStore(bucket: string): PhotoStore {
       return url;
     },
     async delete(key) {
-      await gcsBucket
-        .file(key)
-        .delete({ ignoreNotFound: true, timeout: PHOTO_STORE_TIMEOUT_MS });
+      await gcsBucket.file(key).delete({ ignoreNotFound: true });
     },
   };
 }
