@@ -14,6 +14,7 @@ import {
   createTestDb,
   unusedMealParser,
   unusedPhotoStore,
+  unusedAdvisor,
   unusedEquipmentIdentifier,
 } from "./db";
 
@@ -54,6 +55,7 @@ describe("workout session routes", () => {
       notifyWorkoutFinished: (...args) => notify(...args),
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
+      advisor: unusedAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

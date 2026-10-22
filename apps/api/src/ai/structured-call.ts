@@ -17,6 +17,10 @@ export interface StructuredSpec {
   schema: object;
   content: Anthropic.MessageParam["content"];
   maxTokens: number;
+  /** Defaults to "low". */
+  effort?: "low" | "medium";
+  /** Placed before the current user message; defaults to none. */
+  history?: Anthropic.MessageParam[];
   /** Extra log fields; never content. */
   logExtra?: Record<string, number>;
 }
@@ -40,9 +44,12 @@ export async function callStructured<T>(
           cache_control: { type: "ephemeral" },
         },
       ],
-      messages: [{ role: "user", content: spec.content }],
+      messages: [
+        ...(spec.history ?? []),
+        { role: "user", content: spec.content },
+      ],
       output_config: {
-        effort: "low",
+        effort: spec.effort ?? "low",
         format: {
           type: "json_schema",
           schema: spec.schema as Record<string, unknown>,

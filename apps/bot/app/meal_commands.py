@@ -16,6 +16,9 @@ _PREFIXES = {
 _MEAL_TEXT = re.compile(rf"^({'|'.join(_PREFIXES)})[\s:：]*(.*)$", re.DOTALL)
 
 
+_QUESTION_LIKE = re.compile(r"吃什麼|推薦|建議|可以吃|要吃|嗎|呢|[?？]\s*$")
+
+
 @dataclass(frozen=True)
 class MealText:
     meal_type: str
@@ -63,3 +66,11 @@ def parse_meal_postback(data: str) -> MealPostback | None:
     if action == "meal_type" and meal_type not in MEAL_TYPES:
         return None
     return MealPostback(action, meal_id.lower(), meal_type)
+
+
+def parse_meal_log(text: str) -> MealText | None:
+    """A meal log: meal-prefixed text whose content is not a question for the AI."""
+    meal = parse_meal_text(text)
+    if meal is None or _QUESTION_LIKE.search(meal.text):
+        return None
+    return meal

@@ -25,7 +25,12 @@ import {
   shapeGuess,
 } from "../src/workouts/identify";
 import { listBuiltinExercises } from "../src/workouts/repo";
-import { createTestDb, unusedMealParser, unusedPhotoStore } from "./db";
+import {
+  createTestDb,
+  unusedAdvisor,
+  unusedMealParser,
+  unusedPhotoStore,
+} from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
 const U1 = `U${"a".repeat(32)}`;
@@ -116,6 +121,7 @@ describe("identifyEquipment and POST /exercises/identify", () => {
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
       equipmentIdentifier: identifier,
+      advisor: unusedAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

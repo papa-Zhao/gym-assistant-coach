@@ -1,10 +1,12 @@
 import {
+  ASK_MAX_CHARS,
   MEAL_PHOTO_MAX_BYTES,
   MEAL_TYPES,
   isValidMetric,
   roundMetric,
   taipeiDate,
   type ApiError,
+  type AskResponse,
   type MetricKey,
   type Meal,
   type MealType,
@@ -14,6 +16,8 @@ import {
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
+import { endConversation } from "../ask/repo";
+import { askCoach } from "../ask/service";
 import { confirmMeal, consumedOn, setMealType } from "../meals/repo";
 import { logMealFromPhoto } from "../meals/photo";
 import { logMealFromText } from "../meals/text";
@@ -111,6 +115,18 @@ const mealPhotoSchema = {
     type: "object",
     required: ["x-line-user-id"],
     properties: { "x-line-user-id": lineUserId },
+  },
+} as const;
+
+const askSchema = {
+  body: {
+    type: "object",
+    required: ["lineUserId", "text"],
+    additionalProperties: false,
+    properties: {
+      lineUserId,
+      text: { type: "string", minLength: 1, maxLength: ASK_MAX_CHARS },
+    },
   },
 } as const;
 
@@ -309,6 +325,31 @@ export const internalRoutes =
           date,
           previous: await previousMetric(db, userId, key, date),
         };
+      },
+    );
+
+    app.post<{ Body: { lineUserId: string; text: string } }>(
+      "/ai/ask",
+      { schema: askSchema },
+      async (req, reply): Promise<AskResponse | ApiError> => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        if (!user) return reply.code(404).send(notFound);
+        return askCoach(
+          { db, advisor: deps.advisor, now },
+          user.id,
+          req.body.text,
+        );
+      },
+    );
+
+    app.post<{ Body: { lineUserId: string } }>(
+      "/ai/reset",
+      { schema: unfollowSchema },
+      async (req, reply) => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        if (!user) return reply.code(404).send(notFound);
+        await endConversation(db, user.id, now());
+        return reply.code(204).send();
       },
     );
   };

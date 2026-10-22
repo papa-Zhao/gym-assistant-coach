@@ -80,6 +80,38 @@ class MealConfirmed:
     targets: Macros | None
 
 
+@dataclass(frozen=True)
+class AdviceItem:
+    name: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class Advice:
+    title: str
+    items: list[AdviceItem]
+    body: str
+    today_line: str | None
+    notices: list[str]
+
+
+@dataclass(frozen=True)
+class AskResult:
+    # answer | limit | refused | unavailable
+    outcome: str
+    advice: Advice | None
+
+
+def _advice(data: dict) -> Advice:
+    return Advice(
+        title=data["title"],
+        items=[AdviceItem(name=i["name"], detail=i["detail"]) for i in data["items"]],
+        body=data["body"],
+        today_line=data.get("todayLine"),
+        notices=list(data["notices"]),
+    )
+
+
 def _meal(data: dict) -> Meal:
     return Meal(
         id=data["id"],
@@ -103,8 +135,9 @@ def _macros(data: dict) -> Macros:
     )
 
 
-# The three meal calls wait on an AI model; everything else keeps the 5 s default.
+# The AI calls (meals and ask) wait on a model; everything else keeps the 5 s default.
 MEAL_TIMEOUT = 30.0
+ASK_TIMEOUT = 30.0
 
 
 class ApiError(Exception):
@@ -133,6 +166,10 @@ class ApiClient(Protocol):
     def confirm_meal(self, line_user_id: str, meal_id: str) -> MealConfirmed: ...
 
     def set_meal_type(self, line_user_id: str, meal_id: str, meal_type: str) -> Meal: ...
+
+    def ask(self, line_user_id: str, text: str) -> AskResult: ...
+
+    def reset_conversation(self, line_user_id: str) -> None: ...
 
 
 class HttpApiClient:
@@ -250,6 +287,18 @@ class HttpApiClient:
             timeout=MEAL_TIMEOUT,
         ).json()
         return _meal(data["meal"])
+
+    def ask(self, line_user_id: str, text: str) -> AskResult:
+        data = self._post(
+            "/internal/ai/ask",
+            {"lineUserId": line_user_id, "text": text},
+            timeout=ASK_TIMEOUT,
+        ).json()
+        advice = _advice(data["advice"]) if data["outcome"] == "answer" else None
+        return AskResult(outcome=data["outcome"], advice=advice)
+
+    def reset_conversation(self, line_user_id: str) -> None:
+        self._post("/internal/ai/reset", {"lineUserId": line_user_id})
 
 
 class WorkoutPr(BaseModel):

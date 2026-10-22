@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { fileURLToPath } from "node:url";
 import type { Db } from "../src/users/repo";
+import type { Advisor } from "../src/ai/advisor";
 import type { EquipmentIdentifier } from "../src/ai/equipment-identifier";
 import type { MealParser } from "../src/ai/meal-parser";
 import type { PhotoStore } from "../src/photos/store";
@@ -49,6 +50,13 @@ export const unusedMealParser: MealParser = {
 export const unusedEquipmentIdentifier: EquipmentIdentifier = {
   identify: async () => {
     throw new Error("equipment identifier should not be called");
+  },
+};
+
+/** For suites that never reach the advisor. */
+export const unusedAdvisor: Advisor = {
+  ask: async () => {
+    throw new Error("advisor should not be called");
   },
 };
 

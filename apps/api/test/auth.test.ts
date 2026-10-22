@@ -7,6 +7,7 @@ import {
   createTestDb,
   unusedMealParser,
   unusedPhotoStore,
+  unusedAdvisor,
   unusedEquipmentIdentifier,
 } from "./db";
 import { CONSENT_VERSION } from "@gac/shared";
@@ -45,6 +46,7 @@ describe("auth", () => {
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
+      advisor: unusedAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
@@ -201,6 +203,7 @@ describe("error handling", () => {
         notifyWorkoutFinished: async () => {},
         mealParser: unusedMealParser,
         equipmentIdentifier: unusedEquipmentIdentifier,
+        advisor: unusedAdvisor,
         photoStore: unusedPhotoStore,
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,

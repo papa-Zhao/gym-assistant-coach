@@ -309,3 +309,51 @@ def test_other_calls_keep_five_second_timeout(monkeypatch: pytest.MonkeyPatch) -
     client, sent = _http_client(monkeypatch, {})
     client.unfollow(USER)
     assert sent[0]["timeout"] == 5.0
+
+
+ADVICE_JSON = {
+    "title": "晚餐建議",
+    "items": [{"name": "雞胸沙拉", "detail": "約 450 kcal"}],
+    "body": "先吃蛋白質。",
+    "todayLine": "今天還能吃 700 kcal",
+    "notices": ["提醒"],
+}
+
+
+def test_ask_request_and_parse_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {"outcome": "answer", "advice": ADVICE_JSON})
+    result = client.ask(USER, "晚餐吃什麼")
+    assert sent[0]["url"] == "https://api.test/internal/ai/ask"
+    assert sent[0]["json"] == {"lineUserId": USER, "text": "晚餐吃什麼"}
+    assert sent[0]["timeout"] == 30.0
+    assert result.outcome == "answer"
+    assert result.advice is not None
+    assert result.advice.title == "晚餐建議"
+    assert (result.advice.items[0].name, result.advice.items[0].detail) == (
+        "雞胸沙拉",
+        "約 450 kcal",
+    )
+    assert result.advice.today_line == "今天還能吃 700 kcal"
+    assert result.advice.notices == ["提醒"]
+
+
+def test_ask_parses_null_today_line_and_non_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _http_client(
+        monkeypatch, {"outcome": "answer", "advice": {**ADVICE_JSON, "todayLine": None}}
+    )
+    result = client.ask(USER, "x")
+    assert result.advice is not None
+    assert result.advice.today_line is None
+
+    for outcome in ("limit", "refused", "unavailable"):
+        client, _ = _http_client(monkeypatch, {"outcome": outcome})
+        result = client.ask(USER, "x")
+        assert (result.outcome, result.advice) == (outcome, None)
+
+
+def test_reset_conversation_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, sent = _http_client(monkeypatch, {})
+    assert client.reset_conversation(USER) is None
+    assert sent[0]["url"] == "https://api.test/internal/ai/reset"
+    assert sent[0]["json"] == {"lineUserId": USER}
+    assert sent[0]["timeout"] == 5.0

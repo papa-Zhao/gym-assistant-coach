@@ -401,3 +401,47 @@ export const aiUsageDaily = pgTable(
     check("ai_usage_daily_kind_check", sql`${t.kind} in (${inList(AI_KINDS)})`),
   ],
 );
+
+export const aiConversations = pgTable(
+  "ai_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("ai_conversations_one_active_unique")
+      .on(t.userId)
+      .where(sql`${t.endedAt} is null`),
+  ],
+);
+
+export const aiMessages = pgTable(
+  "ai_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("ai_messages_role_check", sql`${t.role} in ('user', 'assistant')`),
+    index("ai_messages_conversation_created_idx").on(
+      t.conversationId,
+      t.createdAt,
+    ),
+    index("ai_messages_created_idx").on(t.createdAt),
+  ],
+);
