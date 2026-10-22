@@ -270,10 +270,26 @@
 ## 狀態
 
 - 2026-10-22：計畫完成，待使用者確認。
+- 2026-10-23：實作完成（Task 1–5），Task 6 的檢查全部通過，待開 PR。尚未 `terraform apply`、尚未手機實測。
 
 ## 交接備註
 
-（實作完成後填寫）
+和計畫不同、或計畫沒寫到的地方：
+
+- **CI 也要加環境變數**：`.github/workflows/ci.yml` 的 docker 啟動測試要帶 `SCHEDULER_SA_EMAIL`（假值），不然新版 api 啟動失敗。計畫沒列這個檔，已在 Task 3 的 commit 一起改。
+- `purgeDeletedUsers` 多一個選用的第 4 個參數 `log`（只有 `warn`），照片刪除失敗時記錯誤類別名稱；`/jobs/daily` 傳入 `req.log`。不傳就不記。
+- `/jobs` plugin 接受任何 content type 並忽略 body：Cloud Scheduler 可能帶 `Content-Type: application/octet-stream`，Fastify 預設會回 415。`application/json` 的空 body 仍會回 400（排程不會這樣送）。
+- `AppDeps.schedulerServiceAccount` 是必填，所有測試的 deps 都補上了 `"scheduler@x"`。
+- `workoutAuth` 改成 `workoutAuth(db, sessionSecret)`；meals 路由也用它。
+- 測試用 `memoryPhotoStore`：`calls.deletePrefix` 記錄呼叫；`fail.deletePrefix` 是一個 Set，放進去的前綴會拋 `TypeError`（用來測單一帳號失敗）。
+- 匯出內容：不含任何內部 id（自己的也不含）；訓練有 `template`（範本名稱）、`items`／`sets`／`cardio` 帶動作中文名稱；餐點品項有 `name`（品項名）和 `food`（對應食物名稱，沒有對應時 null）；課表的 `days[].items[]` 把 `exerciseId` 換成動作名稱；數值欄位轉成 number。AI 訊息依時間排序，同時間時問題排在回答前面。
+- 刪除時 `line_user_id` 用 SQL 改成 `'deleted:' || id`；`deleted_at` 用 `lte(now - 6 天)` 判斷，剛好 6 天會刪。
+- LIFF：「匯出我的資料」和「刪除我的所有資料」留在原本的「更多」區塊，放在「訓練範本」前面。匯出或刪除送出中，按鈕都停用；確認畫面的「取消」在送出中也停用。另外加了 `saveFile` 的單元測試。
+- 注意 GCS `deleteFiles` 套用 `withPhotoDeadline`（5 秒）：照片很多的帳號可能逾時，這時帳號留到隔天再試（已刪掉的物件不會回來，所以會一天天變少），不會卡住其他帳號。實際上 90 天內的照片量應該不會到這個程度。
+- 沒有替 `users(status, deleted_at)` 加索引；使用者數量小，全表掃描可接受。
+- Cloud Scheduler 用 OIDC 時，執行 `terraform apply` 的人需要對 `scheduler-invoker` 有 `iam.serviceAccounts.actAs`（專案 Owner 已有）。2019 年以後建立的專案不需要另外替 Cloud Scheduler 服務代理授權。
+- **合併前待辦**（使用者自行操作）：依「部署」一節先 `terraform apply` 再合併；合併後手動觸發一次排程，並在 iOS／Android 的 LINE 內建瀏覽器實測匯出下載與刪除流程。
+- 和 PR 10.2 的合併：`app.ts` 只多了一行 import 和一行 `app.register(jobRoutes(deps), { prefix: "/jobs" })`，放在 `/internal` 下面。
 
 ## 下一個 PR 需要知道的事
 
