@@ -18,12 +18,8 @@ import { issueSession } from "../src/auth/session";
 import type { AppDeps } from "../src/deps.js";
 import { aiUsageDaily } from "../src/db/schema";
 import { syncUser, type Db } from "../src/users/repo";
-import {
-  bySlugOrder,
-  identifyEquipment,
-  resetBuiltinLibraryCache,
-  shapeGuess,
-} from "../src/workouts/identify";
+import { identifyEquipment, shapeGuess } from "../src/workouts/identify";
+import { bySlugOrder, resetBuiltinLibraryCache } from "../src/workouts/library";
 import { listBuiltinExercises } from "../src/workouts/repo";
 import {
   createTestDb,

@@ -15,7 +15,7 @@ import type {
 import { withAiUse } from "../ai/usage";
 import { InvalidImage, normalizePhoto } from "../photos/image";
 import type { Db } from "../users/repo";
-import { listBuiltinExercises } from "./repo";
+import { getBuiltinLibrary } from "./library";
 
 const MAX_CANDIDATES = 5;
 const MAX_NAME_CHARS = 30;
@@ -24,33 +24,6 @@ const isEquipment = (v: string): v is Equipment =>
   (EQUIPMENT as readonly string[]).includes(v);
 const isMuscleGroup = (v: string): v is MuscleGroup =>
   (MUSCLE_GROUPS as readonly string[]).includes(v);
-
-/** Plain code-unit order on slug; independent of database collation. */
-export const bySlugOrder = (a: Exercise, b: Exercise): number =>
-  a.slug! < b.slug! ? -1 : a.slug! > b.slug! ? 1 : 0;
-
-// The built-in list never changes at runtime; keep the first read so the
-// identifier gets the same list (and prompt cache prefix) on every call.
-let builtinLibrary: Promise<Exercise[]> | undefined;
-
-function getBuiltinLibrary(db: Db): Promise<Exercise[]> {
-  if (!builtinLibrary) {
-    const loading = listBuiltinExercises(db).then((rows) =>
-      [...rows].sort(bySlugOrder),
-    );
-    // A failed read must not stick.
-    loading.catch(() => {
-      if (builtinLibrary === loading) builtinLibrary = undefined;
-    });
-    builtinLibrary = loading;
-  }
-  return builtinLibrary;
-}
-
-/** Clears the remembered built-in list. Exists for tests only. */
-export function resetBuiltinLibraryCache(): void {
-  builtinLibrary = undefined;
-}
 
 /**
  * Normalizes the photo (a bad one costs no use), asks the identifier, and

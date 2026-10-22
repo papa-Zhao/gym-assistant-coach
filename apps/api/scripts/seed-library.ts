@@ -12,7 +12,7 @@ import {
   type ExerciseKind,
   type MuscleGroup,
 } from "@gac/shared";
-import { bySlugOrder } from "../src/workouts/identify";
+import { bySlugOrder } from "../src/workouts/library";
 
 // Only 0004 is parsed: no later migration adds built-in exercises today.
 const SEED_PATH = path.resolve(

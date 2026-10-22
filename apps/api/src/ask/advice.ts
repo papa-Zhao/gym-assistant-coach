@@ -1,5 +1,6 @@
 import type { Advice } from "@gac/shared";
 import type { RawAdvice } from "../ai/advisor";
+import { programText } from "./program";
 import { lowKcalWarning, MEDICAL_NOTICE, needsMedicalNotice } from "./safety";
 
 export const DISCLAIMER = "AI 建議僅供參考，不能取代醫師或營養師的專業意見。";
@@ -36,7 +37,14 @@ export function shapeAdvice(
     .map((t) => lowKcalWarning(t, opts.floorKcal))
     .find((w) => w !== null);
   if (kcal) notices.push(kcal);
-  return { title, items, body, todayLine: opts.todayLine, notices };
+  return {
+    title,
+    items,
+    body,
+    todayLine: opts.todayLine,
+    notices,
+    program: null,
+  };
 }
 
 /** Plain-text form stored as the assistant turn. */
@@ -46,6 +54,7 @@ export function adviceText(a: Advice): string {
     ...a.items.map((i) =>
       i.detail ? `・${i.name}（${i.detail}）` : `・${i.name}`,
     ),
+    ...(a.program ? [programText(a.program.days)] : []),
     a.body,
   ].join("\n");
 }

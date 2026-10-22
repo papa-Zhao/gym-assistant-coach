@@ -11,6 +11,7 @@ import {
   type Meal,
   type MealType,
   type MetricRecordedResponse,
+  type SaveProgramDayResponse,
   type TodayResponse,
 } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
@@ -18,6 +19,7 @@ import { apiErrorHandler, bearerAuth } from "../http.js";
 import type { AppDeps } from "../deps.js";
 import { endConversation } from "../ask/repo";
 import { askCoach } from "../ask/service";
+import { saveProgramDay } from "../ask/programs";
 import { confirmMeal, consumedOn, setMealType } from "../meals/repo";
 import { logMealFromPhoto } from "../meals/photo";
 import { logMealFromText } from "../meals/text";
@@ -126,6 +128,19 @@ const askSchema = {
     properties: {
       lineUserId,
       text: { type: "string", minLength: 1, maxLength: ASK_MAX_CHARS },
+    },
+  },
+} as const;
+
+const programSaveSchema = {
+  body: {
+    type: "object",
+    required: ["lineUserId", "programId", "day"],
+    additionalProperties: false,
+    properties: {
+      lineUserId,
+      programId: { type: "string", format: "uuid" },
+      day: { type: "integer", minimum: 1, maximum: 7 },
     },
   },
 } as const;
@@ -339,6 +354,26 @@ export const internalRoutes =
           user.id,
           req.body.text,
         );
+      },
+    );
+
+    app.post<{
+      Body: { lineUserId: string; programId: string; day: number };
+    }>(
+      "/ai/program-save",
+      { schema: programSaveSchema },
+      async (req, reply): Promise<SaveProgramDayResponse | ApiError> => {
+        const user = await findByLineUserId(db, req.body.lineUserId);
+        if (!user) return reply.code(404).send(notFound);
+        const saved = await saveProgramDay(
+          db,
+          user.id,
+          req.body.programId,
+          req.body.day,
+          now(),
+        );
+        if (!saved) return reply.code(404).send(notFound);
+        return saved;
       },
     );
 

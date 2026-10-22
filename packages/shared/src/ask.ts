@@ -5,12 +5,29 @@ export interface AdviceItem {
   detail: string;
 }
 
+export interface ProgramItem {
+  nameZh: string;
+  sets: number;
+  reps: number;
+}
+
+export interface ProgramDay {
+  name: string;
+  items: ProgramItem[];
+}
+
+export interface Program {
+  id: string;
+  days: ProgramDay[];
+}
+
 export interface Advice {
   title: string;
   items: AdviceItem[];
   body: string;
   todayLine: string | null;
   notices: string[];
+  program: Program | null;
 }
 
 export type AskResponse =

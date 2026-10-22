@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { Advisor } from "../src/ai/advisor.js";
+import type { Advisor, RawProgramDay } from "../src/ai/advisor.js";
 import type { AppDeps } from "../src/deps.js";
 import { CONSENT_VERSION } from "@gac/shared";
 import { saveProfile } from "../src/profile/repo";
@@ -53,6 +53,7 @@ let parser: MealParser = {
 const auth = { authorization: "Bearer good" };
 const photos = memoryPhotoStore();
 let photoCalls = 0;
+let askProgram: RawProgramDay[] = [];
 const askCalls: Parameters<Advisor["ask"]>[0][] = [];
 
 describe("/internal/users", () => {
@@ -85,7 +86,12 @@ describe("/internal/users", () => {
           askCalls.push(input);
           return {
             kind: "ok",
-            advice: { title: "建議", items: [], body: "多喝水。", program: [] },
+            advice: {
+              title: "建議",
+              items: [],
+              body: "多喝水。",
+              program: askProgram,
+            },
             usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 },
           };
         },
@@ -627,6 +633,55 @@ describe("/internal/users", () => {
     expect(reset.statusCode).toBe(204);
     await post("/internal/ai/ask", { lineUserId: id, text: "早餐？" });
     expect(askCalls[2]?.history).toEqual([]);
+  });
+
+  it("ask returns a program and program-save saves a day once", async () => {
+    const id = `U${"d".repeat(32)}`;
+    const other = `U${"e".repeat(32)}`;
+    await syncUser(db, id, null);
+    await syncUser(db, other, null);
+    askProgram = [
+      {
+        name: "推日",
+        exercises: [{ slug: "barbell-bench-press", sets: 4, reps: 8 }],
+      },
+    ];
+    try {
+      const res = await post("/internal/ai/ask", {
+        lineUserId: id,
+        text: "課表",
+      });
+      const program = res.json().advice.program;
+      expect(program.days).toEqual([
+        { name: "推日", items: [{ nameZh: "槓鈴臥推", sets: 4, reps: 8 }] },
+      ]);
+      const body = { lineUserId: id, programId: program.id, day: 1 };
+      const first = await post("/internal/ai/program-save", body);
+      expect(first.statusCode).toBe(200);
+      expect(first.json()).toEqual({ outcome: "saved", templateName: "推日" });
+      const second = await post("/internal/ai/program-save", body);
+      expect(second.statusCode).toBe(200);
+      expect(second.json().outcome).toBe("already_saved");
+      for (const bad of [
+        { ...body, lineUserId: `U${"0".repeat(32)}` },
+        { ...body, lineUserId: other },
+        { ...body, day: 7 },
+        { ...body, programId: "00000000-0000-4000-8000-000000000000" },
+      ]) {
+        const r = await post("/internal/ai/program-save", bad);
+        expect(r.statusCode).toBe(404);
+      }
+      for (const bad of [
+        { ...body, day: 0 },
+        { ...body, day: 8 },
+        { ...body, programId: "x" },
+      ]) {
+        const r = await post("/internal/ai/program-save", bad);
+        expect(r.statusCode).toBe(400);
+      }
+    } finally {
+      askProgram = [];
+    }
   });
 
   it("GET /health still works without auth", async () => {
