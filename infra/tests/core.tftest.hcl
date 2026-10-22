@@ -170,4 +170,21 @@ run "service_env" {
     ])
     error_message = "bot API_SA_EMAIL must be the api runtime service account email."
   }
+
+  assert {
+    condition = anytrue([
+      for e in google_cloud_run_v2_service.svc["api"].template[0].containers[0].env :
+      e.name == "MEAL_PHOTOS_BUCKET" && e.value == "test-project-meal-photos"
+    ])
+    error_message = "api MEAL_PHOTOS_BUCKET must be the meal photo bucket name."
+  }
+
+  assert {
+    condition = (
+      google_service_account_iam_member.api_sign_blob.role == "roles/iam.serviceAccountTokenCreator" &&
+      google_service_account_iam_member.api_sign_blob.member == "serviceAccount:api-runtime@test-project.iam.gserviceaccount.com" &&
+      google_service_account_iam_member.api_sign_blob.service_account_id == "projects/test-project/serviceAccounts/api-runtime@test-project.iam.gserviceaccount.com"
+    )
+    error_message = "api runtime must be able to signBlob as itself (roles/iam.serviceAccountTokenCreator on its own service account)."
+  }
 }

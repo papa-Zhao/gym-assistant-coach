@@ -141,6 +141,15 @@ gh variable set API_URL --body "$(terraform output -raw api_url)"
 
 push 到 `main` 且 CI 成功後，Deploy workflow 會自動執行：備份 Neon（建立 `pre-migrate-<sha>` branch）、執行 migration，再部署 api、bot 與 liff。也可手動觸發 `workflow_dispatch`。只有本 repo 的 `main` 能使用 deployer 服務帳號。
 
+### PR 8.1 部署順序（照片記餐）
+
+順序很重要，請依序執行：
+
+1. **【使用者自行操作】** 先在本機執行 `terraform -chdir=infra apply`。plan 應該只有兩項變更：api Cloud Run 新增 `MEAL_PHOTOS_BUCKET` 環境變數，以及新增一個 IAM member（api 服務帳號對自己的 `roles/iam.serviceAccountTokenCreator`，供簽署照片網址）。舊版 api 會忽略這個環境變數，所以先 apply 不影響現有服務。
+2. 再合併 PR。部署時會先備份資料庫，再套用 migration 0009。
+
+反過來（先合併）會讓新版 api 因為缺少 `MEAL_PHOTOS_BUCKET` 而啟動失敗。
+
 ## 9. 回滾：migration 出錯時
 
 每次 migration 前會建立 Neon branch `pre-migrate-<sha>`，只保留最新 3 個。
