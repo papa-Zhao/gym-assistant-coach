@@ -302,10 +302,20 @@
 ## 狀態
 
 - 2026-10-22：計畫完成，待使用者確認。
+- 2026-10-22：實作完成（Task 1–5），整體審查後修正完成，待開 PR。
 
 ## 交接備註
 
-（實作完成後填寫）
+- `MAX_TEMPLATE_NAME = 30` 原本不存在（`template-routes.ts` 寫死 30）；現在從 `apps/api/src/workouts/repo.ts` 匯出，範本路由和 `shapeProgram` 共用。
+- 新增 `apps/api/src/ai/library.ts`（`libraryView`、`deepFreeze`），問 AI 和器材辨識共用同一個動作清單格式。
+- `/internal/ai/program-save` 的 `day` 超過 1–7（例如 8）回 400（schema 擋下），不是 404；課表沒有那一天（例如兩天的課表傳 7）才回 404。bot 的 postback 解析本來就只接受 1–7，使用者不會遇到 400。
+- 多餘的 body 欄位會被 Fastify 預設的 removeAdditional 移除，不回 400，和其他路由一致。
+- `shapeProgram` 先拿掉沒有有效動作的天，再取前 7 天。
+- 天的名稱會把控制字元和連續空白換成一個空格再 trim（避免 `\n` 弄亂對話歷史、`\u0000` 讓 jsonb 寫入失敗）；`【】` 沒有特別處理。
+- `saveProgramDay` 會去掉同一天重複的動作（防 `template_items` 主鍵衝突）。
+- bot carousel 最多 1 張建議卡＋7 天；`PROGRAM_MAX_DAYS = 7` 定義在 `apps/bot/app/program_commands.py`。
+- 受傷提醒觸發時課表會被丟掉，但 AI 的 body 可能仍描述一週安排（卡片有就醫提醒）；之後可以考慮在這種情況改寫 body。
+- **合併前待辦**：課表回答的輸出 token 與耗時還沒實測。`ASK_MAX_TOKENS = 4000`（含 medium 思考）、逾時 20 秒。請在自己的終端機用 `read -rs` 輸入金鑰後執行 `npm run eval:ask -w @gac/api`，看「幫我排一週三天的課表」那題的 out tokens 和 ms；接近 3000 tokens 或 15 秒時，調高 `ASK_MAX_TOKENS`（例如 8000）或收緊提示。
 
 ## 下一個 PR 需要知道的事
 
