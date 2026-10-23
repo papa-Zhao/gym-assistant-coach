@@ -29,6 +29,7 @@ const calls: Parameters<Notify>[] = [];
 
 describe("workout session routes", () => {
   let app: ReturnType<typeof buildApp>;
+  let deps: AppDeps;
   let db: Db;
   let closeDb: () => Promise<void>;
   let h1: Record<string, string>;
@@ -45,7 +46,7 @@ describe("workout session routes", () => {
     const id2 = (await syncUser(db, U2, null)).userId;
     h1 = { authorization: `Bearer ${await issueSession(SECRET, id1)}` };
     h2 = { authorization: `Bearer ${await issueSession(SECRET, id2)}` };
-    app = buildApp({
+    deps = {
       db,
       verifyServiceToken: async () => {
         throw new Error("unused");
@@ -62,7 +63,8 @@ describe("workout session routes", () => {
       corsOrigin: "http://localhost",
       now: () => new Date("2026-10-19T04:00:00Z"),
       notifyTimeoutMs: 50,
-    });
+    };
+    app = buildApp(deps);
     const all = (
       await app.inject({ method: "GET", url: "/exercises", headers: h1 })
     ).json<Exercise[]>();
@@ -81,7 +83,11 @@ describe("workout session routes", () => {
     await app.close();
     await closeDb();
   });
-  beforeEach(() => {
+  beforeEach(async () => {
+    // A fresh app per test: this file makes more requests as one user than
+    // the per-minute rate limit allows.
+    await app.close();
+    app = buildApp(deps);
     calls.length = 0;
     notify = async (...args) => {
       calls.push(args);

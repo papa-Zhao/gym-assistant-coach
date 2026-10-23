@@ -103,4 +103,26 @@ describe("App", () => {
       screen.getByRole("button", { name: "重新整理" }),
     ).toBeInTheDocument();
   });
+
+  it("shows the rate-limited message when loading hits 429", async () => {
+    configureApi({
+      apiUrl: "https://api.test",
+      fetchImpl: (async () =>
+        new Response("{}", { status: 429 })) as unknown as typeof fetch,
+      relogin: async () => ({ kind: "error" }),
+    });
+    render(
+      <App
+        {...base}
+        state={{ kind: "ready", displayName: "小明" }}
+        pathname="/records"
+      />,
+    );
+    expect(
+      await screen.findByText("操作太頻繁，請稍等一分鐘再試。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("連線出了點問題，請稍後再試。"),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -4,6 +4,7 @@ from typing import Any, cast
 from app.api_client import ApiClient, HttpApiClient
 from app.handlers import create_app
 from app.line_replier import LineReplier, SdkLineReplier
+from app.logging_setup import configure_logging
 from app.settings import Settings
 
 
@@ -31,6 +32,8 @@ def _api() -> ApiClient:
 def _line() -> LineReplier:
     return SdkLineReplier(_settings().line_channel_access_token)
 
+
+configure_logging()
 
 app = create_app(
     cast(Settings, _Lazy(_settings)),

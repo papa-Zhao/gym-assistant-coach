@@ -29,6 +29,7 @@ export interface ApiError {
     | "internal"
     | "payload_too_large"
     | "unsupported_media_type"
+    | "rate_limited"
     // Meal input errors (see MealInputErrorCode in the api).
     | "invalid_grams"
     | "unknown_food"

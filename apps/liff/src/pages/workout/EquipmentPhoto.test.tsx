@@ -169,6 +169,11 @@ describe("ExercisePicker equipment photo", () => {
       () => new Response("x", { status: 413 }),
       "這張照片沒辦法讀取，請換一張再試。",
     ],
+    [
+      "http 429",
+      () => new Response("x", { status: 429 }),
+      "操作太頻繁，請稍等一分鐘再試。",
+    ],
   ];
   it.each(failures)("shows the %s message", async (_n, reply, text) => {
     setup(reply);

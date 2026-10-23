@@ -7,7 +7,7 @@ import {
   type Template,
   type WeekStats,
 } from "@gac/shared";
-import { apiFetch } from "../../api";
+import { apiFetch, failureMessage } from "../../api";
 import { ActiveWorkout } from "./ActiveWorkout";
 import { ConfirmRow } from "./ConfirmRow";
 import { FinishSummary } from "./FinishSummary";
@@ -16,7 +16,7 @@ import { Skeleton } from "../../components/Skeleton";
 
 interface WorkoutHomeProps {
   /** Called when the session cannot be recovered or loading failed. */
-  onFatal: () => void;
+  onFatal: (err?: unknown) => void;
   /** Closes the LIFF window (back to the chat room). */
   onClose: () => void;
 }
@@ -49,7 +49,7 @@ export function WorkoutHome({ onFatal, onClose }: WorkoutHomeProps) {
     setPhase({ kind: "loading" });
     loadHome()
       .then(setPhase)
-      .catch(() => onFatal());
+      .catch((err: unknown) => onFatal(err));
   }, [loadHome, onFatal]);
 
   useEffect(() => {
@@ -58,8 +58,8 @@ export function WorkoutHome({ onFatal, onClose }: WorkoutHomeProps) {
       .then((next) => {
         if (live) setPhase(next);
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     return () => {
       live = false;
@@ -123,7 +123,7 @@ function Home({ data, onData, onStarted, onFatal }: HomeProps) {
       await action();
     } catch (err) {
       if (isAuthExpired(err)) onFatal();
-      else setError(fallback);
+      else setError(failureMessage(err, fallback));
     } finally {
       setBusy(false);
     }

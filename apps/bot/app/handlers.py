@@ -22,6 +22,7 @@ from app.internal import VerifyApiToken, google_verifier, internal_router
 from app.line_replier import LineReplier
 from app.meal_commands import MealPostback, MealText, parse_meal_log, parse_meal_postback
 from app.program_commands import ProgramPostback, parse_program_postback
+from app.rate_limit import UserRateLimiter
 from app.settings import CONSENT_VERSION, Settings
 
 logger = logging.getLogger("gac.bot")
@@ -276,10 +277,34 @@ def _reply_to_question(event: MessageEvent, question: str, user_id: str, deps: "
 
 
 class _Deps:
-    def __init__(self, settings: Settings, api: ApiClient, line: LineReplier) -> None:
+    def __init__(
+        self, settings: Settings, api: ApiClient, line: LineReplier, limiter: UserRateLimiter
+    ) -> None:
         self.settings = settings
         self.api = api
         self.line = line
+        self.limiter = limiter
+
+
+def _rate_limited(event: Event, deps: _Deps) -> bool:
+    """True when the event must be skipped; replies once when a user first goes over.
+
+    Only messages and postbacks count. Follow/Unfollow always go through: an
+    unfollow has no reply token and must still mark the user as unfollowed.
+    """
+    if not isinstance(event, MessageEvent | PostbackEvent):
+        return False
+    user_id = getattr(getattr(event, "source", None), "user_id", None)
+    if not user_id:
+        return False
+    verdict = deps.limiter.check(user_id)
+    if verdict == "ok":
+        return False
+    if verdict == "warn":
+        # Never log the user id.
+        logger.info("rate limited event=%s", event.type)
+        deps.line.reply(event.reply_token, [messages.rate_limited()])
+    return True
 
 
 def _handle_event(event: Event, deps: _Deps) -> None:
@@ -331,6 +356,8 @@ def _handle_event(event: Event, deps: _Deps) -> None:
 def _process(events: list[Event], deps: _Deps) -> None:
     for event in events:
         try:
+            if _rate_limited(event, deps):
+                continue
             _handle_event(event, deps)
         except ApiError as err:
             logger.error("api call failed event=%s status=%s", event.type, err.status_code)
@@ -343,9 +370,10 @@ def create_app(
     api: ApiClient,
     line: LineReplier,
     verify_api_token: VerifyApiToken | None = None,
+    limiter: UserRateLimiter | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Gym Assistant Coach bot")
-    deps = _Deps(settings, api, line)
+    deps = _Deps(settings, api, line, limiter if limiter is not None else UserRateLimiter())
 
     @app.get("/health")
     def health() -> dict[str, str]:

@@ -6,7 +6,7 @@ import {
   type ExerciseSuggestion,
   type IdentifyEquipmentResponse,
 } from "@gac/shared";
-import { ApiHttpError, apiFetch } from "../../api";
+import { ApiHttpError, apiFetch, failureMessage } from "../../api";
 import { Skeleton } from "../../components/Skeleton";
 import { ExerciseRow } from "./ExerciseRow";
 import { PhotoReadError, resizePhoto } from "../../photo";
@@ -48,10 +48,10 @@ interface EquipmentPhotoProps {
   children: ReactNode;
 }
 
-function failureMessage(err: unknown): string {
+function photoFailureMessage(err: unknown): string {
   if (err instanceof PhotoReadError) return MSG_UNREADABLE;
   if (err instanceof ApiHttpError && err.status === 413) return MSG_UNREADABLE;
-  return MSG_BUSY;
+  return failureMessage(err, MSG_BUSY);
 }
 
 export function EquipmentPhoto({
@@ -101,7 +101,7 @@ export function EquipmentPhoto({
     } catch (err) {
       if (id !== requestId.current) return;
       if (isAuthExpired(err)) onFatal();
-      else setPhase({ kind: "error", message: failureMessage(err) });
+      else setPhase({ kind: "error", message: photoFailureMessage(err) });
     }
   };
 
