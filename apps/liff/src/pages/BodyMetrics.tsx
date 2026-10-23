@@ -7,7 +7,12 @@ import {
   type BodyMetricsResponse,
   type MetricKey,
 } from "@gac/shared";
-import { ApiHttpError, AuthExpiredError, apiFetch } from "../api";
+import {
+  ApiHttpError,
+  AuthExpiredError,
+  apiFetch,
+  failureMessage,
+} from "../api";
 import { formatChange, seriesFor, shortDate } from "../bodyMetricsView";
 import { TrendChart } from "../components/TrendChart";
 import { Skeleton } from "../components/Skeleton";
@@ -34,7 +39,7 @@ function fieldError(key: MetricKey, text: string): string | null {
 
 interface BodyMetricsProps {
   /** Called when the session cannot be recovered or loading failed. */
-  onFatal: () => void;
+  onFatal: (err?: unknown) => void;
 }
 
 export function BodyMetrics({ onFatal }: BodyMetricsProps) {
@@ -58,8 +63,8 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
       .then((res) => {
         if (live) setData(res);
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     return () => {
       live = false;
@@ -93,7 +98,7 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
       if (err instanceof AuthExpiredError) onFatal();
       else if (err instanceof ApiHttpError && err.status === 400)
         setSaveError("數字格式有誤，請檢查上面的欄位。");
-      else setSaveError("儲存失敗，請稍後再試。");
+      else setSaveError(failureMessage(err, "儲存失敗，請稍後再試。"));
     } finally {
       setSaving(false);
     }

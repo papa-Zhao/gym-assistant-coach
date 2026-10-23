@@ -15,6 +15,15 @@ export class ApiHttpError extends Error {
   }
 }
 
+export const RATE_LIMITED_MESSAGE = "操作太頻繁，請稍等一分鐘再試。";
+
+/** The rate-limit message on a 429, otherwise `fallback`. */
+export function failureMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiHttpError && err.status === 429
+    ? RATE_LIMITED_MESSAGE
+    : fallback;
+}
+
 /** The session expired and a fresh login did not fix it. */
 export class AuthExpiredError extends Error {
   constructor() {

@@ -11,6 +11,7 @@ import { createMealParser } from "./ai/meal-parser.js";
 import { instrument } from "./db/timing.js";
 import { createLineVerifier } from "./auth/line.js";
 import { loadConfig } from "./config.js";
+import { loggerOptions } from "./logging.js";
 import { createGcsPhotoStore } from "./photos/store.js";
 import { createBotNotifier } from "./notify/bot.js";
 import type { AppDeps, VerifyServiceToken } from "./deps.js";
@@ -70,7 +71,10 @@ const deps: AppDeps = {
   corsOrigin: config.corsOrigin,
   now: () => new Date(),
 };
-const app = buildApp(deps, { logger: true, disableRequestLogging: true });
+const app = buildApp(deps, {
+  logger: loggerOptions,
+  disableRequestLogging: true,
+});
 appRef.current = app;
 
 try {

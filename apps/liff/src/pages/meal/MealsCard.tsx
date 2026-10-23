@@ -11,7 +11,7 @@ import { Skeleton } from "../../components/Skeleton";
 
 interface MealsCardProps {
   /** Called when the session cannot be recovered or loading failed. */
-  onFatal: () => void;
+  onFatal: (err?: unknown) => void;
 }
 
 const ROW_TYPES: readonly MealType[] = ["breakfast", "lunch", "dinner"];
@@ -33,8 +33,8 @@ export function MealsCard({ onFatal }: MealsCardProps) {
       .then((res) => {
         if (live) setDay(res);
       })
-      .catch(() => {
-        if (live) onFatal();
+      .catch((err: unknown) => {
+        if (live) onFatal(err);
       });
     // A missing target only hides the progress bar.
     apiFetch<ProfileResponse>("/profile")

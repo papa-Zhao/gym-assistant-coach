@@ -4,6 +4,7 @@ mock_provider "google-beta" {}
 variables {
   project_id      = "test-project"
   billing_account = "000000-000000-000000"
+  alert_email     = "alerts@example.com"
 }
 
 run "core" {

@@ -28,6 +28,7 @@ from app.api_client import (
     TodayResult,
 )
 from app.handlers import create_app
+from app.rate_limit import UserRateLimiter
 from app.settings import CONSENT_VERSION, Settings
 
 SECRET = "test-channel-secret"
@@ -990,3 +991,76 @@ def test_program_save_postback_malformed_is_ignored() -> None:
     post(client, [menu_postback(f"action=program_save&id={MEAL_ID}&day=8")])
     assert api.calls == []
     assert line.replies == []
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.t = 1000.0
+
+    def __call__(self) -> float:
+        return self.t
+
+
+RATE_LIMITED = {"type": "text", "text": "訊息太多了，請稍等一分鐘再傳。"}
+OTHER_USER = "U" + "fedcba9876543210" * 2
+
+
+def limited_setup():
+    clock = FakeClock()
+    api, line = FakeApi(consented=True), FakeLine()
+    app = create_app(SETTINGS, api, line, limiter=UserRateLimiter(now=clock))
+    return TestClient(app), api, line, clock
+
+
+def syncs(api: FakeApi, user: str = USER) -> int:
+    return sum(1 for c in api.calls if c[0] == "sync" and c[1] == user)
+
+
+def test_rate_limit_warns_once_then_drops_across_webhooks() -> None:
+    client, api, line, _ = limited_setup()
+    for _ in range(20):
+        post(client, [text_event()])
+    assert syncs(api) == 20
+    assert all(msgs != [RATE_LIMITED] for _, msgs in line.replies)
+    post(client, [text_event()])
+    assert line.replies[-1] == ("reply-token", [RATE_LIMITED])
+    replies = len(line.replies)
+    post(client, [text_event()])
+    assert syncs(api) == 20
+    assert len(line.replies) == replies
+
+
+def test_rate_limit_within_one_webhook_replies_once() -> None:
+    client, api, line, _ = limited_setup()
+    post(client, [text_event() for _ in range(25)])
+    assert syncs(api) == 20
+    assert sum(1 for _, msgs in line.replies if msgs == [RATE_LIMITED]) == 1
+    assert len(line.replies) == 21
+
+
+def test_rate_limit_still_processes_unfollow() -> None:
+    client, api, line, _ = limited_setup()
+    post(client, [text_event() for _ in range(25)])
+    post(client, [event("unfollow")])
+    assert api.calls[-1] == ("unfollow", USER)
+
+
+def test_rate_limit_is_per_user_and_resets() -> None:
+    client, api, line, clock = limited_setup()
+    post(client, [text_event() for _ in range(22)])
+    other = text_event()
+    other["source"] = {"type": "user", "userId": OTHER_USER}
+    post(client, [other])
+    assert syncs(api, OTHER_USER) == 1
+    clock.t += 60
+    post(client, [text_event()])
+    assert syncs(api) == 21
+
+
+def test_rate_limited_log_has_no_user_id(caplog) -> None:
+    client, _, _, _ = limited_setup()
+    with caplog.at_level(logging.INFO, logger="gac.bot"):
+        post(client, [text_event() for _ in range(21)])
+    limited = [r for r in caplog.records if r.getMessage().startswith("rate limited")]
+    assert [r.getMessage() for r in limited] == ["rate limited event=message"]
+    assert USER not in caplog.text

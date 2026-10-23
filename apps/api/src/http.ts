@@ -29,7 +29,7 @@ export function bearerAuth<T>(
 
 /**
  * Maps errors to fixed, content-free API bodies. Validation and other 4xx
- * errors become 400 bad_request (except 413 and 415, which are kept); anything else is a 500 "internal". The 5xx
+ * errors become 400 bad_request (except 413, 415 and 429, which are kept); anything else is a 500 "internal". The 5xx
  * path logs only the error name/code: DB driver messages embed SQL text and
  * params (LINE userIds), which must reach neither the client nor the logs.
  */
@@ -49,6 +49,10 @@ export function apiErrorHandler(
     return reply
       .code(415)
       .send({ error: "unsupported_media_type" } satisfies ApiError);
+  }
+  // Rate limit: the plugin already set retry-after.
+  if (status === 429) {
+    return reply.code(429).send({ error: "rate_limited" } satisfies ApiError);
   }
   if (
     err.validation ||

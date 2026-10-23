@@ -15,7 +15,7 @@ import {
   type ExerciseSuggestion,
   type MuscleGroup,
 } from "@gac/shared";
-import { apiFetch } from "../../api";
+import { apiFetch, failureMessage } from "../../api";
 import { isAuthExpired } from "./fields";
 import { Skeleton } from "../../components/Skeleton";
 import { EquipmentPhoto, type PhotoPhase } from "./EquipmentPhoto";
@@ -47,7 +47,8 @@ export function ExercisePicker({
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Exercise[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  // The load failure message, or null.
+  const [failed, setFailed] = useState<string | null>(null);
   const [custom, setCustom] = useState(false);
   const [photo, setPhoto] = useState<PhotoPhase>({ kind: "idle" });
   const [initial, setInitial] = useState<ExerciseSuggestion | undefined>();
@@ -65,12 +66,12 @@ export function ExercisePicker({
       .then((list) => {
         if (!live) return;
         setResults(list);
-        setFailed(false);
+        setFailed(null);
       })
       .catch((err: unknown) => {
         if (!live) return;
         if (isAuthExpired(err)) onFatal();
-        else setFailed(true);
+        else setFailed(failureMessage(err, "載入動作失敗，請再試一次。"));
       });
     return () => {
       live = false;
@@ -196,7 +197,7 @@ export function ExercisePicker({
         )}
         <section className="card list picker-list" aria-label="動作列表">
           {failed ? (
-            <p className="error-text">載入動作失敗，請再試一次。</p>
+            <p className="error-text">{failed}</p>
           ) : results === null ? (
             <Skeleton layout="rows" />
           ) : results.length === 0 ? (
@@ -287,7 +288,7 @@ function CustomExerciseForm({
       setBusy(false);
     } catch (err) {
       if (isAuthExpired(err)) onFatal();
-      else setError("無法新增，請檢查欄位後再試一次。");
+      else setError(failureMessage(err, "無法新增，請檢查欄位後再試一次。"));
       setBusy(false);
     }
   };

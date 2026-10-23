@@ -16,7 +16,7 @@ import {
   type MealType,
   type Nutrition,
 } from "@gac/shared";
-import { ApiHttpError, apiFetch } from "../../api";
+import { ApiHttpError, apiFetch, failureMessage } from "../../api";
 import { Skeleton } from "../../components/Skeleton";
 import { ConfirmRow } from "../workout/ConfirmRow";
 import { isAuthExpired } from "../workout/fields";
@@ -116,6 +116,7 @@ export function MealEdit({
 }: MealEditProps) {
   const editing = id !== null && id !== "";
   const [load, setLoad] = useState<Load>(editing ? "loading" : "ready");
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [date, setDate] = useState(today);
   const [mealType, setMealType] = useState<MealType>(() =>
     isMealType(type) ? type : defaultMealType(taipeiHour(new Date())),
@@ -146,7 +147,10 @@ export function MealEdit({
         if (isAuthExpired(err)) onFatal();
         else if (err instanceof ApiHttpError && err.status === 404)
           setLoad("missing");
-        else setLoad("failed");
+        else {
+          setLoadError(err);
+          setLoad("failed");
+        }
       });
     return () => {
       live = false;
@@ -165,7 +169,11 @@ export function MealEdit({
     return (
       <main>
         <section className="card stack">
-          <p>{load === "missing" ? NOT_FOUND : "載入失敗，請稍後再試。"}</p>
+          <p>
+            {load === "missing"
+              ? NOT_FOUND
+              : failureMessage(loadError, "載入失敗，請稍後再試。")}
+          </p>
           <a href="/records">回到我的紀錄</a>
         </section>
       </main>
@@ -205,7 +213,7 @@ export function MealEdit({
     if (isAuthExpired(err)) onFatal();
     else if (err instanceof ApiHttpError && err.status === 404)
       setLoad("missing");
-    else setError(fallback);
+    else setError(failureMessage(err, fallback));
   };
 
   const save = async () => {
