@@ -10,6 +10,7 @@ export interface Config {
   botAudience: string;
   anthropicApiKey: string;
   mealPhotosBucket: string;
+  schedulerServiceAccount: string;
 }
 
 const REQUIRED = [
@@ -23,6 +24,7 @@ const REQUIRED = [
   "BOT_AUDIENCE",
   "ANTHROPIC_API_KEY",
   "MEAL_PHOTOS_BUCKET",
+  "SCHEDULER_SA_EMAIL",
 ] as const;
 
 const MIN_SECRET_BYTES = 32;
@@ -76,6 +78,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     botAudience: get("BOT_AUDIENCE"),
     anthropicApiKey: get("ANTHROPIC_API_KEY"),
     mealPhotosBucket: get("MEAL_PHOTOS_BUCKET"),
+    schedulerServiceAccount: get("SCHEDULER_SA_EMAIL"),
   };
 }
 

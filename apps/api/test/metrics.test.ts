@@ -88,6 +88,7 @@ describe("metrics routes", () => {
         throw new Error("invalid token");
       },
       botServiceAccount: BOT,
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({ sub: U1, name: null }),
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,

@@ -8,7 +8,7 @@ import { MEDICAL_NOTICE } from "./safety";
 import { getBuiltinLibrary } from "../workouts/library";
 import { adviceText, shapeAdvice } from "./advice";
 import { buildAskContext, loadAskContext, todayLine } from "./context";
-import { appendExchange, purgeExpiredMessages, recentTurns } from "./repo";
+import { appendExchange, recentTurns } from "./repo";
 
 /** One question to the coach: counts a daily use, answers, and keeps the exchange. */
 export async function askCoach(
@@ -18,7 +18,6 @@ export async function askCoach(
 ): Promise<AskResponse> {
   const { db, advisor } = deps;
   const now = deps.now();
-  await purgeExpiredMessages(db, now);
 
   const library = (await getBuiltinLibrary(db)).filter(
     (e) => e.kind === "strength",

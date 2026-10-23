@@ -1,13 +1,16 @@
 import { CONSENT_VERSION } from "@gac/shared";
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   findByLineUserId,
   hasCurrentConsent,
   markUnfollowed,
   recordConsent,
+  requestAccountDeletion,
   syncUser,
   updateDisplayName,
 } from "../src/users/repo";
+import { users } from "../src/db/schema";
 import { createTestDb } from "./db";
 
 describe("users repo", () => {
@@ -86,5 +89,54 @@ describe("updateDisplayName", () => {
       displayName: "New",
       status: "unfollowed",
     });
+  });
+});
+
+describe("requestAccountDeletion", () => {
+  let close: (() => Promise<void>) | undefined;
+  afterEach(async () => {
+    await close?.();
+    close = undefined;
+  });
+
+  const T1 = new Date("2026-10-20T01:00:00Z");
+  const T2 = new Date("2026-10-21T01:00:00Z");
+
+  async function setup() {
+    const t = await createTestDb();
+    close = t.close;
+    const { userId } = await syncUser(t.db, "U1", "Amy");
+    await recordConsent(t.db, "U1", CONSENT_VERSION);
+    const row = async (id: string) =>
+      (await t.db.select().from(users).where(eq(users.id, id)))[0];
+    return { db: t.db, userId, row };
+  }
+
+  it("marks the account deleted and frees the LINE id; idempotent", async () => {
+    const { db, userId, row } = await setup();
+    await requestAccountDeletion(db, userId, T1);
+    expect(await row(userId)).toMatchObject({
+      status: "deleted",
+      deletedAt: T1,
+      lineUserId: `deleted:${userId}`,
+    });
+    await requestAccountDeletion(db, userId, T2);
+    expect((await row(userId))?.deletedAt).toEqual(T1);
+  });
+
+  it("the same LINE id comes back as a new, unconsented user", async () => {
+    const { db, userId, row } = await setup();
+    await requestAccountDeletion(db, userId, T1);
+    const again = await syncUser(db, "U1", "Amy");
+    expect(again.userId).not.toBe(userId);
+    expect(again.consented).toBe(false);
+    expect((await row(userId))?.status).toBe("deleted");
+  });
+
+  it("markUnfollowed with the old LINE id leaves the deleted account alone", async () => {
+    const { db, userId, row } = await setup();
+    await requestAccountDeletion(db, userId, T1);
+    await markUnfollowed(db, "U1");
+    expect((await row(userId))?.status).toBe("deleted");
   });
 });

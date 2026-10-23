@@ -37,6 +37,7 @@ describe("auth", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async (tok) => {
         if (tok === "ok") return { sub: U_OK, name: "Amy" };
         if (tok === "noconsent") return { sub: U_NOCONSENT, name: null };
@@ -131,6 +132,39 @@ describe("auth", () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it("DELETE /me rejects a missing token with 401", async () => {
+    const res = await app.inject({ method: "DELETE", url: "/me" });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("DELETE /me returns 204 and the same token stops working everywhere", async () => {
+    const lineId = `U${"d".repeat(32)}`;
+    const { userId } = await syncUser(db, lineId, "Del");
+    await recordConsent(db, lineId, CONSENT_VERSION);
+    const token = await issueSession(SECRET, userId);
+    const call = (method: "GET" | "DELETE", url: string) =>
+      app.inject({
+        method,
+        url,
+        headers: { authorization: `Bearer ${token}` },
+      });
+    expect((await call("GET", "/me")).statusCode).toBe(200);
+    const del = await call("DELETE", "/me");
+    expect(del.statusCode).toBe(204);
+    expect(del.body).toBe("");
+    for (const url of [
+      "/me",
+      "/profile",
+      "/workouts/week",
+      "/meals?date=2026-10-19",
+    ]) {
+      const res = await call("GET", url);
+      expect(res.statusCode, url).toBe(401);
+      expect(res.json()).toEqual({ error: "unauthorized" });
+    }
+    expect((await call("DELETE", "/me")).statusCode).toBe(401);
+  });
+
   it("CORS allows configured origin only", async () => {
     const preflight = (origin: string) =>
       app.inject({
@@ -196,6 +230,7 @@ describe("error handling", () => {
           throw new Error("unused");
         },
         botServiceAccount: "bot@x",
+        schedulerServiceAccount: "scheduler@x",
         verifyLineIdToken: async () => {
           if (throwing) throw new Error(LEAK);
           return { sub: "Uabc", name: null };

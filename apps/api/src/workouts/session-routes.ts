@@ -148,7 +148,7 @@ export const sessionRoutes =
     const { db, sessionSecret, now, notifyWorkoutFinished } = deps;
     const notifyTimeoutMs = deps.notifyTimeoutMs ?? DEFAULT_NOTIFY_TIMEOUT_MS;
     app.setErrorHandler(apiErrorHandler);
-    const authenticate = workoutAuth(sessionSecret);
+    const authenticate = workoutAuth(db, sessionSecret);
     const auth = { onRequest: authenticate };
     const uid = (req: { workoutUserId?: string }) =>
       req.workoutUserId as string;

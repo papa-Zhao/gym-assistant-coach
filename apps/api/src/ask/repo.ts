@@ -118,7 +118,7 @@ export async function endConversation(
     .where(activeConversation(userId));
 }
 
-/** Deletes all users' messages and AI programs older than 90 days, then ended conversations left empty. Templates already saved from a program are kept. */
+/** Called by the daily job: deletes all users' messages and AI programs older than 90 days, then ended conversations left empty. Templates already saved from a program are kept. */
 export async function purgeExpiredMessages(db: Db, now: Date): Promise<void> {
   await db.transaction(async (tx) => {
     await tx

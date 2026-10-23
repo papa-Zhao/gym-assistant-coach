@@ -43,7 +43,7 @@ export function App({
             />
           );
         case "settings":
-          return <Settings />;
+          return <Settings today={today} onClose={onClose} />;
         case "records":
           return <Records onFatal={() => setFailed(true)} />;
         case "body":

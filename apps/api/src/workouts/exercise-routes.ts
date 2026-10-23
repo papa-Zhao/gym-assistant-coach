@@ -73,7 +73,7 @@ export const exerciseRoutes =
   async (app) => {
     const { db, sessionSecret } = deps;
     app.setErrorHandler(apiErrorHandler);
-    const authenticate = workoutAuth(sessionSecret);
+    const authenticate = workoutAuth(db, sessionSecret);
 
     // Photo bytes arrive raw from the LIFF. Registered in this plugin only,
     // and only /exercises/identify reads them.

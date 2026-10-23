@@ -130,7 +130,7 @@ describe("askCoach", () => {
     expect(await messageCount()).toBe(0);
   });
 
-  it("purges messages older than 90 days", async () => {
+  it("leaves expired messages to the daily job", async () => {
     await appendExchange(
       db,
       userId,
@@ -141,8 +141,8 @@ describe("askCoach", () => {
     );
     await askCoach(deps(), userId, "新問題");
     const rows = await db.select().from(aiMessages);
-    expect(rows.map((r) => r.content)).not.toContain("舊問題");
-    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.content)).toContain("舊問題");
+    expect(rows).toHaveLength(4);
   });
 
   const withProgram = (program: RawAdvice["program"]): AdvisorResult => ({

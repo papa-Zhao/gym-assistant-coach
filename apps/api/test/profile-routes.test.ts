@@ -45,6 +45,7 @@ describe("profile routes", () => {
       db,
       verifyServiceToken: unused,
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: unused,
       notifyWorkoutFinished: async () => {},
       mealParser: unusedMealParser,

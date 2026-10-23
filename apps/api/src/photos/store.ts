@@ -32,6 +32,8 @@ export interface PhotoStore {
   /** V4 read URL valid for 5 minutes. */
   signedUrl(key: string): Promise<string>;
   delete(key: string): Promise<void>;
+  /** Deletes every object whose key starts with `prefix`. */
+  deletePrefix(prefix: string): Promise<void>;
 }
 
 export function createGcsPhotoStore(bucket: string): PhotoStore {
@@ -55,9 +57,17 @@ export function createGcsPhotoStore(bucket: string): PhotoStore {
     async delete(key) {
       await gcsBucket.file(key).delete({ ignoreNotFound: true });
     },
+    async deletePrefix(prefix) {
+      await withPhotoDeadline(() => gcsBucket.deleteFiles({ prefix }));
+    },
   };
 }
 
+/** Key prefix of all of a user's meal photos. */
+export function mealPhotoPrefix(userId: string): string {
+  return `meals/${userId}/`;
+}
+
 export function newMealPhotoKey(userId: string): string {
-  return `meals/${userId}/${randomUUID()}.jpg`;
+  return `${mealPhotoPrefix(userId)}${randomUUID()}.jpg`;
 }

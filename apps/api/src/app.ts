@@ -12,6 +12,7 @@ import { templateRoutes } from "./workouts/template-routes.js";
 import { sessionRoutes } from "./workouts/session-routes.js";
 import { mealRoutes } from "./meals/routes.js";
 import { internalRoutes } from "./internal/routes.js";
+import { jobRoutes } from "./jobs/routes.js";
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   const app = Fastify(options);
@@ -59,6 +60,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   app.register(sessionRoutes(deps));
   app.register(mealRoutes(deps));
   app.register(internalRoutes(deps), { prefix: "/internal" });
+  app.register(jobRoutes(deps), { prefix: "/jobs" });
 
   return app;
 }

@@ -127,7 +127,7 @@ export const mealRoutes =
   async (app) => {
     const { db, sessionSecret, now, photoStore } = deps;
     app.setErrorHandler(apiErrorHandler);
-    const auth = { onRequest: workoutAuth(sessionSecret) };
+    const auth = { onRequest: workoutAuth(db, sessionSecret) };
     const write = { ...auth, preValidation: requireNumericGrams };
     const uid = (req: { workoutUserId?: string }) =>
       req.workoutUserId as string;

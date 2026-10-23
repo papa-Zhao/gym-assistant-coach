@@ -21,6 +21,7 @@ locals {
       BOT_URL               = local.bot_url
       BOT_AUDIENCE          = local.bot_aud
       MEAL_PHOTOS_BUCKET    = google_storage_bucket.meal_photos.name
+      SCHEDULER_SA_EMAIL    = google_service_account.scheduler_invoker.email
     }
     bot = {
       API_URL           = local.api_url

@@ -3,7 +3,7 @@ import {
   CONSENT_VERSION,
   type SyncUserResponse,
 } from "@gac/shared";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { consents, users } from "../db/schema";
 
@@ -50,6 +50,24 @@ export async function markUnfollowed(
     .update(users)
     .set({ status: "unfollowed" })
     .where(eq(users.lineUserId, lineUserId));
+}
+
+/** Marks the account deleted and frees its LINE id; idempotent. */
+export async function requestAccountDeletion(
+  db: Db,
+  userId: string,
+  now: Date,
+): Promise<void> {
+  // Rewriting the LINE id detaches the account at once: a later message from
+  // the same LINE user creates a fresh account instead of reviving this one.
+  await db
+    .update(users)
+    .set({
+      status: "deleted",
+      deletedAt: now,
+      lineUserId: sql`'deleted:' || ${users.id}`,
+    })
+    .where(and(eq(users.id, userId), ne(users.status, "deleted")));
 }
 
 export async function findByLineUserId(

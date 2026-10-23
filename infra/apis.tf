@@ -12,6 +12,7 @@ locals {
     "billingbudgets",
     "cloudresourcemanager",
     "serviceusage",
+    "cloudscheduler",
   ])
 }
 

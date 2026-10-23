@@ -35,7 +35,7 @@ export const templateRoutes =
   async (app) => {
     const { db, sessionSecret } = deps;
     app.setErrorHandler(apiErrorHandler);
-    const authenticate = workoutAuth(sessionSecret);
+    const authenticate = workoutAuth(db, sessionSecret);
 
     app.get(
       "/templates",

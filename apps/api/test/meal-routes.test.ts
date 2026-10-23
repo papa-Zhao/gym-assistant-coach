@@ -40,6 +40,7 @@ describe("meal routes", () => {
         throw new Error("unused");
       },
       botServiceAccount: "bot@x",
+      schedulerServiceAccount: "scheduler@x",
       verifyLineIdToken: async () => ({
         sub: `U${"a".repeat(32)}`,
         name: null,

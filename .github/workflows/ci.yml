@@ -83,6 +83,7 @@ jobs:
             -e BOT_AUDIENCE=gac-bot-internal
             -e ANTHROPIC_API_KEY=ci-fake-key
             -e MEAL_PHOTOS_BUCKET=ci-fake-bucket
+            -e SCHEDULER_SA_EMAIL=ci-scheduler@example.iam.gserviceaccount.com
           )
           for svc in api bot; do
             extra=()

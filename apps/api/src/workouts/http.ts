@@ -1,7 +1,8 @@
 import type { ApiError } from "@gac/shared";
 import type { FastifyReply } from "fastify";
 import { bearerAuth } from "../http.js";
-import { verifySession } from "../auth/session";
+import { verifyActiveSession } from "../auth/session";
+import type { Db } from "../users/repo";
 import { WorkoutError } from "./repo";
 
 declare module "fastify" {
@@ -11,9 +12,9 @@ declare module "fastify" {
 }
 
 /** Session auth for the workout routes; stores the user id on the request. */
-export const workoutAuth = (sessionSecret: Uint8Array) =>
+export const workoutAuth = (db: Db, sessionSecret: Uint8Array) =>
   bearerAuth(
-    (token) => verifySession(sessionSecret, token),
+    (token) => verifyActiveSession(db, sessionSecret, token),
     (req, { userId }) => {
       req.workoutUserId = userId;
     },
