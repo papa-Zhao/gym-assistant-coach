@@ -23,14 +23,17 @@ function allowed(req: FastifyRequest): boolean {
  * user; anything else (no token, bad or expired token) against the client IP,
  * so fake tokens cannot buy extra quota. `req.ip` is the last
  * X-Forwarded-For hop (trustProxy: 1), which Cloud Run appends itself.
+ * `limits.ipMax` overrides the per-IP limit; only the load-test server sets it
+ * (all its virtual users share one IP).
  */
 export function rateLimitOptions(
   sessionSecret: Uint8Array,
+  limits: { ipMax?: number | undefined } = {},
 ): RateLimitPluginOptions {
+  const ipMax = limits.ipMax ?? RATE_LIMIT_IP_MAX;
   return {
     timeWindow: RATE_LIMIT_WINDOW_MS,
-    max: (_req, key) =>
-      key.startsWith("u:") ? RATE_LIMIT_USER_MAX : RATE_LIMIT_IP_MAX,
+    max: (_req, key) => (key.startsWith("u:") ? RATE_LIMIT_USER_MAX : ipMax),
     keyGenerator: async (req) => {
       const token = extractBearer(req);
       if (token) {

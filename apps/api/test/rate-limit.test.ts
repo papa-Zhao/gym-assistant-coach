@@ -78,6 +78,24 @@ describe("rate limit", () => {
     expect((await getMe({}, "10.0.0.2")).statusCode).toBe(401);
   });
 
+  it("raises the per-IP limit only when deps.rateLimitIpMax is set (load-test server)", async () => {
+    app = buildApp({ ...deps, rateLimitIpMax: RATE_LIMIT_IP_MAX + 5 });
+    for (let i = 0; i < RATE_LIMIT_IP_MAX + 5; i++) {
+      expect((await getMe()).statusCode).toBe(401);
+    }
+    expect((await getMe()).statusCode).toBe(429);
+
+    const max = rateLimitOptions(SECRET).max as (
+      req: FastifyRequest,
+      key: string,
+    ) => number;
+    const raised = rateLimitOptions(SECRET, { ipMax: 9999 }).max as typeof max;
+    const req = {} as FastifyRequest;
+    expect(max(req, "ip:x")).toBe(RATE_LIMIT_IP_MAX);
+    expect(raised(req, "ip:x")).toBe(9999);
+    expect(raised(req, "u:x")).toBe(RATE_LIMIT_USER_MAX);
+  });
+
   it("keys on the last X-Forwarded-For hop, not client-supplied ones", async () => {
     fresh();
     let last = 0;

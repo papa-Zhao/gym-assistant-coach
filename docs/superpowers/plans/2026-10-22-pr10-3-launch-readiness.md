@@ -236,8 +236,37 @@
 ## 狀態
 
 - 2026-10-22：計畫完成，待使用者確認。實作要等 PR 10.1、10.2 合併。
+- 2026-10-23：程式與文件部分完成（分支 `pr10-3-launch-readiness`，從 `origin/main` 建立並合併 `origin/pr10-2-rate-limit-monitoring`；尚未 push、尚未開 PR）。Task 1、2、4 完成；Task 3 只寫好腳本、fixture 與步驟，**還沒執行負載測試**；Task 5 的檢查全部通過：`npm test --workspaces`、`typecheck`、`eslint apps packages loadtest`、`prettier --check`、bot 的 `pytest`／`ruff check`／`ruff format --check`。本 PR 要在 PR 10.2（#26）之後合併。
 
 ## 交接備註
+
+### 實作時和計畫不同的地方（2026-10-23）
+
+- **Anthropic 條款查證（Task 1 Step 2，2026-10-23）**：
+  - <https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training>：商業產品（含 API）的 input／output 預設不用於訓練；使用者回報意見或選擇加入時例外。
+  - <https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data>：API 的 input／output 在收到或產生後 30 天內從後端自動刪除；例外是違反使用政策（最長 2 年、分類分數最長 7 年）、法律要求、雙方另有約定（例如 zero data retention）、Files API 等使用者自己保存的資料、意見回饋（5 年）。
+  - 政策頁照這兩點寫，並加上「為了執行其使用政策或依法律要求，可能保存更久」。上線前法律審閱時請再確認一次。
+- **政策頁**：`legal.test.ts` 比對前先把連續空白合成一個（prettier 會在「7」和「天」之間換行，瀏覽器顯示時是一個空白）。`import.meta.url` 在 LIFF 的 jsdom 測試環境不是 `file://`，改用 `import.meta.dirname`。兩頁在 375px 寬度用內建瀏覽器看過，沒有橫向捲動。政策頁另外寫了：同意紀錄、系統紀錄不含內容、IP 只在記憶體中計數（10.2 限流）、LINE 平台、個資法第 3 條權利「設定頁沒有的請來信」。
+- **`consent-version.test.ts` 在改版本前就通過**（兩邊原本都是 `2026-10-19`），它是防止只改一邊的守門測試，不是 TDD 的紅燈。
+- **限流 IP 上限（Task 2）**：10.2 的上限是寫死的常數，沒有環境變數。新增 `rateLimitOptions(secret, { ipMax })` 的選用參數和選用的 `AppDeps.rateLimitIpMax`（`buildApp` 傳進去），只有 `loadtest-server` 設定（讀 `RATE_LIMIT_IP_MAX`，預設 100,000，範圍 1–1,000,000）。正式的 `server.ts` 沒改，行為不變；`rate-limit.test.ts` 加了一個測試。
+- `createFakeDeps` 多回傳 `schedulerServiceAccount`（`LOADTEST_SCHEDULER_SA`），假的服務帳號驗證永遠不會回這個身分，所以 `/jobs/*` 一律拒絕。`loadLoadtestConfig` 多回傳 `rateLimitIpMax`；`PORT` 預設 8080。`/internal/users/consent` 回 204（計畫寫的流程不變）。
+- tsup 兩個 entry 會產生共用的 chunk 檔；Dockerfile 複製整個 `dist`，沒問題。已確認 `dist/server.js` 和它的 chunk 都不含假服務的程式碼，`K_SERVICE=api node dist/loadtest-server.js` 會結束並回 1。
+- **k6 腳本（Task 3）和計畫不同的地方**：
+  - 路由照實際程式：`POST /internal/users/today`（計畫寫 `GET`）、`PUT /body-metrics/today`（計畫寫 `POST /body-metrics`）、訓練記組是 `PUT /workouts/:id/sets`、`setIndex` 從 1 開始。
+  - 內部路由要求 LINE ID 是 `U` + 32 個 hex，所以假使用者是 `U10ad<RUN 4 hex><編號 24 hex>`，`/auth/liff` 用 `loadtest:<LINE ID>`。`RUN` 每次執行不同，所以重跑時 AI 每日次數不會累積。
+  - 每日上限情境用保留的第 0 個使用者；`/internal/*` 不受 api 限流，所以預期看到的是 `outcome: "limit"`（第 21–25 次），429 也接受。
+  - 長度用 `STEADY_SECONDS`（k6 的 `--duration` 會蓋掉 scenarios，不能用）。門檻 tag 寫成 `{ai:true}`（k6 語法不加引號）。另加 `unexpected_outcomes` 門檻：steady 情境的 AI 回覆不是 `draft`／`answer`（例如撞到每日上限）就算失敗。
+  - `meal.jpg` 是用 sharp 產生的 960×720 合成圖（約 94 KB），不是真的餐點照片；壓縮成本相近，假 AI 不看內容。
+  - 根目錄 `eslint.config.js` 替 `loadtest/**/*.js` 加了 k6 全域變數（`__ENV`、`__VU`、`__ITER`、`open`）。
+  - **腳本沒有用 k6 實際跑過**（實作環境沒有 k6，也不能動雲端）；`node --check` 與 eslint 通過。第一次執行建議先 `-e USERS=5 -e STEADY_SECONDS=30` 試跑。
+  - `load-test.md` 的 image 用「目前 api 服務的 image」（`gcloud run services describe api`），所以要等本 PR 合併、CI 部署後才能跑。
+- **成本估算（Task 4）**：正式 token 平均值還沒有，文件用標明「暫定」的假設值，並附上合併 `ai_usage_daily` 與 `ai_usage_anonymous_daily`（10.1）的查詢。價格查詢日 2026-10-23，Cloud Run（Tier 2 價格與免費額度）、GCS 新加坡價格、LINE 台灣方案、Cloud Monitoring 標「未確認」。估算發現三件事，已列進上線清單：
+  - **Neon Free 的 100 CU-小時可能不夠**（200 人估計約 120 CU-小時），用完時資料庫會暫停到下個月。
+  - **LINE 免費方案每月 200 則 push 只夠約 13 個活躍使用者的訓練完成通知**；中用量 2026-11-01 起 NT$1,000／月。
+  - Cloud Run 主要成本是 api 和 bot 等 AI 回應的時間，200 人上限估計約 US$13／月。
+- Anthropic 上限建議 US$40（200 人 AI 暫定 US$19.5 × 2）；`infra/README.md` 第 11 節原本寫 US$20，等實際 token 重算後再一起改。
+
+### 原有備註
 
 - 政策頁是 LIFF 的靜態檔（`apps/liff/public/`），不能 import TS；版本字串由 `legal.test.ts` 確認和 `CONSENT_VERSION` 一致。
 - `CONSENT_VERSION` 有兩份：`packages/shared/src/auth.ts`（api、LIFF）和 `apps/bot/app/settings.py`（bot 的同意 postback）。`hasCurrentConsent` 只認完全相同的版本，所以改版本＝所有人重新同意。
@@ -246,6 +275,17 @@
 - 照片記餐的路由會跑 sharp 壓縮，這是 api 最吃 CPU 的地方；負載測試結果要特別看這個端點。
 
 ## 下一個 PR 需要知道的事
+
+### 留給使用者的步驟（本 PR 沒做）
+
+1. 合併前：確認 PR 10.2（#26）先合併；本分支已含 10.2 的 commit。
+2. 合併後：照「部署」一節用手機確認同意卡片與兩頁定稿內容。
+3. 照 `docs/launch/load-test.md` 跑負載測試（Neon 測試分支、`api-loadtest`、k6），把結果填進「結果」，然後刪掉服務和分支。
+4. 在 Neon 正式分支跑 `docs/launch/cost-estimate.md` 的「待執行的查詢」，用結果和負載測試量到的資料量取代文件裡的暫定數字，重算 Anthropic 上限。
+5. 政策與條款送法律審閱；有實質修改就改 `CONSENT_VERSION`（兩邊）和兩頁的版本。
+6. 照 `docs/launch/checklist.md` 一項項完成（網域、LINE Login channel 發布、Anthropic 上限、警示測試、Neon 方案、LINE 方案等）。
+
+### 實作前要確認的事（規劃時寫的）
 
 本 PR 依賴 10.1、10.2，實作前先確認：
 

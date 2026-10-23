@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-CONSENT_VERSION = "2026-10-19"
+CONSENT_VERSION = "2026-10-23"
 
 
 @dataclass(frozen=True)
