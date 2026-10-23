@@ -200,7 +200,7 @@ LINE App ──webhook──► bot（Python, Cloud Run）──內部 API──
 | 紀錄 | 每次呼叫記錄 input / output / 快取 token 與耗時；**不記錄照片內容，也不把對話內容寫進 log** |
 | 品質評估 | 準備 30–50 張台灣常見餐點照（便當、自助餐、超商、手搖飲）與人工標註，作為回歸測試，未來換模型時也用來比較 |
 
-估算成本（Haiku 5.5，粗估）：一個活躍使用者（每天 3 張照片 + 2 次提問）每月約 US$0.2。
+估算成本（Haiku 5.5，粗估）：一個活躍使用者（每天 3 張照片 + 2 次提問）每月約 US$0.2。上線前的詳細估算（含基礎設施、200／1,000 人情境）見 [docs/launch/cost-estimate.md](../launch/cost-estimate.md)。
 
 ---
 
@@ -330,3 +330,4 @@ PR 1–2 不涉及畫面，所以設計與它們同時進行；**PR 3 開始做�
 | 6 | AI 每日上限 | 依 §7 初始值，上線後調整 |
 | 7 | GitHub repo | `papa-Zhao/gym-assistant-coach`（私人） |
 | 8 | 區域 | 新加坡（Cloud Run `asia-southeast1`、Neon `aws-ap-southeast-1`）。**2026-10-18 已確認**：從台灣呼叫 `api` `/health`（熱啟動）中位數約 0.1 秒 |
+| 9 | 政策改版 | 隱私權政策或服務條款有實質變更時，`CONSENT_VERSION`（`packages/shared/src/auth.ts` 與 `apps/bot/app/settings.py` 一起改）改成當天日期，所有人重新同意；只修錯字或排版不改版本（2026-10-23 定稿版本 `2026-10-23`） |
