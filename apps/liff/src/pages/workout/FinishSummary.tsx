@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { FinishSummary as FinishSummaryData, Template } from "@gac/shared";
-import { apiFetch } from "../../api";
+import { apiFetch, failureMessage } from "../../api";
 import { isAuthExpired } from "./fields";
 import { formatRest } from "./RestTimer";
 
@@ -41,7 +41,7 @@ export function FinishSummary({
       setSaved(true);
     } catch (err) {
       if (isAuthExpired(err)) onFatal();
-      else setError("存成範本失敗，請再試一次。");
+      else setError(failureMessage(err, "存成範本失敗，請再試一次。"));
     } finally {
       setBusy(false);
     }

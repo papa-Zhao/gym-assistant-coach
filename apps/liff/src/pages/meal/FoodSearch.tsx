@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Food } from "@gac/shared";
-import { apiFetch } from "../../api";
+import { apiFetch, failureMessage } from "../../api";
 import { isAuthExpired } from "../workout/fields";
 import { Skeleton } from "../../components/Skeleton";
 
@@ -23,6 +23,8 @@ export function FoodSearch({ onPick, onFatal }: FoodSearchProps) {
   const [outcome, setOutcome] = useState<{
     query: string;
     foods: Food[] | null;
+    /** Set when the lookup failed. */
+    error?: string;
   } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -38,7 +40,12 @@ export function FoodSearch({ onPick, onFatal }: FoodSearchProps) {
       .catch((err: unknown) => {
         if (!live) return;
         if (isAuthExpired(err)) onFatal();
-        else setOutcome({ query, foods: null });
+        else
+          setOutcome({
+            query,
+            foods: null,
+            error: failureMessage(err, "搜尋失敗，請再試一次。"),
+          });
       });
     return () => {
       live = false;
@@ -70,7 +77,7 @@ export function FoodSearch({ onPick, onFatal }: FoodSearchProps) {
       {query !== "" && (
         <div className="card list" aria-label="食物列表">
           {failed ? (
-            <p className="error-text">搜尋失敗，請再試一次。</p>
+            <p className="error-text">{answered.error}</p>
           ) : results === null ? (
             <Skeleton layout="rows" />
           ) : results.length === 0 ? (

@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { login, type LiffLike } from "./auth";
-import { ApiHttpError, AuthExpiredError, apiFetch, configureApi } from "./api";
+import {
+  ApiHttpError,
+  AuthExpiredError,
+  RATE_LIMITED_MESSAGE,
+  apiFetch,
+  configureApi,
+  failureMessage,
+} from "./api";
 
 const API = "https://api.test";
 
@@ -166,5 +173,20 @@ describe("apiFetch", () => {
     await expect(apiFetch("/profile/targets")).rejects.toBeInstanceOf(
       ApiHttpError,
     );
+  });
+});
+
+describe("failureMessage", () => {
+  it("names the rate limit on 429", () => {
+    expect(RATE_LIMITED_MESSAGE).toBe("操作太頻繁，請稍等一分鐘再試。");
+    expect(failureMessage(new ApiHttpError(429), "x")).toBe(
+      RATE_LIMITED_MESSAGE,
+    );
+  });
+
+  it("falls back for other errors", () => {
+    expect(failureMessage(new ApiHttpError(500), "x")).toBe("x");
+    expect(failureMessage(new Error("boom"), "x")).toBe("x");
+    expect(failureMessage(undefined, "x")).toBe("x");
   });
 });
