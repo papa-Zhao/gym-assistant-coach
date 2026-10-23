@@ -16,6 +16,18 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // k6 scripts: k6's own runtime globals, not Node or the browser.
+    files: ["loadtest/**/*.js"],
+    languageOptions: {
+      globals: {
+        __ENV: "readonly",
+        __VU: "readonly",
+        __ITER: "readonly",
+        open: "readonly",
+      },
+    },
+  },
+  {
     files: ["apps/liff/**/*.{ts,tsx}"],
     languageOptions: { globals: globals.browser },
     plugins: { "react-hooks": reactHooks },
