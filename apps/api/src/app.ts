@@ -29,7 +29,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
   // A root onRequest hook, not the plugin's per-route one: that runs after
   // route-level auth hooks, so 401s for bad tokens would never be counted.
   app.register(rateLimit, {
-    ...rateLimitOptions(deps.sessionSecret),
+    ...rateLimitOptions(deps.sessionSecret, { ipMax: deps.rateLimitIpMax }),
     global: false,
   });
   app.after(() => {

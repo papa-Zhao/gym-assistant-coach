@@ -41,6 +41,8 @@ export interface AppDeps {
   photoTimeoutMs?: number;
   sessionSecret: Uint8Array;
   corsOrigin: string;
+  /** Per-IP requests per minute; only the load-test server sets it. Defaults to RATE_LIMIT_IP_MAX. */
+  rateLimitIpMax?: number;
   /** Current time; injectable so tests can pin the Taipei date. */
   now: () => Date;
   /** How long finish waits for the bot notification; defaults to 5000. */
