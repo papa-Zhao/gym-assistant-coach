@@ -235,11 +235,11 @@ export function ActiveWorkout({
 
   return (
     <main className="workout">
+      {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
       <header className="workout-head">
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
-      {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
       {discarding ? (
         <ConfirmRow
           label="確認放棄訓練"

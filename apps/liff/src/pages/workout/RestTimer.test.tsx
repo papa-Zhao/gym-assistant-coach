@@ -168,6 +168,23 @@ describe("RestTimer", () => {
     expect(container.querySelector(".rest-timer.compact")).not.toBeNull();
   });
 
+  it("a new completed set after skip restarts the countdown", () => {
+    vi.useFakeTimers({ now: NOW });
+    const { rerender } = render(
+      <RestTimer lastCompletedAt={NOW} skippedFor={NOW} onSkip={vi.fn()} />,
+    );
+    expect(screen.getByText("已休息 0:00")).toBeInTheDocument();
+    rerender(
+      <RestTimer
+        lastCompletedAt={NOW + 1000}
+        skippedFor={NOW}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("休息 1:30")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "跳過" })).toBeInTheDocument();
+  });
+
   it("hides after an hour", () => {
     vi.useFakeTimers({ now: NOW });
     const { container } = render(

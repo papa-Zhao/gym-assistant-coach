@@ -454,6 +454,43 @@ describe("ActiveWorkout", () => {
     expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
   });
 
+  it("pinned bar comes before the header so content is not covered", () => {
+    vi.useFakeTimers({ now: NOW });
+    setup(session([strengthItem({ sets: [doneSet(10)] })]));
+    const bar = document.querySelector(".rest-pinned")!;
+    const head = document.querySelector(".workout-head")!;
+    expect(
+      bar.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("spacer height follows the pinned bar via ResizeObserver", () => {
+    vi.useFakeTimers({ now: NOW });
+    let callback: () => void = () => {};
+    class FakeObserver {
+      constructor(cb: () => void) {
+        callback = cb;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeObserver);
+    try {
+      setup(session([strengthItem({ sets: [doneSet(10)] })]));
+      const bar = document.querySelector<HTMLElement>(".rest-pinned")!;
+      Object.defineProperty(bar, "offsetHeight", {
+        value: 72,
+        configurable: true,
+      });
+      act(() => callback());
+      expect(
+        document.querySelector<HTMLElement>(".rest-spacer")!.style.height,
+      ).toBe("72px");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("skip shrinks the timer to a compact banner", () => {
     vi.useFakeTimers({ now: NOW });
     const { unmount } = setup(session([strengthItem({ sets: [doneSet(10)] })]));
