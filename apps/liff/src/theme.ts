@@ -324,7 +324,7 @@ button.chip { color: var(--color-text); font-weight: 400; }
   flex: 1;
   min-width: 0;
   min-height: ${minTouchTarget}px;
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
