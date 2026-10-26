@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   EQUIPMENT_CATEGORY_LABELS,
   type ActiveSession,
@@ -22,7 +29,9 @@ import {
   toText,
   type FieldName,
 } from "./fields";
-import { RestTimer } from "./RestTimer";
+import { RestTimer, formatRest } from "./RestTimer";
+import { unlockRestSound } from "./restAlert";
+import { useWakeLock } from "./wakeLock";
 
 interface ActiveWorkoutProps {
   session: ActiveSession;
@@ -32,6 +41,32 @@ interface ActiveWorkoutProps {
   onDiscarded: () => void;
   /** Called when the session cannot be recovered. */
   onFatal: () => void;
+}
+
+/** Fixed to the viewport top; a spacer of the same height keeps content clear. */
+function PinnedBar({ children }: { children: ReactNode }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    setHeight(bar.offsetHeight);
+    // ResizeObserver is missing in some environments (e.g. jsdom).
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setHeight(bar.offsetHeight));
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <>
+      <div className="rest-pinned" ref={barRef}>
+        {children}
+      </div>
+      <div className="rest-spacer" style={{ height }} aria-hidden="true" />
+    </>
+  );
 }
 
 type Mutate = (call: () => Promise<ActiveSession>) => Promise<boolean>;
@@ -86,6 +121,8 @@ export function ActiveWorkout({
   onDiscarded,
   onFatal,
 }: ActiveWorkoutProps) {
+  // Held on both the workout and picker views; hooks stay above any early return.
+  useWakeLock(true);
   const [picking, setPicking] = useState(false);
   const [skippedFor, setSkippedFor] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -184,7 +221,7 @@ export function ActiveWorkout({
   if (picking) {
     return (
       <>
-        {restTimer && <div className="rest-pinned">{restTimer}</div>}
+        {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
         <ExercisePicker
           busy={busy}
           error={error}
@@ -198,11 +235,11 @@ export function ActiveWorkout({
 
   return (
     <main className="workout">
+      {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
       <header className="workout-head">
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
-      {restTimer}
       {discarding ? (
         <ConfirmRow
           label="確認放棄訓練"
@@ -440,7 +477,11 @@ function StrengthSection({
         <span role="columnheader">組</span>
         <span role="columnheader">重量 kg</span>
         <span role="columnheader">次數</span>
-        <span role="columnheader">RPE 自覺強度</span>
+        <span role="columnheader">RPE</span>
+        <span role="columnheader">休息</span>
+        <span role="columnheader">
+          <span className="sr-only">操作</span>
+        </span>
       </div>
       {item.sets.map((s) =>
         editing === s.setIndex ? (
@@ -475,6 +516,9 @@ function StrengthSection({
             <span role="cell">{s.weightKg}</span>
             <span role="cell">{s.reps}</span>
             <span role="cell">{s.rpe ?? "—"}</span>
+            <span role="cell">
+              {s.restSec === undefined ? "—" : formatRest(s.restSec)}
+            </span>
             <button
               type="button"
               className="secondary mini"
@@ -494,6 +538,8 @@ function StrengthSection({
           busy={busy}
           submitLabel="完成這組"
           onSubmit={async (v) => {
+            // Inside the tap gesture, so the browser lets the beep play later.
+            unlockRestSound();
             if (await save(newIndex, v, true)) setDrafting(false);
           }}
         />
@@ -584,6 +630,8 @@ function SetEditor({
         {input("weight", "重量", { primary: true, step: "0.1" })}
         {input("reps", "次數", { step: "1" })}
         {input("rpe", "RPE", { step: "0.5" })}
+        <span />
+        <span />
       </div>
       <Err message={errors.weight} />
       <Err message={errors.reps} />

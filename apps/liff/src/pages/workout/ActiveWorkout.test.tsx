@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -369,9 +370,31 @@ describe("ActiveWorkout", () => {
   it("RPE header has Chinese label and hint", () => {
     setup(session([strengthItem()]));
     expect(
-      screen.getByRole("columnheader", { name: "RPE 自覺強度" }),
+      screen.getByRole("columnheader", { name: "RPE" }),
     ).toBeInTheDocument();
     expect(screen.getByText("1 很輕鬆 – 10 力竭")).toBeInTheDocument();
+  });
+
+  it("set list shows rest column", () => {
+    const done = (setIndex: number, restSec?: number) => ({
+      setIndex,
+      weightKg: 60,
+      reps: 8,
+      completedAt: "2026-10-20T04:00:00.000Z",
+      ...(restSec === undefined ? {} : { restSec }),
+    });
+    setup(session([strengthItem({ sets: [done(1), done(2, 95)] })]));
+    expect(
+      screen.getByRole("columnheader", { name: "休息" }),
+    ).toBeInTheDocument();
+    const rows = screen.getAllByRole("row");
+    // Header, done and editor rows share one 6-column grid.
+    expect(within(rows[0]!).getAllByRole("columnheader")).toHaveLength(6);
+    expect(rows[1]!.children).toHaveLength(6);
+    // RPE and rest both fall back to the dash; rest is cell index 4.
+    expect(within(rows[1]!).getAllByText("—")).toHaveLength(2);
+    expect(rows[1]!.children[4]).toHaveTextContent("—");
+    expect(within(rows[2]!).getByText("1:35")).toBeInTheDocument();
   });
 
   it("discard confirm buttons on one row", () => {
@@ -452,14 +475,63 @@ describe("ActiveWorkout", () => {
     unmount();
     setup(session([strengthItem({ sets: [doneSet(3601)] })]));
     expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    // The pinned bar must be empty so `.rest-pinned:empty` hides it.
+    expect(document.querySelector(".rest-pinned")).toBeEmptyDOMElement();
   });
 
-  it("skip hides the timer until the next set completes", () => {
+  it("pinned bar comes before the header so content is not covered", () => {
+    vi.useFakeTimers({ now: NOW });
+    setup(session([strengthItem({ sets: [doneSet(10)] })]));
+    const bar = document.querySelector(".rest-pinned")!;
+    const head = document.querySelector(".workout-head")!;
+    expect(
+      bar.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("spacer height follows the pinned bar via ResizeObserver", () => {
+    vi.useFakeTimers({ now: NOW });
+    let callback: () => void = () => {};
+    class FakeObserver {
+      constructor(cb: () => void) {
+        callback = cb;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeObserver);
+    try {
+      setup(session([strengthItem({ sets: [doneSet(10)] })]));
+      const bar = document.querySelector<HTMLElement>(".rest-pinned")!;
+      Object.defineProperty(bar, "offsetHeight", {
+        value: 72,
+        configurable: true,
+      });
+      act(() => callback());
+      expect(
+        document.querySelector<HTMLElement>(".rest-spacer")!.style.height,
+      ).toBe("72px");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("skip shrinks the timer to a compact banner", () => {
     vi.useFakeTimers({ now: NOW });
     const { unmount } = setup(session([strengthItem({ sets: [doneSet(10)] })]));
     fireEvent.click(screen.getByRole("button", { name: "跳過" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(screen.getByRole("group", { name: "休息計時" })).toHaveClass(
+      "compact",
+    );
+    expect(screen.queryByRole("button", { name: "跳過" })).toBeNull();
     unmount();
+  });
+
+  it("rest timer is rendered inside the pinned bar on the main view", () => {
+    vi.useFakeTimers({ now: NOW });
+    setup(session([strengthItem({ sets: [doneSet(10)] })]));
+    expect(document.querySelector(".rest-pinned .rest-timer")).not.toBeNull();
+    expect(document.querySelector(".rest-spacer")).not.toBeNull();
   });
 
   it("rest timer stays visible while picking and a skip survives the picker", async () => {
@@ -469,11 +541,12 @@ describe("ActiveWorkout", () => {
     expect(screen.getByText("休息 1:20")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
     fireEvent.click(screen.getByRole("button", { name: "跳過" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    const compact = () => screen.getByRole("group", { name: "休息計時" });
+    expect(compact()).toHaveClass("compact");
     fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(compact()).toHaveClass("compact");
     fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(compact()).toHaveClass("compact");
     await act(async () => {});
   });
 
@@ -544,7 +617,7 @@ describe("ActiveWorkout", () => {
     expect(screen.getByText("休息 1:45")).toBeInTheDocument();
   });
 
-  it("rest end vibrates when supported", () => {
+  it("rest end vibrates with the pattern when supported", () => {
     vi.useFakeTimers({ now: NOW });
     const vibrate = vi.fn(() => true);
     setVibrate(vibrate);
@@ -555,7 +628,7 @@ describe("ActiveWorkout", () => {
     });
     expect(screen.getAllByText("休息結束")[0]).toBeInTheDocument();
     expect(vibrate).toHaveBeenCalledTimes(1);
-    expect(vibrate).toHaveBeenCalledWith(200);
+    expect(vibrate).toHaveBeenCalledWith([300, 150, 300, 150, 300]);
     act(() => {
       vi.advanceTimersByTime(3000);
     });

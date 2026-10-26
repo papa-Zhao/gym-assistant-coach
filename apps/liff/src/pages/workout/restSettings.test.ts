@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getRestSec, setRestSec } from "./restSettings";
+import {
+  getRestSec,
+  getRestSound,
+  setRestSec,
+  setRestSound,
+} from "./restSettings";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -32,5 +37,27 @@ describe("restSettings", () => {
     });
     expect(getRestSec()).toBe(90);
     expect(() => setRestSec(120)).not.toThrow();
+  });
+
+  it("getRestSound defaults to true", () => {
+    expect(getRestSound()).toBe(true);
+  });
+
+  it("setRestSound(false) persists", () => {
+    setRestSound(false);
+    expect(getRestSound()).toBe(false);
+    setRestSound(true);
+    expect(getRestSound()).toBe(true);
+  });
+
+  it("sound setting survives broken storage", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(getRestSound()).toBe(true);
+    expect(() => setRestSound(false)).not.toThrow();
   });
 });

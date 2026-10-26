@@ -8,6 +8,7 @@ import { Profile } from "./pages/Profile";
 import { Records } from "./pages/Records";
 import { Settings } from "./pages/Settings";
 import { MealEdit } from "./pages/meal/MealEdit";
+import { WorkoutHistory } from "./pages/WorkoutHistory";
 import { WorkoutHome } from "./pages/workout/WorkoutHome";
 
 interface AppProps {
@@ -45,6 +46,8 @@ export function App({
           return <Records onFatal={onFatal} />;
         case "body":
           return <BodyMetrics onFatal={onFatal} />;
+        case "workouts":
+          return <WorkoutHistory onFatal={onFatal} />;
         case "meal": {
           const params = new URLSearchParams(search);
           return (

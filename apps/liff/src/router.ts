@@ -1,11 +1,12 @@
 export type Route =
-  "profile" | "settings" | "records" | "body" | "workout" | "meal";
+  "profile" | "settings" | "records" | "body" | "workouts" | "workout" | "meal";
 
 const ROUTES: readonly Route[] = [
   "profile",
   "settings",
   "records",
   "body",
+  "workouts",
   "workout",
   "meal",
 ];

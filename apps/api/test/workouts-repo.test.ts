@@ -18,6 +18,7 @@ import {
   getSessionById,
   listBuiltinExercises,
   listExercises,
+  listFinishedSessions,
   listTemplates,
   removeItem,
   startSession,
@@ -26,7 +27,7 @@ import {
   upsertSet,
   weekStats,
 } from "../src/workouts/repo";
-import { exercises } from "../src/db/schema";
+import { exercises, workoutSessions } from "../src/db/schema";
 import { syncUser } from "../src/users/repo";
 import { createTestDb } from "./db";
 
@@ -618,6 +619,201 @@ describe("workouts repo", () => {
       expect(five?.items.every((i) => i.last?.date === "2026-10-10")).toBe(
         true,
       );
+    });
+  });
+  describe("listFinishedSessions", () => {
+    /** Pins ended_at so ordering does not depend on the clock. */
+    async function endAt(
+      db: Awaited<ReturnType<typeof setup>>["db"],
+      id: string,
+      iso: string,
+    ) {
+      await db
+        .update(workoutSessions)
+        .set({ endedAt: new Date(iso) })
+        .where(eq(workoutSessions.id, id));
+    }
+    const at = (i: number) =>
+      new Date(Date.UTC(2026, 9, 1, 12, i)).toISOString();
+
+    it("lists finished sessions newest first with sets and restSec", async () => {
+      const { db, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      const squat = slug("barbell-back-squat");
+      const old = await startSession(db, userId, "2026-10-01");
+      await addItem(db, userId, old.id, squat.id);
+      await upsertSet(db, userId, old.id, squat.id, {
+        setIndex: 1,
+        weightKg: 100,
+        reps: 5,
+      });
+      await finishSession(db, userId, old.id);
+      await endAt(db, old.id, at(1));
+
+      const s = await startSession(db, userId, "2026-10-02");
+      await addItem(db, userId, s.id, squat.id);
+      await addItem(db, userId, s.id, bench.id);
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 2,
+        weightKg: 62.5,
+        reps: 8,
+        restSec: 90,
+      });
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+      });
+      await finishSession(db, userId, s.id);
+      await endAt(db, s.id, at(2));
+
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      expect(page.nextBefore).toBeNull();
+      expect(page.entries.map((e) => e.id)).toEqual([s.id, old.id]);
+      const [first, second] = page.entries;
+      expect(first?.date).toBe("2026-10-02");
+      expect(first?.endedAt).toBe(at(2));
+      expect(first?.templateName).toBeNull();
+      // squat has no sets in this session, so only bench is listed
+      expect(first?.items).toHaveLength(1);
+      const item = first?.items[0] as { exercise: Exercise; sets: unknown[] };
+      expect(item.exercise.id).toBe(bench.id);
+      expect(item.sets).toMatchObject([
+        { setIndex: 1, weightKg: 60, reps: 8 },
+        { setIndex: 2, weightKg: 62.5, reps: 8, restSec: 90 },
+      ]);
+      expect(second?.items).toHaveLength(1);
+    });
+
+    it("lists cardio entries and the template name", async () => {
+      const { db, userId, slug } = await setup();
+      const all = await listExercises(db, userId);
+      const tread = all.find((e) => e.kind === "cardio") as Exercise;
+      const bench = slug("barbell-bench-press");
+      const s = await startSession(db, userId, "2026-10-02");
+      await addItem(db, userId, s.id, bench.id);
+      await addItem(db, userId, s.id, tread.id);
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+      });
+      await upsertCardio(db, userId, s.id, tread.id, {
+        entryIndex: 1,
+        durationMin: 20,
+      });
+      await finishSession(db, userId, s.id);
+      const tpl = await createTemplateFromSession(db, userId, s.id, "推日");
+      const s2 = await startSession(db, userId, "2026-10-03", tpl.id);
+      await upsertSet(db, userId, s2.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+      });
+      await finishSession(db, userId, s2.id);
+
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      const byId = new Map(page.entries.map((e) => [e.id, e]));
+      expect(byId.get(s2.id)?.templateName).toBe("推日");
+      expect(byId.get(s.id)?.templateName).toBeNull();
+      const items = byId.get(s.id)?.items ?? [];
+      expect(items.map((i) => i.exercise.id)).toEqual([bench.id, tread.id]);
+      expect(items[1]).toMatchObject({
+        cardio: [{ entryIndex: 1, durationMin: 20 }],
+      });
+    });
+
+    it("orders items by position even when later items get their sets first", async () => {
+      const { db, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      const squat = slug("barbell-back-squat");
+      const s = await startSession(db, userId, "2026-10-02");
+      await addItem(db, userId, s.id, bench.id);
+      await addItem(db, userId, s.id, squat.id);
+      // Squat (higher position) gets its set inserted first.
+      await upsertSet(db, userId, s.id, squat.id, {
+        setIndex: 1,
+        weightKg: 100,
+        reps: 5,
+      });
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+      });
+      await finishSession(db, userId, s.id);
+
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      const items = page.entries[0]?.items ?? [];
+      expect(items.map((i) => i.exercise.id)).toEqual([bench.id, squat.id]);
+    });
+
+    it("excludes the active session and other users", async () => {
+      const { db, userId, otherId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      const mine = await doSession(db, userId, "2026-10-01", bench.id, [
+        [60, 8],
+      ]);
+      await doSession(db, otherId, "2026-10-01", bench.id, [[60, 8]]);
+      const active = await startSession(db, userId, "2026-10-02");
+      await upsertSet(db, userId, active.id, bench.id, {
+        setIndex: 1,
+        weightKg: 50,
+        reps: 8,
+      });
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      expect(page.entries.map((e) => e.id)).toEqual([mine.id]);
+    });
+
+    it("pages with before", async () => {
+      const { db, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      const ids: string[] = [];
+      for (let i = 0; i < 11; i++) {
+        const s = await doSession(db, userId, "2026-10-01", bench.id, [
+          [60, 8],
+        ]);
+        await endAt(db, s.id, at(i));
+        ids.push(s.id);
+      }
+      const first = await listFinishedSessions(db, userId, { limit: 10 });
+      expect(first.entries.map((e) => e.id)).toEqual(ids.slice(1).reverse());
+      expect(first.nextBefore).toBe(first.entries[9]?.endedAt);
+      const second = await listFinishedSessions(db, userId, {
+        limit: 10,
+        before: new Date(first.nextBefore as string),
+      });
+      expect(second.entries.map((e) => e.id)).toEqual([ids[0]]);
+      expect(second.nextBefore).toBeNull();
+    });
+
+    it("has no nextBefore when the last page is exactly full", async () => {
+      const { db, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      for (let i = 0; i < 2; i++) {
+        const s = await doSession(db, userId, "2026-10-01", bench.id, [
+          [60, 8],
+        ]);
+        await endAt(db, s.id, at(i));
+      }
+      const page = await listFinishedSessions(db, userId, { limit: 2 });
+      expect(page.entries).toHaveLength(2);
+      expect(page.nextBefore).toBeNull();
+    });
+
+    it("uses three statements however many sessions", async () => {
+      const { db, statements, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      for (let i = 0; i < 4; i++) {
+        const s = await doSession(db, userId, "2026-10-01", bench.id, [
+          [60, 8],
+        ]);
+        await endAt(db, s.id, at(i));
+      }
+      statements.reset();
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      expect(page.entries).toHaveLength(4);
+      expect(statements.count).toBe(3);
     });
   });
 });
