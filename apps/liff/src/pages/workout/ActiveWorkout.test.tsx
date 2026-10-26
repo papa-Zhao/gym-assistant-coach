@@ -388,8 +388,12 @@ describe("ActiveWorkout", () => {
       screen.getByRole("columnheader", { name: "休息" }),
     ).toBeInTheDocument();
     const rows = screen.getAllByRole("row");
-    // RPE and rest both fall back to the dash.
+    // Header, done and editor rows share one 6-column grid.
+    expect(within(rows[0]!).getAllByRole("columnheader")).toHaveLength(6);
+    expect(rows[1]!.children).toHaveLength(6);
+    // RPE and rest both fall back to the dash; rest is cell index 4.
     expect(within(rows[1]!).getAllByText("—")).toHaveLength(2);
+    expect(rows[1]!.children[4]).toHaveTextContent("—");
     expect(within(rows[2]!).getByText("1:35")).toBeInTheDocument();
   });
 
@@ -471,6 +475,8 @@ describe("ActiveWorkout", () => {
     unmount();
     setup(session([strengthItem({ sets: [doneSet(3601)] })]));
     expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    // The pinned bar must be empty so `.rest-pinned:empty` hides it.
+    expect(document.querySelector(".rest-pinned")).toBeEmptyDOMElement();
   });
 
   it("pinned bar comes before the header so content is not covered", () => {

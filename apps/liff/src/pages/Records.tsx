@@ -75,12 +75,14 @@ export function Records({ onFatal }: RecordsProps) {
         ) : (
           <Skeleton layout="value" />
         )}
-        <a className="muted" href="/workout">
-          記訓練 ›
-        </a>{" "}
-        <a className="muted" href="/records/workouts">
-          看紀錄 ›
-        </a>
+        <div className="card-links">
+          <a className="muted" href="/workout">
+            記訓練 ›
+          </a>
+          <a className="muted" href="/records/workouts">
+            看紀錄 ›
+          </a>
+        </div>
       </section>
       <MealsCard onFatal={onFatal} />
     </main>

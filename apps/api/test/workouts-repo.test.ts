@@ -723,6 +723,31 @@ describe("workouts repo", () => {
       });
     });
 
+    it("orders items by position even when later items get their sets first", async () => {
+      const { db, userId, slug } = await setup();
+      const bench = slug("barbell-bench-press");
+      const squat = slug("barbell-back-squat");
+      const s = await startSession(db, userId, "2026-10-02");
+      await addItem(db, userId, s.id, bench.id);
+      await addItem(db, userId, s.id, squat.id);
+      // Squat (higher position) gets its set inserted first.
+      await upsertSet(db, userId, s.id, squat.id, {
+        setIndex: 1,
+        weightKg: 100,
+        reps: 5,
+      });
+      await upsertSet(db, userId, s.id, bench.id, {
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+      });
+      await finishSession(db, userId, s.id);
+
+      const page = await listFinishedSessions(db, userId, { limit: 10 });
+      const items = page.entries[0]?.items ?? [];
+      expect(items.map((i) => i.exercise.id)).toEqual([bench.id, squat.id]);
+    });
+
     it("excludes the active session and other users", async () => {
       const { db, userId, otherId, slug } = await setup();
       const bench = slug("barbell-bench-press");

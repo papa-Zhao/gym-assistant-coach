@@ -101,7 +101,7 @@ export function RestTimer({
         <button
           type="button"
           className="secondary mini"
-          aria-label={sound ? "關閉提示音" : "開啟提示音"}
+          aria-label="提示音"
           aria-pressed={sound}
           onClick={toggleSound}
         >

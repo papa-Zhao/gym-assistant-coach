@@ -479,6 +479,9 @@ function StrengthSection({
         <span role="columnheader">次數</span>
         <span role="columnheader">RPE</span>
         <span role="columnheader">休息</span>
+        <span role="columnheader">
+          <span className="sr-only">操作</span>
+        </span>
       </div>
       {item.sets.map((s) =>
         editing === s.setIndex ? (
@@ -627,6 +630,7 @@ function SetEditor({
         {input("weight", "重量", { primary: true, step: "0.1" })}
         {input("reps", "次數", { step: "1" })}
         {input("rpe", "RPE", { step: "0.5" })}
+        <span />
         <span />
       </div>
       <Err message={errors.weight} />

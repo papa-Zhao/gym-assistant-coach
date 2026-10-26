@@ -47,7 +47,7 @@ function EntryCard({ entry }: { entry: WorkoutHistoryEntry }) {
         {shortDate(entry.date)}・{entry.templateName ?? "訓練"}
       </h2>
       {entry.items.map((item) => (
-        <div key={item.exercise.id}>
+        <div className="history-item" key={item.exercise.id}>
           <h3>{item.exercise.nameZh}</h3>
           {"sets" in item
             ? item.sets.map((s) => <p key={s.setIndex}>{setLine(s)}</p>)

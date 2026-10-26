@@ -84,5 +84,12 @@ describe("Records", () => {
       "href",
       "/records/workouts",
     );
+    // Both links sit in one row styled with 44 px tap targets.
+    expect(screen.getByRole("link", { name: /記訓練/ }).parentElement).toBe(
+      screen.getByRole("link", { name: /看紀錄/ }).parentElement,
+    );
+    expect(
+      screen.getByRole("link", { name: /記訓練/ }).parentElement,
+    ).toHaveClass("card-links");
   });
 });

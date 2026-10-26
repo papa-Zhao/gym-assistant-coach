@@ -141,8 +141,10 @@ describe("RestTimer", () => {
     render(
       <RestTimer lastCompletedAt={NOW} skippedFor={null} onSkip={vi.fn()} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "關閉提示音" }));
-    const on = screen.getByRole("button", { name: "開啟提示音" });
+    const toggle = screen.getByRole("button", { name: "提示音" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toggle);
+    const on = screen.getByRole("button", { name: "提示音" });
     expect(on).toHaveTextContent("🔕");
     expect(on).toHaveAttribute("aria-pressed", "false");
     expect(getRestSound()).toBe(false);
