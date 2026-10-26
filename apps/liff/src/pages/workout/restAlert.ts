@@ -47,6 +47,7 @@ export function playRestEndSound(): void {
   try {
     const ctx = audioCtx;
     if (!ctx) return;
+    if (ctx.state !== "running") void ctx.resume().catch(() => {});
     const start = ctx.currentTime;
     for (let i = 0; i < BEEP_COUNT; i++) {
       const at = start + i * (BEEP_SEC + BEEP_GAP_SEC);

@@ -47,11 +47,13 @@ export function RestTimer({
   const resting = remainingMs > 0;
   const hidden = elapsedMs > HOUR_MS || skippedFor === lastCompletedAt;
 
+  const ended = !resting && -remainingMs < END_NOTICE_MS;
+
   // Alert once, when a countdown seen on screen reaches zero.
   useEffect(() => {
-    if (wasResting.current && !resting && !hidden) alertRestEnd({ sound });
+    if (wasResting.current && ended && !hidden) alertRestEnd({ sound });
     wasResting.current = resting;
-  }, [resting, hidden, sound]);
+  }, [resting, ended, hidden, sound]);
 
   if (hidden) return null;
 
@@ -65,8 +67,6 @@ export function RestTimer({
     setSound(!sound);
     setRestSound(!sound);
   };
-
-  const ended = !resting && -remainingMs < END_NOTICE_MS;
 
   let label: string;
   if (resting) label = `休息 ${formatRest(Math.ceil(remainingMs / 1000))}`;

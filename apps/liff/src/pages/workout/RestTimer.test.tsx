@@ -95,6 +95,24 @@ describe("RestTimer", () => {
     expect(alertRestEnd).toHaveBeenCalledTimes(1);
   });
 
+  it("does not alert when the end was missed while backgrounded", () => {
+    vi.useFakeTimers({ now: NOW });
+    window.localStorage.setItem("gac.restSec", "30");
+    render(
+      <RestTimer
+        lastCompletedAt={NOW - 10_000}
+        skippedFor={null}
+        onSkip={vi.fn()}
+      />,
+    );
+    act(() => {
+      vi.setSystemTime(NOW + 60_000);
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText(/已休息/)).toBeInTheDocument();
+    expect(alertRestEnd).not.toHaveBeenCalled();
+  });
+
   it("ended state adds the ended class for 3 seconds", () => {
     vi.useFakeTimers({ now: NOW });
     window.localStorage.setItem("gac.restSec", "30");
