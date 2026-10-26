@@ -17,6 +17,8 @@ import {
   type SessionItem,
   type Template,
   type WeekStats,
+  type WorkoutHistoryEntry,
+  type WorkoutHistoryPage,
   type WorkoutSet,
 } from "@gac/shared";
 import {
@@ -28,6 +30,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   ne,
   or,
@@ -1144,6 +1147,142 @@ export async function weekStats(
     if (r.muscle) setsByMuscle[r.muscle as MuscleGroup] = r.n;
   }
   return { from, to, sessions: n, setsByMuscle, cardioMinutes: minutes };
+}
+
+/**
+ * Finished sessions, newest first, strictly older than `before`. Three
+ * statements however many sessions: the page (with template name), then all
+ * their sets, then all their cardio. Exercises with nothing logged are left out.
+ * `nextBefore` is set only when the page is full and an older session exists.
+ */
+export async function listFinishedSessions(
+  db: Db,
+  userId: string,
+  opts: { before?: Date; limit: number },
+): Promise<WorkoutHistoryPage> {
+  // One extra row tells whether an older session exists.
+  const rows = await db
+    .select({
+      id: workoutSessions.id,
+      date: workoutSessions.performedOn,
+      endedAt: workoutSessions.endedAt,
+      templateName: workoutTemplates.name,
+    })
+    .from(workoutSessions)
+    .leftJoin(
+      workoutTemplates,
+      eq(workoutTemplates.id, workoutSessions.templateId),
+    )
+    .where(
+      and(
+        eq(workoutSessions.userId, userId),
+        isNotNull(workoutSessions.endedAt),
+        opts.before ? lt(workoutSessions.endedAt, opts.before) : undefined,
+      ),
+    )
+    .orderBy(desc(workoutSessions.endedAt), desc(workoutSessions.id))
+    .limit(opts.limit + 1);
+  const hasOlder = rows.length > opts.limit;
+  const page = rows.slice(0, opts.limit);
+  if (page.length === 0) return { entries: [], nextBefore: null };
+  const ids = page.map((r) => r.id);
+
+  const [sets, cardio] = await Promise.all([
+    db
+      .select({
+        sessionId: workoutSets.sessionId,
+        position: workoutSessionItems.position,
+        exercise: exercises,
+        set: workoutSets,
+      })
+      .from(workoutSets)
+      .innerJoin(
+        workoutSessionItems,
+        and(
+          eq(workoutSessionItems.sessionId, workoutSets.sessionId),
+          eq(workoutSessionItems.exerciseId, workoutSets.exerciseId),
+        ),
+      )
+      .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
+      .where(inArray(workoutSets.sessionId, ids))
+      .orderBy(asc(workoutSets.setIndex)),
+    db
+      .select({
+        sessionId: cardioEntries.sessionId,
+        position: workoutSessionItems.position,
+        exercise: exercises,
+        entry: cardioEntries,
+      })
+      .from(cardioEntries)
+      .innerJoin(
+        workoutSessionItems,
+        and(
+          eq(workoutSessionItems.sessionId, cardioEntries.sessionId),
+          eq(workoutSessionItems.exerciseId, cardioEntries.exerciseId),
+        ),
+      )
+      .innerJoin(exercises, eq(exercises.id, cardioEntries.exerciseId))
+      .where(inArray(cardioEntries.sessionId, ids))
+      .orderBy(asc(cardioEntries.entryIndex)),
+  ]);
+
+  type Item = WorkoutHistoryEntry["items"][number];
+  const bySession = new Map<
+    string,
+    Map<string, { position: number; item: Item }>
+  >();
+  const slot = (
+    sessionId: string,
+    position: number,
+    exercise: ExerciseRow,
+    init: () => Item,
+  ) => {
+    const items = bySession.get(sessionId) ?? new Map();
+    bySession.set(sessionId, items);
+    const found = items.get(exercise.id);
+    if (found) return found.item;
+    const item = init();
+    items.set(exercise.id, { position, item });
+    return item;
+  };
+  for (const r of sets) {
+    const item = slot(r.sessionId, r.position, r.exercise, () => ({
+      exercise: toExercise(r.exercise),
+      sets: [],
+    })) as { sets: WorkoutSet[] };
+    item.sets.push(
+      toWorkoutSet({
+        setIndex: r.set.setIndex,
+        weightKg: r.set.weightKg,
+        reps: r.set.reps,
+        rpe: r.set.rpe,
+        restSec: r.set.restSec,
+        completedAt: r.set.completedAt.toISOString(),
+      }),
+    );
+  }
+  for (const r of cardio) {
+    const item = slot(r.sessionId, r.position, r.exercise, () => ({
+      exercise: toExercise(r.exercise),
+      cardio: [],
+    })) as { cardio: CardioEntry[] };
+    item.cardio.push(toCardioEntry(r.entry));
+  }
+
+  const entries: WorkoutHistoryEntry[] = page.map((r) => ({
+    id: r.id,
+    date: r.date,
+    endedAt: (r.endedAt as Date).toISOString(),
+    templateName: r.templateName ?? null,
+    items: [...(bySession.get(r.id)?.values() ?? [])]
+      .sort((a, b) => a.position - b.position)
+      .map((x) => x.item),
+  }));
+  const last = entries[entries.length - 1];
+  return {
+    entries,
+    nextBefore: hasOlder && last ? last.endedAt : null,
+  };
 }
 
 /** Name of the template a session was started from, or null. */

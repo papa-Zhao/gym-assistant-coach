@@ -5,8 +5,10 @@ import {
   weekRange,
   type ActiveSession,
   type ApiError,
+  WORKOUT_HISTORY_PAGE_SIZE,
   type FinishSummary,
   type WeekStats,
+  type WorkoutHistoryPage,
 } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { apiErrorHandler } from "../http.js";
@@ -20,6 +22,7 @@ import {
   removeItem,
   finishSession,
   getActiveSession,
+  listFinishedSessions,
   markNotified,
   sessionTemplateName,
   startSession,
@@ -37,6 +40,14 @@ const index = { type: "integer", minimum: 1, maximum: 1000 } as const;
 
 const range = (r: { min: number; max: number }, type = "number") =>
   ({ type, minimum: r.min, maximum: r.max }) as const;
+
+const historySchema = {
+  querystring: {
+    type: "object",
+    additionalProperties: false,
+    properties: { before: { type: "string", format: "date-time" } },
+  },
+} as const;
 
 const startSchema = {
   body: {
@@ -164,6 +175,16 @@ export const sessionRoutes =
       const { from, to } = weekRange(taipeiDate(now()));
       return weekStats(db, uid(req), from, to);
     });
+
+    app.get<{ Querystring: { before?: string } }>(
+      "/workouts/history",
+      { ...auth, schema: historySchema },
+      async (req): Promise<WorkoutHistoryPage> =>
+        listFinishedSessions(db, uid(req), {
+          limit: WORKOUT_HISTORY_PAGE_SIZE,
+          ...(req.query.before ? { before: new Date(req.query.before) } : {}),
+        }),
+    );
 
     app.post<{ Body: { templateId?: string } | null }>(
       "/workouts",

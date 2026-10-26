@@ -241,6 +241,28 @@ export type SessionItem =
   | (SessionItemBase & { sets: WorkoutSet[] })
   | (SessionItemBase & { cardio: CardioEntry[] });
 
+/** One finished workout in the history list; only exercises with content. */
+export interface WorkoutHistoryEntry {
+  id: string;
+  /** performed_on */
+  date: string;
+  /** ISO */
+  endedAt: string;
+  templateName: string | null;
+  items: (
+    | { exercise: Exercise; sets: WorkoutSet[] }
+    | { exercise: Exercise; cardio: CardioEntry[] }
+  )[];
+}
+
+export interface WorkoutHistoryPage {
+  entries: WorkoutHistoryEntry[];
+  /** Pass as `before` for the next page; null when there is no more. */
+  nextBefore: string | null;
+}
+
+export const WORKOUT_HISTORY_PAGE_SIZE = 10;
+
 export interface ActiveSession {
   id: string;
   date: string;

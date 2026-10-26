@@ -3,6 +3,7 @@ import type {
   Exercise,
   FinishSummary,
   WeekStats,
+  WorkoutHistoryPage,
 } from "@gac/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
@@ -148,10 +149,30 @@ describe("workout session routes", () => {
       ["POST", `/workouts/${ZERO}/finish`],
       ["DELETE", `/workouts/${ZERO}`],
       ["GET", "/workouts/week"],
+      ["GET", "/workouts/history"],
     ] as const) {
       const res = await app.inject({ method, url });
       expect(res.statusCode).toBe(401);
     }
+  });
+
+  it("rejects a bad before on /workouts/history (400)", async () => {
+    const res = await req("GET", "/workouts/history?before=yesterday");
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("GET /workouts/history returns a page", async () => {
+    await reset();
+    const a = await start();
+    await putSet(a.id, bench.id, 1, { restSec: 60 });
+    await finish(a.id);
+    const res = await req("GET", "/workouts/history");
+    expect(res.statusCode).toBe(200);
+    const page = res.json<WorkoutHistoryPage>();
+    expect(page.entries[0]?.id).toBe(a.id);
+    expect(page.entries[0]?.items[0]).toMatchObject({
+      sets: [{ setIndex: 1, restSec: 60 }],
+    });
   });
 
   it("start, add item, record sets, finish returns PRs", async () => {
