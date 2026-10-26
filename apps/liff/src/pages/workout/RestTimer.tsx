@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { alertRestEnd } from "./restAlert";
 import {
   REST_MAX_SEC,
   REST_MIN_SEC,
   REST_STEP_SEC,
   getRestSec,
+  getRestSound,
   setRestSec,
+  setRestSound,
 } from "./restSettings";
 
 const HOUR_MS = 3600 * 1000;
@@ -31,6 +34,7 @@ export function RestTimer({
 }: RestTimerProps) {
   const [now, setNow] = useState(() => Date.now());
   const [target, setTarget] = useState(getRestSec);
+  const [sound, setSound] = useState(getRestSound);
   const wasResting = useRef(false);
 
   useEffect(() => {
@@ -43,18 +47,11 @@ export function RestTimer({
   const resting = remainingMs > 0;
   const hidden = elapsedMs > HOUR_MS || skippedFor === lastCompletedAt;
 
-  // Vibrate once, when a countdown seen on screen reaches zero.
+  // Alert once, when a countdown seen on screen reaches zero.
   useEffect(() => {
-    if (
-      wasResting.current &&
-      !resting &&
-      !hidden &&
-      typeof navigator.vibrate === "function"
-    ) {
-      navigator.vibrate(200);
-    }
+    if (wasResting.current && !resting && !hidden) alertRestEnd({ sound });
     wasResting.current = resting;
-  }, [resting, hidden]);
+  }, [resting, hidden, sound]);
 
   if (hidden) return null;
 
@@ -64,19 +61,39 @@ export function RestTimer({
     setRestSec(next);
   };
 
+  const toggleSound = () => {
+    setSound(!sound);
+    setRestSound(!sound);
+  };
+
+  const ended = !resting && -remainingMs < END_NOTICE_MS;
+
   let label: string;
   if (resting) label = `休息 ${formatRest(Math.ceil(remainingMs / 1000))}`;
-  else if (-remainingMs < END_NOTICE_MS) label = "休息結束";
+  else if (ended) label = "休息結束";
   else label = `已休息 ${formatRest(elapsedMs / 1000)}`;
 
   return (
-    <div className="rest-timer" role="group" aria-label="休息計時">
+    <div
+      className={ended ? "rest-timer ended" : "rest-timer"}
+      role="group"
+      aria-label="休息計時"
+    >
       <strong className="rest-label">{label}</strong>
       {/* Announce only the end of the rest, not every tick. */}
       <span className="sr-only" role="status">
-        {!resting && -remainingMs < END_NOTICE_MS ? "休息結束" : ""}
+        {ended ? "休息結束" : ""}
       </span>
       <div className="rest-actions">
+        <button
+          type="button"
+          className="secondary mini"
+          aria-label={sound ? "關閉提示音" : "開啟提示音"}
+          aria-pressed={sound}
+          onClick={toggleSound}
+        >
+          {sound ? "🔔" : "🔕"}
+        </button>
         <button
           type="button"
           className="secondary mini"

@@ -254,6 +254,14 @@ button.text-button { background: transparent; color: var(--color-primary); }
   border-radius: var(--radius-sm);
   background: var(--color-primary-soft);
 }
+@keyframes rest-flash {
+  0%, 100% { background: var(--color-primary-soft); }
+  50% { background: var(--color-primary); }
+}
+.rest-timer.ended { animation: rest-flash 1s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) {
+  .rest-timer.ended { animation: none; background: var(--color-primary); color: var(--color-on-primary); }
+}
 .rest-pinned {
   position: sticky;
   top: 0;

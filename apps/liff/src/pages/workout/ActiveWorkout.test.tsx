@@ -544,7 +544,7 @@ describe("ActiveWorkout", () => {
     expect(screen.getByText("休息 1:45")).toBeInTheDocument();
   });
 
-  it("rest end vibrates when supported", () => {
+  it("rest end vibrates with the pattern when supported", () => {
     vi.useFakeTimers({ now: NOW });
     const vibrate = vi.fn(() => true);
     setVibrate(vibrate);
@@ -555,7 +555,7 @@ describe("ActiveWorkout", () => {
     });
     expect(screen.getAllByText("休息結束")[0]).toBeInTheDocument();
     expect(vibrate).toHaveBeenCalledTimes(1);
-    expect(vibrate).toHaveBeenCalledWith(200);
+    expect(vibrate).toHaveBeenCalledWith([300, 150, 300, 150, 300]);
     act(() => {
       vi.advanceTimersByTime(3000);
     });

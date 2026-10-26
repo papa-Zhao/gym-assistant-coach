@@ -1,10 +1,15 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RestTimer, formatRest } from "./RestTimer";
+import { alertRestEnd } from "./restAlert";
+import { getRestSound } from "./restSettings";
+
+vi.mock("./restAlert", () => ({ alertRestEnd: vi.fn() }));
 
 const NOW = Date.parse("2026-10-21T10:00:00.000Z");
 
 afterEach(() => {
+  vi.mocked(alertRestEnd).mockClear();
   vi.useRealTimers();
   window.localStorage.clear();
 });
@@ -66,5 +71,61 @@ describe("RestTimer", () => {
       vi.advanceTimersByTime(2000);
     });
     expect(screen.getByRole("status")).toHaveTextContent("休息結束");
+  });
+
+  it("countdown reaching zero calls alertRestEnd once", () => {
+    vi.useFakeTimers({ now: NOW });
+    window.localStorage.setItem("gac.restSec", "30");
+    render(
+      <RestTimer
+        lastCompletedAt={NOW - 28_000}
+        skippedFor={null}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(alertRestEnd).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(alertRestEnd).toHaveBeenCalledTimes(1);
+    expect(alertRestEnd).toHaveBeenCalledWith({ sound: true });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(alertRestEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("ended state adds the ended class for 3 seconds", () => {
+    vi.useFakeTimers({ now: NOW });
+    window.localStorage.setItem("gac.restSec", "30");
+    render(
+      <RestTimer
+        lastCompletedAt={NOW - 28_000}
+        skippedFor={null}
+        onSkip={vi.fn()}
+      />,
+    );
+    const box = screen.getByRole("group", { name: "休息計時" });
+    expect(box).not.toHaveClass("ended");
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(box).toHaveClass("ended");
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(box).not.toHaveClass("ended");
+  });
+
+  it("sound toggle flips and persists", () => {
+    vi.useFakeTimers({ now: NOW });
+    render(
+      <RestTimer lastCompletedAt={NOW} skippedFor={null} onSkip={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "關閉提示音" }));
+    const on = screen.getByRole("button", { name: "開啟提示音" });
+    expect(on).toHaveTextContent("🔕");
+    expect(on).toHaveAttribute("aria-pressed", "false");
+    expect(getRestSound()).toBe(false);
   });
 });

@@ -28,3 +28,23 @@ export function setRestSec(n: number): void {
     // Storage may be blocked (private mode); the target just won't persist.
   }
 }
+
+export const REST_SOUND_KEY = "gac.restSound";
+
+/** Whether the rest-end beep is on; true when storage is unusable. */
+export function getRestSound(): boolean {
+  try {
+    return window.localStorage.getItem(REST_SOUND_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** Saves the beep preference; a storage failure is ignored. */
+export function setRestSound(on: boolean): void {
+  try {
+    window.localStorage.setItem(REST_SOUND_KEY, on ? "on" : "off");
+  } catch {
+    // Storage may be blocked (private mode); the choice just won't persist.
+  }
+}

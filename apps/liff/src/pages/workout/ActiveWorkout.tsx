@@ -23,6 +23,7 @@ import {
   type FieldName,
 } from "./fields";
 import { RestTimer } from "./RestTimer";
+import { unlockRestSound } from "./restAlert";
 
 interface ActiveWorkoutProps {
   session: ActiveSession;
@@ -494,6 +495,8 @@ function StrengthSection({
           busy={busy}
           submitLabel="完成這組"
           onSubmit={async (v) => {
+            // Inside the tap gesture, so the browser lets the beep play later.
+            unlockRestSound();
             if (await save(newIndex, v, true)) setDrafting(false);
           }}
         />
