@@ -45,7 +45,9 @@ export function RestTimer({
   const elapsedMs = Math.max(0, now - lastCompletedAt);
   const remainingMs = target * 1000 - elapsedMs;
   const resting = remainingMs > 0;
-  const hidden = elapsedMs > HOUR_MS || skippedFor === lastCompletedAt;
+  const stale = elapsedMs > HOUR_MS;
+  const skipped = skippedFor === lastCompletedAt;
+  const hidden = stale || skipped;
 
   const ended = !resting && -remainingMs < END_NOTICE_MS;
 
@@ -55,7 +57,18 @@ export function RestTimer({
     wasResting.current = resting;
   }, [resting, ended, hidden, sound]);
 
-  if (hidden) return null;
+  if (stale) return null;
+
+  // Skipped: keep a one-line elapsed banner so the pinned bar stays put.
+  if (skipped) {
+    return (
+      <div className="rest-timer compact" role="group" aria-label="休息計時">
+        <strong className="rest-label">
+          已休息 {formatRest(elapsedMs / 1000)}
+        </strong>
+      </div>
+    );
+  }
 
   const adjust = (delta: number) => {
     const next = Math.min(REST_MAX_SEC, Math.max(REST_MIN_SEC, target + delta));

@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   EQUIPMENT_CATEGORY_LABELS,
   type ActiveSession,
@@ -34,6 +41,32 @@ interface ActiveWorkoutProps {
   onDiscarded: () => void;
   /** Called when the session cannot be recovered. */
   onFatal: () => void;
+}
+
+/** Fixed to the viewport top; a spacer of the same height keeps content clear. */
+function PinnedBar({ children }: { children: ReactNode }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    setHeight(bar.offsetHeight);
+    // ResizeObserver is missing in some environments (e.g. jsdom).
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setHeight(bar.offsetHeight));
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <>
+      <div className="rest-pinned" ref={barRef}>
+        {children}
+      </div>
+      <div className="rest-spacer" style={{ height }} aria-hidden="true" />
+    </>
+  );
 }
 
 type Mutate = (call: () => Promise<ActiveSession>) => Promise<boolean>;
@@ -188,7 +221,7 @@ export function ActiveWorkout({
   if (picking) {
     return (
       <>
-        {restTimer && <div className="rest-pinned">{restTimer}</div>}
+        {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
         <ExercisePicker
           busy={busy}
           error={error}
@@ -206,7 +239,7 @@ export function ActiveWorkout({
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
-      {restTimer}
+      {restTimer && <PinnedBar>{restTimer}</PinnedBar>}
       {discarding ? (
         <ConfirmRow
           label="確認放棄訓練"

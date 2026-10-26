@@ -454,12 +454,22 @@ describe("ActiveWorkout", () => {
     expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
   });
 
-  it("skip hides the timer until the next set completes", () => {
+  it("skip shrinks the timer to a compact banner", () => {
     vi.useFakeTimers({ now: NOW });
     const { unmount } = setup(session([strengthItem({ sets: [doneSet(10)] })]));
     fireEvent.click(screen.getByRole("button", { name: "跳過" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(screen.getByRole("group", { name: "休息計時" })).toHaveClass(
+      "compact",
+    );
+    expect(screen.queryByRole("button", { name: "跳過" })).toBeNull();
     unmount();
+  });
+
+  it("rest timer is rendered inside the pinned bar on the main view", () => {
+    vi.useFakeTimers({ now: NOW });
+    setup(session([strengthItem({ sets: [doneSet(10)] })]));
+    expect(document.querySelector(".rest-pinned .rest-timer")).not.toBeNull();
+    expect(document.querySelector(".rest-spacer")).not.toBeNull();
   });
 
   it("rest timer stays visible while picking and a skip survives the picker", async () => {
@@ -469,11 +479,12 @@ describe("ActiveWorkout", () => {
     expect(screen.getByText("休息 1:20")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
     fireEvent.click(screen.getByRole("button", { name: "跳過" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    const compact = () => screen.getByRole("group", { name: "休息計時" });
+    expect(compact()).toHaveClass("compact");
     fireEvent.click(screen.getByRole("button", { name: "＋ 加動作" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(compact()).toHaveClass("compact");
     fireEvent.click(screen.getByRole("button", { name: "返回訓練" }));
-    expect(screen.queryByRole("group", { name: "休息計時" })).toBeNull();
+    expect(compact()).toHaveClass("compact");
     await act(async () => {});
   });
 

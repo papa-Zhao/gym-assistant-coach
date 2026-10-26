@@ -240,9 +240,6 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .exercise-head .exercise-name { flex: 1; min-width: 0; }
 .set-hint { margin: 0; }
 .rest-timer {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -262,11 +259,15 @@ button.text-button { background: transparent; color: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) {
   .rest-timer.ended { animation: none; background: var(--color-primary); color: var(--color-on-primary); }
 }
+.rest-timer.compact { padding: var(--space-1) var(--space-4); flex-wrap: nowrap; }
 .rest-pinned {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 1;
-  padding: var(--space-3) var(--space-4) 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: var(--space-2) var(--space-4);
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top));
   background: var(--color-bg);
 }
 .rest-pinned .rest-timer { margin-bottom: 0; }
