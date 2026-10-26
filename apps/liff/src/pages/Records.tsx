@@ -68,15 +68,20 @@ export function Records({ onFatal }: RecordsProps) {
         )}
         <span className="muted">看趨勢 ›</span>
       </a>
-      <a className="card link" href="/workout">
+      <section className="card">
         <h2>訓練</h2>
         {week ? (
           <p>本週訓練 {week.sessions} 次</p>
         ) : (
           <Skeleton layout="value" />
         )}
-        <span className="muted">記訓練 ›</span>
-      </a>
+        <a className="muted" href="/workout">
+          記訓練 ›
+        </a>{" "}
+        <a className="muted" href="/records/workouts">
+          看紀錄 ›
+        </a>
+      </section>
       <MealsCard onFatal={onFatal} />
     </main>
   );

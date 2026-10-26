@@ -73,12 +73,16 @@ describe("Records", () => {
     expect(screen.queryByText("即將推出")).not.toBeInTheDocument();
   });
 
-  it("records training card links to /workout", async () => {
+  it("training card links to /workout and /records/workouts", async () => {
     render(<Records onFatal={vi.fn()} />);
     expect(await screen.findByText("本週訓練 3 次")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /訓練/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /記訓練/ })).toHaveAttribute(
       "href",
       "/workout",
+    );
+    expect(screen.getByRole("link", { name: /看紀錄/ })).toHaveAttribute(
+      "href",
+      "/records/workouts",
     );
   });
 });
