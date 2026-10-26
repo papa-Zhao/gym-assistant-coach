@@ -1,11 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWakeLock } from "./wakeLock";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-let release: ReturnType<typeof vi.fn>;
-let request: ReturnType<typeof vi.fn>;
+let release: Mock<() => Promise<void>>;
+let request: Mock<
+  (type: "screen") => Promise<{ release: () => Promise<void> }>
+>;
 
 function setVisibility(state: "visible" | "hidden") {
   Object.defineProperty(document, "visibilityState", {
@@ -15,8 +25,10 @@ function setVisibility(state: "visible" | "hidden") {
 }
 
 beforeEach(() => {
-  release = vi.fn().mockResolvedValue(undefined);
-  request = vi.fn().mockResolvedValue({ release });
+  release = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  request = vi
+    .fn<(type: "screen") => Promise<{ release: () => Promise<void> }>>()
+    .mockResolvedValue({ release });
   Object.defineProperty(navigator, "wakeLock", {
     configurable: true,
     value: { request },
@@ -74,6 +86,15 @@ describe("useWakeLock", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     await flush();
     expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-request when the page becomes hidden", async () => {
+    renderHook(() => useWakeLock(true));
+    await flush();
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flush();
+    expect(request).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-request on visibilitychange when inactive", async () => {
