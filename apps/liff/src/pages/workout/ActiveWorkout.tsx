@@ -24,6 +24,7 @@ import {
 } from "./fields";
 import { RestTimer } from "./RestTimer";
 import { unlockRestSound } from "./restAlert";
+import { useWakeLock } from "./wakeLock";
 
 interface ActiveWorkoutProps {
   session: ActiveSession;
@@ -87,6 +88,8 @@ export function ActiveWorkout({
   onDiscarded,
   onFatal,
 }: ActiveWorkoutProps) {
+  // Held on both the workout and picker views; hooks stay above any early return.
+  useWakeLock(true);
   const [picking, setPicking] = useState(false);
   const [skippedFor, setSkippedFor] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
