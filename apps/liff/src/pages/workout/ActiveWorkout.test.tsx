@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -369,9 +370,27 @@ describe("ActiveWorkout", () => {
   it("RPE header has Chinese label and hint", () => {
     setup(session([strengthItem()]));
     expect(
-      screen.getByRole("columnheader", { name: "RPE 自覺強度" }),
+      screen.getByRole("columnheader", { name: "RPE" }),
     ).toBeInTheDocument();
     expect(screen.getByText("1 很輕鬆 – 10 力竭")).toBeInTheDocument();
+  });
+
+  it("set list shows rest column", () => {
+    const done = (setIndex: number, restSec?: number) => ({
+      setIndex,
+      weightKg: 60,
+      reps: 8,
+      completedAt: "2026-10-20T04:00:00.000Z",
+      ...(restSec === undefined ? {} : { restSec }),
+    });
+    setup(session([strengthItem({ sets: [done(1), done(2, 95)] })]));
+    expect(
+      screen.getByRole("columnheader", { name: "休息" }),
+    ).toBeInTheDocument();
+    const rows = screen.getAllByRole("row");
+    // RPE and rest both fall back to the dash.
+    expect(within(rows[1]!).getAllByText("—")).toHaveLength(2);
+    expect(within(rows[2]!).getByText("1:35")).toBeInTheDocument();
   });
 
   it("discard confirm buttons on one row", () => {

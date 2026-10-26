@@ -193,8 +193,8 @@ a.card.link { display: block; color: inherit; text-decoration: none; }
 .exercise-name small { font-family: var(--font-body); font-weight: 400; }
 .exercise-card .badge { align-self: flex-start; }
 .set-grid { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
-.set-row { display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr; gap: var(--space-2); align-items: center; }
-.set-row.done { grid-template-columns: 1fr 1.4fr 1fr 1fr auto; }
+.set-row { display: grid; grid-template-columns: 0.8fr 1.3fr 0.9fr 0.9fr 1fr; gap: var(--space-2); align-items: center; }
+.set-row.done { grid-template-columns: 0.8fr 1.3fr 0.9fr 0.9fr 1fr auto; }
 .set-row.cardio-row { grid-template-columns: auto 1fr auto; }
 .set-head { color: var(--color-text-muted); font-size: var(--font-size-caption); }
 .done-mark { color: var(--color-accent); font-weight: 700; }

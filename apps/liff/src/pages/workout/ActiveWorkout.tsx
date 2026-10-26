@@ -29,7 +29,7 @@ import {
   toText,
   type FieldName,
 } from "./fields";
-import { RestTimer } from "./RestTimer";
+import { RestTimer, formatRest } from "./RestTimer";
 import { unlockRestSound } from "./restAlert";
 import { useWakeLock } from "./wakeLock";
 
@@ -477,7 +477,8 @@ function StrengthSection({
         <span role="columnheader">組</span>
         <span role="columnheader">重量 kg</span>
         <span role="columnheader">次數</span>
-        <span role="columnheader">RPE 自覺強度</span>
+        <span role="columnheader">RPE</span>
+        <span role="columnheader">休息</span>
       </div>
       {item.sets.map((s) =>
         editing === s.setIndex ? (
@@ -512,6 +513,9 @@ function StrengthSection({
             <span role="cell">{s.weightKg}</span>
             <span role="cell">{s.reps}</span>
             <span role="cell">{s.rpe ?? "—"}</span>
+            <span role="cell">
+              {s.restSec === undefined ? "—" : formatRest(s.restSec)}
+            </span>
             <button
               type="button"
               className="secondary mini"
@@ -623,6 +627,7 @@ function SetEditor({
         {input("weight", "重量", { primary: true, step: "0.1" })}
         {input("reps", "次數", { step: "1" })}
         {input("rpe", "RPE", { step: "0.5" })}
+        <span />
       </div>
       <Err message={errors.weight} />
       <Err message={errors.reps} />
