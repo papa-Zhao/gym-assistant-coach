@@ -129,6 +129,8 @@ export function ActiveWorkout({
   const [discarding, setDiscarding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Non-fatal message that must survive the picker closing.
+  const [notice, setNotice] = useState<string | null>(null);
   const cards = useRef(new Map<string, HTMLElement>());
   const scrollTarget = useRef<string | null>(null);
 
@@ -226,6 +228,7 @@ export function ActiveWorkout({
           busy={busy}
           error={error}
           onPick={(ex) => void addExercise(ex)}
+          onNotice={setNotice}
           onClose={() => setPicking(false)}
           onFatal={onFatal}
         />
@@ -276,6 +279,11 @@ export function ActiveWorkout({
           }}
         />
       ))}
+      {notice && (
+        <p className="muted" role="status">
+          {notice}
+        </p>
+      )}
       {error && (
         <p className="error-text" role="alert">
           {error}
@@ -296,7 +304,10 @@ export function ActiveWorkout({
             <button
               type="button"
               className="secondary outline"
-              onClick={() => setPicking(true)}
+              onClick={() => {
+                setNotice(null);
+                setPicking(true);
+              }}
             >
               ＋ 加動作
             </button>

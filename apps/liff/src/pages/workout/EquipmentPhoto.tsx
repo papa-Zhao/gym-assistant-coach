@@ -34,6 +34,8 @@ export type PhotoPhase =
       equipment: Equipment;
       candidates: Exercise[];
       suggestion: ExerciseSuggestion;
+      /** The resized shot these results came from; a retake replaces it. */
+      photo: Blob;
     };
 
 interface EquipmentPhotoProps {
@@ -41,7 +43,7 @@ interface EquipmentPhotoProps {
   phase: PhotoPhase;
   onPhase: (phase: PhotoPhase) => void;
   onPick: (exercise: Exercise) => void;
-  onCustom: (suggestion: ExerciseSuggestion) => void;
+  onCustom: (suggestion: ExerciseSuggestion, photo: Blob | null) => void;
   onFatal: () => void;
   busy: boolean;
   /** The normal search view, shown while no photo flow is active. */
@@ -94,6 +96,7 @@ export function EquipmentPhoto({
           equipment: res.equipment,
           candidates: res.candidates,
           suggestion: res.suggestion,
+          photo: blob,
         });
       } else {
         setPhase({ kind: "error", message: OUTCOME_MESSAGES[res.outcome] });
@@ -192,14 +195,14 @@ function FoundView({
   phase: Extract<PhotoPhase, { kind: "found" }>;
   busy: boolean;
   onPick: (exercise: Exercise) => void;
-  onCustom: (suggestion: ExerciseSuggestion) => void;
+  onCustom: (suggestion: ExerciseSuggestion, photo: Blob | null) => void;
 }) {
-  const { candidates, suggestion, equipment } = phase;
+  const { candidates, suggestion, equipment, photo } = phase;
   if (candidates.length === 0) {
     return (
       <section className="card stack">
         <p className="muted">動作庫裡沒有這台器材的動作</p>
-        <button type="button" onClick={() => onCustom(suggestion)}>
+        <button type="button" onClick={() => onCustom(suggestion, photo)}>
           建立自訂動作
         </button>
       </section>
@@ -221,7 +224,7 @@ function FoundView({
       <button
         type="button"
         className="secondary picker-actions"
-        onClick={() => onCustom(suggestion)}
+        onClick={() => onCustom(suggestion, photo)}
       >
         都不是？建立自訂動作
       </button>

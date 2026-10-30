@@ -290,6 +290,7 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .rest-actions { display: flex; gap: var(--space-2); }
 .picker-list .row { align-items: flex-start; gap: var(--space-2); }
 .illus { background: var(--color-surface-alt); border-radius: var(--radius-sm); flex-shrink: 0; }
+.illus-photo { object-fit: cover; border-radius: var(--radius-sm); flex-shrink: 0; }
 .row-name { flex: 1; min-width: 0; }
 .row-tag {
   flex-shrink: 0;

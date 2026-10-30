@@ -311,4 +311,105 @@ describe("ExercisePicker equipment photo", () => {
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.getByRole("search")).toBeInTheDocument();
   });
+
+  describe("custom exercise photo", () => {
+    const CREATED = {
+      ...BENCH,
+      id: "ex-new",
+      nameZh: "腿推機",
+      isCustom: true,
+    };
+    const WITH_PHOTO = { ...CREATED, photoUrl: "data:image/jpeg;base64,AAAA" };
+
+    function route(
+      photoReply: (blob: unknown) => unknown = () => WITH_PHOTO,
+      identify: (blob: unknown) => unknown = () => found(),
+    ) {
+      const calls = fakeApi(({ method, path, body }) => {
+        if (path === "/exercises/identify") return identify(body);
+        if (method === "POST" && path === "/exercises") return CREATED;
+        if (method === "PUT" && path === "/exercises/ex-new/photo")
+          return photoReply(body);
+        return [BENCH];
+      });
+      const onPick = vi.fn();
+      render(
+        <ExercisePicker onPick={onPick} onClose={vi.fn()} onFatal={vi.fn()} />,
+      );
+      return { calls, onPick };
+    }
+
+    const submit = () =>
+      fireEvent.click(screen.getByRole("button", { name: "新增並加入訓練" }));
+
+    it("custom from photo uploads the photo after create", async () => {
+      const { calls, onPick } = route();
+      takePhoto();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "都不是？建立自訂動作" }),
+      );
+      submit();
+      await waitFor(() => expect(onPick).toHaveBeenCalledWith(WITH_PHOTO));
+      const writes = calls.filter((c) => c.method !== "GET");
+      expect(writes.map((c) => `${c.method} ${c.path}`)).toEqual([
+        "POST /exercises/identify",
+        "POST /exercises",
+        "PUT /exercises/ex-new/photo",
+      ]);
+      expect(writes[2]?.body).toBe(SMALL);
+    });
+
+    it("custom from search has no photo upload", async () => {
+      const { calls, onPick } = route();
+      takePhoto();
+      await screen.findByText("看起來是：槓鈴");
+      fireEvent.click(screen.getByRole("button", { name: "回到搜尋" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "新增自訂動作" }),
+      );
+      fireEvent.change(screen.getByLabelText("中文名稱"), {
+        target: { value: "腿推機" },
+      });
+      fireEvent.change(screen.getByLabelText("肌群"), {
+        target: { value: "quads" },
+      });
+      fireEvent.change(screen.getByLabelText("器材"), {
+        target: { value: "plate_loaded_machine" },
+      });
+      submit();
+      await waitFor(() => expect(onPick).toHaveBeenCalledWith(CREATED));
+      expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    });
+
+    it("retake uses the latest photo", async () => {
+      const first = new Blob(["1"]);
+      const second = new Blob(["2"]);
+      resizePhoto.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+      const { calls, onPick } = route();
+      takePhoto("1.jpg");
+      await screen.findByText("看起來是：槓鈴");
+      takePhoto("2.jpg");
+      await waitFor(() => expect(resizePhoto).toHaveBeenCalledTimes(2));
+      await screen.findByText("看起來是：槓鈴");
+      fireEvent.click(
+        screen.getByRole("button", { name: "都不是？建立自訂動作" }),
+      );
+      submit();
+      await waitFor(() => expect(onPick).toHaveBeenCalled());
+      expect(calls.find((c) => c.method === "PUT")?.body).toBe(second);
+    });
+
+    it("photo upload failure still adds the exercise", async () => {
+      const { onPick } = route(() => new Response("x", { status: 500 }));
+      takePhoto();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "都不是？建立自訂動作" }),
+      );
+      submit();
+      await waitFor(() => expect(onPick).toHaveBeenCalledWith(CREATED));
+      expect(
+        screen.getByText("照片沒有存成功，動作已經建立"),
+      ).toBeInTheDocument();
+    });
+  });
 });

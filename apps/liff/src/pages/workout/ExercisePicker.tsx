@@ -30,7 +30,11 @@ interface ExercisePickerProps {
   busy?: boolean;
   /** Message from a failed add. */
   error?: string | null;
+  /** A non-fatal message to show where the user lands after onPick. */
+  onNotice?: (message: string) => void;
 }
+
+const MSG_PHOTO_NOT_SAVED = "照片沒有存成功，動作已經建立";
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -40,6 +44,7 @@ export function ExercisePicker({
   onFatal,
   busy = false,
   error = null,
+  onNotice,
 }: ExercisePickerProps) {
   const [kind, setKind] = useState<ExerciseKind>("strength");
   const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
@@ -52,6 +57,8 @@ export function ExercisePicker({
   const [custom, setCustom] = useState(false);
   const [photo, setPhoto] = useState<PhotoPhase>({ kind: "idle" });
   const [initial, setInitial] = useState<ExerciseSuggestion | undefined>();
+  // Only set by the photo flow; search and manual entry never carry a photo.
+  const [customPhoto, setCustomPhoto] = useState<Blob | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -98,9 +105,12 @@ export function ExercisePicker({
       <CustomExerciseForm
         onCreated={onPick}
         initial={initial}
+        photo={customPhoto}
+        onNotice={onNotice}
         onBack={() => {
           setCustom(false);
           setInitial(undefined);
+          setCustomPhoto(null);
         }}
         onFatal={onFatal}
         busy={busy}
@@ -121,8 +131,9 @@ export function ExercisePicker({
         phase={photo}
         onPhase={setPhoto}
         onPick={onPick}
-        onCustom={(suggestion) => {
+        onCustom={(suggestion, shot) => {
           setInitial(suggestion);
+          setCustomPhoto(shot);
           setCustom(true);
         }}
         onFatal={onFatal}
@@ -217,7 +228,11 @@ export function ExercisePicker({
           <button
             type="button"
             className="secondary"
-            onClick={() => setCustom(true)}
+            onClick={() => {
+              setInitial(undefined);
+              setCustomPhoto(null);
+              setCustom(true);
+            }}
           >
             新增自訂動作
           </button>
@@ -232,6 +247,8 @@ export function ExercisePicker({
 
 interface CustomFormProps {
   initial?: ExerciseSuggestion | undefined;
+  photo: Blob | null;
+  onNotice?: ((message: string) => void) | undefined;
   busy: boolean;
   error: string | null;
   onCreated: (exercise: Exercise) => void;
@@ -241,6 +258,8 @@ interface CustomFormProps {
 
 function CustomExerciseForm({
   initial,
+  photo,
+  onNotice,
   onCreated,
   onBack,
   onFatal,
@@ -258,6 +277,7 @@ function CustomExerciseForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const equipmentOptions = EQUIPMENT.filter(
     (e) =>
@@ -284,7 +304,20 @@ function CustomExerciseForm({
           equipment,
         }),
       });
-      onCreated(created);
+      let result = created;
+      if (photo) {
+        try {
+          result = await apiFetch<Exercise>(`/exercises/${created.id}/photo`, {
+            method: "PUT",
+            body: photo,
+            headers: { "content-type": "application/octet-stream" },
+          });
+        } catch {
+          setNotice(MSG_PHOTO_NOT_SAVED);
+          onNotice?.(MSG_PHOTO_NOT_SAVED);
+        }
+      }
+      onCreated(result);
       setBusy(false);
     } catch (err) {
       if (isAuthExpired(err)) onFatal();
@@ -355,6 +388,11 @@ function CustomExerciseForm({
         {(error ?? addError) && (
           <p className="error-text" role="alert">
             {error ?? addError}
+          </p>
+        )}
+        {notice && (
+          <p className="muted" role="status">
+            {notice}
           </p>
         )}
         <button type="submit" disabled={!valid || busy || adding}>

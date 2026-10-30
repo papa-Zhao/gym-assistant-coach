@@ -10,6 +10,7 @@ const strength = (slug: string | null, muscleGroup: MuscleGroup = "chest") => ({
   slug,
   kind: "strength" as const,
   muscleGroup,
+  photoUrl: null,
 });
 
 function html(
@@ -219,5 +220,32 @@ describe("ExerciseIllustration", () => {
     for (const pose of Object.values(POSES))
       for (const d of paths(pose))
         expect(d).toMatch(/^[MLHVCQAZmlhvcqaz0-9\s.,-]+$/);
+  });
+});
+
+describe("ExerciseIllustration photo", () => {
+  const photoUrl = "data:image/jpeg;base64,AAAA";
+
+  it("renders the photo when present", () => {
+    const { container } = render(
+      <ExerciseIllustration
+        exercise={{ ...strength("x"), photoUrl }}
+        size={64}
+      />,
+    );
+    const img = container.querySelector("img.illus-photo");
+    expect(img).toHaveAttribute("src", photoUrl);
+    expect(img).toHaveAttribute("alt", "");
+    expect(img).toHaveAttribute("width", "64");
+    expect(img).toHaveAttribute("height", "64");
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("still renders the svg without a photo", () => {
+    const { container } = render(
+      <ExerciseIllustration exercise={strength("x")} size={40} />,
+    );
+    expect(container.querySelector("svg.illus")).not.toBeNull();
+    expect(container.querySelector("img")).toBeNull();
   });
 });
