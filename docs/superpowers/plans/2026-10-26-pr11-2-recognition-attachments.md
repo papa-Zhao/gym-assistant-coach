@@ -12,7 +12,7 @@
 
 **Spec:** 2026-10-26 手機測試回饋第 1、2 項（本計畫「已決定」一節）；規格 [docs/specs/2026-10-15-gym-assistant-coach-design.md](../../specs/2026-10-15-gym-assistant-coach-design.md) 訓練紀錄、器材辨識章節；PR 8.2 計畫（器材照片）。
 
-**前一份計畫：** PR 11.1 休息計時。要等 11.1 合併後才實作（同樣會改 `ActiveWorkout.tsx`、`workouts/repo.ts`）。
+**前一份計畫：** PR 11.4 訓練建議（2026-10-30 調整順序：11.3 → 11.4 → 11.2）。要等 11.3、11.4 都合併後才實作：11.3 改過 `EquipmentPhoto.tsx`、`ExercisePicker.tsx`（照片建立自訂動作），11.4 加了 `workoutAdviceContext`，本 PR 要在它們之上加把手。
 
 ## 已決定（2026-10-26，使用者同意）
 
@@ -37,7 +37,7 @@
 - AI 回傳的 `attachment` 不在清單內、或器材不是 `cable` 時，一律當作 null。
 - 候選最多 5 個（沿用 `MAX_CANDIDATES`）。
 - prompt 不能放日期或使用者資料（保持 prompt cache 有效）。
-- migration 編號接在現有最後一號之後（目前是 `0012`，本 PR 為 `0013`）。
+- migration 編號接在 PR 11.4 的 `0014` 之後（本 PR 為 `0015`）。實作前用 `ls db/migrations` 確認最後一號。
 - 不要 stage `.claude/` 和 `skills-lock.json`。
 
 ## Review Focus
@@ -55,7 +55,7 @@
 **Files:**
 - Modify: `packages/shared/src/workouts.ts`、`packages/shared/src/workouts.test.ts`
 - Modify: `apps/api/src/db/schema.ts`
-- Create: `db/migrations/0013_cable_attachments_and_exercises.sql`（drizzle-kit 產生，Task 2 的 seed 加在同一個檔案後面）
+- Create: `db/migrations/0015_cable_attachments_and_exercises.sql`（drizzle-kit 產生，Task 2 的 seed 加在同一個檔案後面）
 - Modify: `apps/api/src/users/export.ts`、`apps/api/test/export.test.ts`
 
 **Interfaces:**
@@ -78,7 +78,7 @@
 ### Task 2: 新增內建動作與圖
 
 **Files:**
-- Modify: `db/migrations/0013_cable_attachments_and_exercises.sql`（後面加 insert）
+- Modify: `db/migrations/0015_cable_attachments_and_exercises.sql`（後面加 insert）
 - Modify: `apps/liff/src/illustrations/poses.ts`
 - Test: `apps/liff/src/illustrations/ExerciseIllustration.test.tsx`
 
@@ -159,6 +159,7 @@
 - Modify: `apps/api/src/workouts/repo.ts`（`addItem`、新的 `setItemAttachment`、`sessionDataQuery`、`buildSession`、`finishSession` 的 PR 比較、`createTemplateFromSession`、`startSession`、`loadTemplates`）
 - Modify: `apps/api/src/workouts/session-routes.ts`（`POST /workouts/:id/items` body 加可選的 `attachment`；新的 `PATCH /workouts/:id/items/:exerciseId`）
 - Modify: PR 11.1 的 `listFinishedSessions`（items 加 `attachment`）
+- Modify: PR 11.4 的 `workoutAdviceContext`（每個動作附上把手名稱；「上一次」改用「動作＋把手」）
 - Test: `apps/api/test/workouts-repo.test.ts`、`apps/api/test/session-routes.test.ts`
 
 **Interfaces:**
@@ -174,6 +175,7 @@
   - `setItemAttachment on non-cable exercise is bad_request`；route 回 400。
   - `template keeps attachment`：存成範本再開始訓練，item 的 attachment 一樣。
   - `history entry includes attachment`。
+  - `advice context includes attachment label`：rope 的動作在 context 裡出現「繩索」，「上一次」取的是 rope 那次。
 - [ ] **Step 2: 跑測試確認失敗**：`npm test -w @gac/api -- workouts-repo session-routes`，Expected: FAIL
 - [ ] **Step 3: 實作**：`sessionDataQuery` 的 `src` 子查詢 join 前一次的 `workout_session_items`（同 session、同 exercise）和這次的 item，加條件 `prev.attachment is not distinct from cur.attachment`；PR 的 `prior` 查詢同樣 join。
 - [ ] **Step 4: 跑測試確認通過**：同上，Expected: PASS
@@ -183,7 +185,7 @@
 
 **Files:**
 - Modify: `apps/liff/src/pages/workout/ActiveWorkout.tsx`（`ExerciseCard` 加把手選單；`addExercise` 帶 attachment）
-- Modify: `apps/liff/src/pages/workout/ExercisePicker.tsx`、`EquipmentPhoto.tsx`（`onPick(exercise, attachment?)`）
+- Modify: `apps/liff/src/pages/workout/ExercisePicker.tsx`、`EquipmentPhoto.tsx`（`onPick(exercise, attachment?)`；保留 PR 11.3 的照片建立自訂動作流程）
 - Modify: `apps/liff/src/pages/WorkoutHistory.tsx`（動作名稱後加「（繩索）」）
 - Test: `ActiveWorkout.test.tsx`、`EquipmentPhoto.test.tsx`、`WorkoutHistory.test.tsx`
 
@@ -209,7 +211,7 @@
 
 ## 部署
 
-有 migration `0013`：先照現有流程跑 migration，再部署 api，最後 LIFF（舊 LIFF 不送 attachment，新 api 允許省略，所以順序錯了也不會壞）。合併後用手機拍 3–5 台器材確認推薦結果。
+有 migration `0015`：先照現有流程跑 migration，再部署 api，最後 LIFF（舊 LIFF 不送 attachment，新 api 允許省略，所以順序錯了也不會壞）。合併後用手機拍 3–5 台器材確認推薦結果。
 
 ## 狀態
 
@@ -224,4 +226,4 @@
 
 - `compatibleEquipment` 是「這個動作能不能用這台器材做」的唯一判斷，之後其他地方要用就 import，不要另寫。
 - 新增內建動作時，`every seeded slug has its own pose` 測試會要求同時畫圖。
-- `attachment` 在 session item 與範本 item 上；比較「同一個動作」的地方（上次、加重建議、PR）都要用「動作＋把手」。PR 11.4 的訓練建議要遵守這個規則。
+- `attachment` 在 session item 與範本 item 上；比較「同一個動作」的地方（上次、加重建議、PR）都要用「動作＋把手」。本 PR 已經把 PR 11.4 的 AI 建議 context 改成遵守這個規則。

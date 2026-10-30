@@ -12,7 +12,7 @@
 
 **Spec:** 2026-10-26 手機測試回饋第 4 項；規格 [docs/specs/2026-10-15-gym-assistant-coach-design.md](../../specs/2026-10-15-gym-assistant-coach-design.md) 的 AI 建議與安全規則；PR 9.1（問 AI）的 prompt 安全規則。
 
-**前一份計畫：** PR 11.3（政策已經寫好 AI 訓練建議會送出訓練紀錄）。要等 11.3 合併後才實作；也會用到 PR 11.2 的「動作＋把手」比較規則。
+**前一份計畫：** PR 11.3（政策已經寫好 AI 訓練建議會送出訓練紀錄）。要等 11.3 合併後才實作（2026-10-30 調整順序：11.3 → 11.4 → 11.2）。PR 11.2（滑輪把手）排在本 PR 之後，所以本 PR 只用「動作」判斷是不是同一個動作，不碰把手；11.2 會再把把手補進來。
 
 ## 已決定（2026-10-26，使用者同意）
 
@@ -31,7 +31,7 @@
 3. **AI 建議扣「問 AI」的次數**（`AiKind` 的 `"chat"`，每天 20 次），不另外加一種次數。畫面上寫「會用掉 1 次問 AI 的次數」。
 4. **控制誰能用**：`canUseWorkoutAiAdvice(deps: { db: Db }, userId: string): Promise<boolean>`，放在 `apps/api/src/workouts/ai-advice-access.ts`，現在回傳 true。`FinishSummary.aiAdviceAvailable` 由它決定，LIFF 只在 true 時顯示按鈕；`POST /advice` 也再檢查一次（false 回 403 `not_allowed`）。
 5. **AI 建議只能在已結束的訓練上要**，而且只限結束後 24 小時內（避免拿很久以前的訓練一直問）。進行中回 409 `not_finished`，超過時間回 409 `too_old`。
-6. **AI 看到的資料**：這次每個動作（含把手）的每組重量、次數、RPE、休息；同一個動作＋把手上一次的組數；本週各肌群組數；個人檔案的目標（沿用 `ask/context.ts` 的寫法）。不送 LINE 名稱等識別資料。
+6. **AI 看到的資料**：這次每個動作的每組重量、次數、RPE、休息；同一個動作上一次的組數；本週各肌群組數；個人檔案的目標（沿用 `ask/context.ts` 的寫法）。不送 LINE 名稱等識別資料。
 7. **AI 回覆格式**：`title`（20 字以內）、`points`（1–3 條，每條 60 字以內）。安全規則沿用問 AI：不診斷受傷、提到疼痛就建議找專業人員。
 8. **快取**：`workout_sessions.ai_advice jsonb`，存 `{ title, points, createdAt }`。成功才存；失敗不扣次數（`withAiUse` 已經這樣處理）。刪除帳號時跟著 session cascade 刪掉；匯出資料包含它。
 9. LINE 聊天室的訓練完成通知**不加**建議（避免訊息變長）。
@@ -40,10 +40,10 @@
 
 - 使用者看得到的文字一律是繁體中文；規則建議的文字照上面第 1、2 點原樣。
 - `buildWorkoutTips` 是純函式（不碰資料庫、不讀時間），日期由呼叫端傳入。
-- 規則建議比較「同一個動作」時用「動作＋把手」（PR 11.2 規則）。
+- 規則建議比較「同一個動作」時只用 `exerciseId`（把手由 PR 11.2 補上）。上一次的資料一律重用現有的 `last`／`overloadHint` 查詢，不要另寫，11.2 改那裡就會一起生效。
 - AI prompt 不能有日期或使用者識別資料在 system 裡（保持 prompt cache 有效）；使用者資料放在 user message。
 - AI 建議的錯誤結果對應：`limit` →「今天問 AI 的次數用完了，明天再試」；`refused`／`invalid` →「這次沒辦法產生建議，請稍後再試」；`unavailable` →「AI 暫時忙不過來，請稍後再試」。
-- migration 編號接在 PR 11.3 的 `0014` 之後（本 PR 為 `0015`）。
+- migration 編號接在 PR 11.3 的 `0013` 之後（本 PR 為 `0014`）。
 - 不要 stage `.claude/` 和 `skills-lock.json`。
 
 ## Review Focus
@@ -94,7 +94,7 @@
 - Create: `apps/api/src/workouts/ai-advice-access.ts`
 - Create: `apps/api/src/ai/workout-advisor.ts`、`apps/api/test/workout-advisor.test.ts`
 - Modify: `apps/api/src/ai/prompts.ts`（`WORKOUT_ADVICE_SYSTEM`）、`apps/api/src/ai/config.ts`（`WORKOUT_ADVICE_MAX_TOKENS = 1500`）
-- Modify: `apps/api/src/db/schema.ts`、Create: `db/migrations/0015_workout_ai_advice.sql`
+- Modify: `apps/api/src/db/schema.ts`、Create: `db/migrations/0014_workout_ai_advice.sql`
 - Modify: `apps/api/src/deps.ts`、`apps/api/src/server.ts`、`apps/api/src/loadtest/fakes.ts`（注入 `workoutAdvisor`）
 - Modify: `apps/api/src/users/export.ts`（session 加 `aiAdvice`）
 - Modify: `packages/shared/src/workouts.ts`
@@ -116,7 +116,7 @@
 
 - [ ] **Step 1: 寫失敗的測試**
   - advisor：`parses title and points`；`truncates title to 20 and points to 60 chars, max 3 points`；`missing points is invalid`；`system prompt has no dates`（字串不含 `/20\d\d/`）。
-  - context：`includes sets, attachment label, last time, week muscles and goal; excludes display name`。
+  - context：`includes sets, last time, week muscles and goal; excludes display name`。
   - export：`session export includes aiAdvice`。
 - [ ] **Step 2: 跑測試確認失敗**：`npm test -w @gac/api -- workout-advisor export`，Expected: FAIL
 - [ ] **Step 3: 實作**（`finishSession` 的路由在回傳前填 `aiAdviceAvailable = await canUseWorkoutAiAdvice(...)`）
@@ -169,7 +169,7 @@
 
 ## 部署
 
-有 migration `0015`：先 migration，再 api，再 LIFF。舊 LIFF 不認得 `tips`、`aiAdviceAvailable`，不會壞。
+有 migration `0014`：先 migration，再 api，再 LIFF。舊 LIFF 不認得 `tips`、`aiAdviceAvailable`，不會壞。
 
 ## 狀態
 
@@ -181,6 +181,7 @@
 
 ## 下一個 PR 需要知道的事
 
+- 下一個是 PR 11.2（把手），migration 用 `0015`。它要把 `workoutAdviceContext` 改成每個動作附上把手名稱、「上一次」改用「動作＋把手」比較；規則建議的加重提示走 `overloadHint`，11.2 改了查詢就會自動跟著變。
 - 要限制誰能用 AI 建議（例如付費會員）時，只改 `canUseWorkoutAiAdvice`；`FinishSummary.aiAdviceAvailable` 和 API 都會跟著變。
 - AI 建議和問 AI 共用每日次數；要分開時在 `AI_KINDS` 加一種並改 `withAiUse` 的 kind。
 - `buildWorkoutTips` 是純函式，之後要把建議放進 LINE 通知或週報可以直接重用。

@@ -10,7 +10,7 @@
 
 **Spec:** 2026-10-26 手機測試回饋第 3 項，使用者選方案 A；PR 8.2 器材照片計畫；PR 10.3 政策定稿（`CONSENT_VERSION` 規則）。
 
-**前一份計畫：** PR 11.2。要等 11.2 合併後才實作（同樣改 `EquipmentPhoto.tsx`、`ExercisePicker.tsx`、migration 編號接續）。
+**前一份計畫：** PR 11.1 休息計時（已合併）（2026-10-30 調整順序：11.3 → 11.4 → 11.2）。PR 11.2 延後到 11.4 之後，本 PR 不依賴它；本 PR 改的 `EquipmentPhoto.tsx`、`ExercisePicker.tsx` 之後由 11.2 接著改。
 
 ## 已決定（2026-10-26，使用者同意）
 
@@ -35,7 +35,7 @@
 - AI 處理那一條加上「使用 AI 訓練建議時的訓練紀錄」（給 PR 11.4 用）。
 - 政策頁與條款頁上的 `版本 {CONSENT_VERSION}` 必須和程式一致（`legal.test.ts` 會檢查）；新版本是實作當天的日期。
 - 上傳限制沿用 `MEAL_PHOTO_MAX_BYTES`；只有動作的擁有者、而且動作沒有封存時才能上傳，否則 404。
-- migration 編號接在 PR 11.2 的 `0013` 之後（本 PR 為 `0014`）。
+- migration 編號接在現有最後一號 `0012` 之後（本 PR 為 `0013`）。
 - 不要 stage `.claude/` 和 `skills-lock.json`。
 
 ## Review Focus
@@ -51,7 +51,7 @@
 ### Task 1: 縮圖欄位與產生縮圖
 
 **Files:**
-- Modify: `apps/api/src/db/schema.ts`、Create: `db/migrations/0014_exercise_photo_thumb.sql`（drizzle-kit 產生）
+- Modify: `apps/api/src/db/schema.ts`、Create: `db/migrations/0013_exercise_photo_thumb.sql`（drizzle-kit 產生）
 - Modify: `apps/api/src/photos/image.ts`（`makeThumbnail`）
 - Modify: `packages/shared/src/workouts.ts`（`Exercise.photoUrl: string | null`）
 - Modify: `apps/api/src/workouts/repo.ts`（`toExercise` 產生 data URL；`archiveCustomExercise` 清掉縮圖）
@@ -135,7 +135,7 @@
 
 ## 部署
 
-有 migration `0014`：先 migration，再 api，再 LIFF，最後 bot（同意版本）。部署後所有使用者下次互動會看到同意卡片（預期行為）。用手機確認同意卡片、照片縮圖。
+有 migration `0013`：先 migration，再 api，再 LIFF，最後 bot（同意版本）。部署後所有使用者下次互動會看到同意卡片（預期行為）。用手機確認同意卡片、照片縮圖。
 
 ## 狀態
 
@@ -149,5 +149,6 @@
 ## 下一個 PR 需要知道的事
 
 - 本 PR 已經把「AI 訓練建議會把訓練紀錄送給 Anthropic」寫進政策；PR 11.4 不用再改 `CONSENT_VERSION`，除非內容和這裡寫的不同。
+- 下一個是 PR 11.4，migration 用 `0014`。PR 11.2 排在最後，要在本 PR 改過的 `EquipmentPhoto.tsx`、`ExercisePicker.tsx` 上加把手（`onPick` 帶 attachment），不要蓋掉「都不是？建立自訂動作」帶照片的流程。
 - `makeThumbnail` 可以重用在其他需要小圖示的地方。
 - `Exercise.photoUrl` 是 data URL，會跟著 `ActiveSession`、範本、訓練紀錄一起回傳；不要在列表 API 裡加大縮圖尺寸。
