@@ -81,6 +81,10 @@ function toExercise(r: ExerciseRow): Exercise {
     equipment,
     equipmentCategory: equipmentCategory(equipment),
     isCustom: r.isCustom,
+    photoUrl:
+      r.isCustom && r.photoThumb
+        ? `data:image/jpeg;base64,${Buffer.from(r.photoThumb).toString("base64")}`
+        : null,
   };
 }
 
@@ -171,6 +175,29 @@ export async function createCustomExercise(
   return toExercise(row);
 }
 
+/** Stores the thumbnail on the user's own, non-archived custom exercise. */
+export async function setExercisePhoto(
+  db: Db,
+  userId: string,
+  exerciseId: string,
+  thumb: Buffer,
+): Promise<Exercise> {
+  const [row] = await db
+    .update(exercises)
+    .set({ photoThumb: thumb })
+    .where(
+      and(
+        eq(exercises.id, exerciseId),
+        eq(exercises.isCustom, true),
+        eq(exercises.ownerUserId, userId),
+        isNull(exercises.archivedAt),
+      ),
+    )
+    .returning();
+  if (!row) throw new WorkoutError("not_found");
+  return toExercise(row);
+}
+
 /**
  * Hard-deletes an unused custom exercise; archives it when any set, cardio
  * entry, session item or template still references it.
@@ -217,7 +244,7 @@ export async function archiveCustomExercise(
     if (used.some((r) => r.length > 0)) {
       await tx
         .update(exercises)
-        .set({ archivedAt: new Date() })
+        .set({ archivedAt: new Date(), photoThumb: null })
         .where(eq(exercises.id, exerciseId));
       return "archived";
     }

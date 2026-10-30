@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -26,6 +27,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 export const users = pgTable(
   "users",
@@ -142,6 +147,7 @@ export const exercises = pgTable(
       onDelete: "cascade",
     }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    photoThumb: bytea("photo_thumb"),
   },
   (t) => [
     check(
@@ -167,6 +173,10 @@ export const exercises = pgTable(
     check(
       "exercises_builtin_names_check",
       sql`${t.isCustom} or (${t.slug} is not null and ${t.nameEn} is not null)`,
+    ),
+    check(
+      "exercises_photo_thumb_custom_check",
+      sql`${t.photoThumb} is null or ${t.isCustom}`,
     ),
     uniqueIndex("exercises_builtin_name_zh_unique")
       .on(t.nameZh)

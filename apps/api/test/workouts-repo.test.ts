@@ -21,6 +21,7 @@ import {
   listFinishedSessions,
   listTemplates,
   removeItem,
+  setExercisePhoto,
   startSession,
   todayWorkoutSummary,
   upsertCardio,
@@ -244,6 +245,74 @@ describe("workouts repo", () => {
     const rows = await db.select().from(exercises);
     expect(rows.find((r) => r.id === used.id)?.archivedAt).not.toBeNull();
     expect(rows.find((r) => r.id === unused.id)).toBeUndefined();
+  });
+
+  describe("exercise photo thumbnail", () => {
+    const thumb = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+    const custom = (db: Awaited<ReturnType<typeof setup>>["db"], u: string) =>
+      createCustomExercise(db, u, {
+        nameZh: "照片動作",
+        kind: "strength",
+        muscleGroup: "back",
+        equipment: "cable",
+      });
+
+    it("setExercisePhoto then list returns a data URL", async () => {
+      const { db, userId } = await setup();
+      const ex = await custom(db, userId);
+      expect(ex.photoUrl).toBeNull();
+      const updated = await setExercisePhoto(db, userId, ex.id, thumb);
+      expect(updated.photoUrl).toBe(
+        `data:image/jpeg;base64,${thumb.toString("base64")}`,
+      );
+      const [listed] = await listExercises(db, userId, { q: "照片" });
+      expect(listed?.photoUrl).toBe(updated.photoUrl);
+    });
+
+    it("setExercisePhoto on another user's exercise is not_found", async () => {
+      const { db, userId, otherId } = await setup();
+      const ex = await custom(db, userId);
+      await expect(
+        setExercisePhoto(db, otherId, ex.id, thumb),
+      ).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("setExercisePhoto on a built-in is not_found", async () => {
+      const { db, userId } = await setup();
+      const [builtin] = await listBuiltinExercises(db);
+      await expect(
+        setExercisePhoto(db, userId, builtin!.id, thumb),
+      ).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("setExercisePhoto on an archived exercise is not_found", async () => {
+      const { db, userId } = await setup();
+      const ex = await custom(db, userId);
+      await doSession(db, userId, "2026-10-19", ex.id, [[40, 10]]);
+      await archiveCustomExercise(db, userId, ex.id);
+      await expect(
+        setExercisePhoto(db, userId, ex.id, thumb),
+      ).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("archiving a used custom exercise clears its photo", async () => {
+      const { db, userId } = await setup();
+      const ex = await custom(db, userId);
+      await setExercisePhoto(db, userId, ex.id, thumb);
+      await doSession(db, userId, "2026-10-19", ex.id, [[40, 10]]);
+      expect(await archiveCustomExercise(db, userId, ex.id)).toBe("archived");
+      const row = (await db.select().from(exercises)).find(
+        (r) => r.id === ex.id,
+      );
+      expect(row?.photoThumb).toBeNull();
+    });
+
+    it("built-in exercises have null photoUrl", async () => {
+      const { db } = await setup();
+      const builtins = await listBuiltinExercises(db);
+      expect(builtins.length).toBeGreaterThan(0);
+      expect(builtins.every((e) => e.photoUrl === null)).toBe(true);
+    });
   });
 
   it("only one active session; starting again returns it", async () => {

@@ -32,6 +32,7 @@ function ex(
     equipment,
     equipmentCategory: "machine",
     isCustom: false,
+    photoUrl: null,
   };
 }
 

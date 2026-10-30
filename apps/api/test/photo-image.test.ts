@@ -2,7 +2,11 @@ import { randomBytes } from "node:crypto";
 import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { InvalidImage, normalizePhoto } from "../src/photos/image.js";
+import {
+  InvalidImage,
+  makeThumbnail,
+  normalizePhoto,
+} from "../src/photos/image.js";
 import { newMealPhotoKey } from "../src/photos/store.js";
 
 function solid(width: number, height: number) {
@@ -96,5 +100,20 @@ describe("newMealPhotoKey", () => {
     const a = newMealPhotoKey("u1");
     expect(a).toMatch(/^meals\/u1\/[0-9a-f-]{36}\.jpg$/);
     expect(newMealPhotoKey("u1")).not.toBe(a);
+  });
+});
+
+describe("makeThumbnail", () => {
+  it("returns a 192x192 jpeg under 32KB", async () => {
+    const out = await makeThumbnail(await solid(1024, 768).jpeg().toBuffer());
+    const meta = await sharp(out).metadata();
+    expect([meta.width, meta.height, meta.format]).toEqual([192, 192, "jpeg"]);
+    expect(out.length).toBeLessThanOrEqual(32768);
+  });
+
+  it("rejects non-images", async () => {
+    await expect(makeThumbnail(Buffer.from("hello"))).rejects.toBeInstanceOf(
+      InvalidImage,
+    );
   });
 });
