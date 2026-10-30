@@ -1,4 +1,5 @@
 import type { Exercise, Template } from "@gac/shared";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { AppDeps } from "../src/deps.js";
@@ -77,6 +78,7 @@ describe("exercise and template routes", () => {
       ["GET", "/exercises"],
       ["POST", "/exercises"],
       ["DELETE", `/exercises/${ZERO}`],
+      ["PUT", `/exercises/${ZERO}/photo`],
       ["GET", "/templates"],
       ["POST", "/templates"],
       ["DELETE", `/templates/${ZERO}`],
@@ -196,6 +198,101 @@ describe("exercise and template routes", () => {
     });
     expect(own.statusCode).toBe(204);
     expect((await list(h1)).some((e) => e.id === made.id)).toBe(false);
+  });
+
+  describe("PUT /exercises/:id/photo", () => {
+    const png = () =>
+      sharp({
+        create: {
+          width: 400,
+          height: 300,
+          channels: 3,
+          background: { r: 10, g: 120, b: 200 },
+        },
+      })
+        .png()
+        .toBuffer();
+    const put = (
+      headers: Record<string, string>,
+      id: string,
+      payload: Buffer | string,
+      type = "application/octet-stream",
+    ) =>
+      app.inject({
+        method: "PUT",
+        url: `/exercises/${id}/photo`,
+        headers: { ...headers, "content-type": type },
+        payload,
+      });
+    const makeCustom = async (name: string) =>
+      (
+        await create(h1, {
+          nameZh: name,
+          kind: "strength",
+          muscleGroup: "core",
+          equipment: "bodyweight",
+        })
+      ).json<Exercise>();
+
+    it("200 returns the exercise with a photo data URL", async () => {
+      const made = await makeCustom("有照片");
+      const res = await put(h1, made.id, await png());
+      expect(res.statusCode).toBe(200);
+      const out = res.json<Exercise>();
+      expect(out.id).toBe(made.id);
+      expect(out.photoUrl).toMatch(/^data:image\/jpeg;base64,/);
+      const listed = (await list(h1)).find((e) => e.id === made.id);
+      expect(listed?.photoUrl).toBe(out.photoUrl);
+    });
+
+    it("415 when the body is not octet-stream bytes", async () => {
+      const made = await makeCustom("錯類型");
+      const res = await put(h1, made.id, "{}", "application/json");
+      expect(res.statusCode).toBe(415);
+      expect(res.json()).toEqual({ error: "unsupported_media_type" });
+    });
+
+    it("400 invalid_image for bytes that are not an image", async () => {
+      const made = await makeCustom("壞圖");
+      const res = await put(h1, made.id, Buffer.from("not an image"));
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "invalid_image" });
+    });
+
+    it("404 for another user's, built-in, archived and missing ids", async () => {
+      const mine = await makeCustom("別人的");
+      const builtin = (await list(h1)).find((e) => !e.isCustom)!;
+      const archived = await makeCustom("已封存");
+      const s = await startSession(db, id1, "2026-10-19");
+      await addItem(db, id1, s.id, archived.id);
+      await upsertSet(db, id1, s.id, archived.id, {
+        setIndex: 1,
+        weightKg: 0,
+        reps: 5,
+      });
+      await finishSession(db, id1, s.id);
+      await app.inject({
+        method: "DELETE",
+        url: `/exercises/${archived.id}`,
+        headers: h1,
+      });
+      const body = await png();
+      for (const [h, id] of [
+        [h2, mine.id],
+        [h1, builtin.id],
+        [h1, archived.id],
+        [h1, ZERO],
+      ] as const) {
+        const res = await put(h, id, body);
+        expect(res.statusCode).toBe(404);
+        expect(res.json()).toEqual({ error: "not_found" });
+      }
+    });
+
+    it("400 for a non-uuid id", async () => {
+      const res = await put(h1, "nope", await png());
+      expect(res.statusCode).toBe(400);
+    });
   });
 
   it("delete archives a used custom exercise (204) and bad ids are 400", async () => {

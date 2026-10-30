@@ -20,8 +20,10 @@ import {
   archiveCustomExercise,
   createCustomExercise,
   listExercises,
+  setExercisePhoto,
 } from "./repo";
 import { identifyEquipment } from "./identify";
+import { InvalidImage, makeThumbnail } from "../photos/image";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const listSchema = {
@@ -76,7 +78,7 @@ export const exerciseRoutes =
     const authenticate = workoutAuth(db, sessionSecret);
 
     // Photo bytes arrive raw from the LIFF. Registered in this plugin only,
-    // and only /exercises/identify reads them.
+    // and only /exercises/identify and /exercises/:id/photo read them.
     app.addContentTypeParser(
       "application/octet-stream",
       { parseAs: "buffer" },
@@ -101,6 +103,38 @@ export const exerciseRoutes =
           req.workoutUserId as string,
           req.body,
         );
+      },
+    );
+
+    app.put<{ Params: { id: string } }>(
+      "/exercises/:id/photo",
+      {
+        onRequest: authenticate,
+        schema: idSchema,
+        bodyLimit: MEAL_PHOTO_MAX_BYTES,
+      },
+      async (req, reply) => {
+        if (!Buffer.isBuffer(req.body)) {
+          return reply
+            .code(415)
+            .send({ error: "unsupported_media_type" } satisfies ApiError);
+        }
+        try {
+          const thumb = await makeThumbnail(req.body);
+          return await setExercisePhoto(
+            db,
+            req.workoutUserId as string,
+            req.params.id,
+            thumb,
+          );
+        } catch (err) {
+          if (err instanceof InvalidImage) {
+            return reply
+              .code(400)
+              .send({ error: "invalid_image" } satisfies ApiError);
+          }
+          return sendWorkoutError(reply, err);
+        }
       },
     );
 
