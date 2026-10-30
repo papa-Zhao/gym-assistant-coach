@@ -1,4 +1,4 @@
-export const CONSENT_VERSION = "2026-10-23";
+export const CONSENT_VERSION = "2026-10-30";
 
 export const CONSENT_DOCS = ["terms", "privacy", "age_18_plus"] as const;
 
