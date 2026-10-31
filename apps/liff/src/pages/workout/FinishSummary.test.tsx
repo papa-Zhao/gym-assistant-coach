@@ -79,7 +79,7 @@ describe("FinishSummary", () => {
 
   describe("訓練建議", () => {
     afterEach(() => window.localStorage.clear());
-    const AI_BUTTON = "問 AI 教練（會用掉 1 次問 AI 的次數）";
+    const AI_BUTTON = "問 AI 教練";
     const renderWith = (over: Partial<typeof SUMMARY>) =>
       render(
         <FinishSummary
@@ -128,6 +128,7 @@ describe("FinishSummary", () => {
       );
       renderWith({ tips: ["a"], aiAdviceAvailable: true });
       const button = screen.getByRole("button", { name: AI_BUTTON });
+      expect(button).toHaveAccessibleDescription("會用掉 1 次問 AI 的次數");
       fireEvent.click(button);
       await waitFor(() => expect(button).toBeDisabled());
       fireEvent.click(button);

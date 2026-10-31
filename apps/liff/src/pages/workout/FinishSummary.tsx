@@ -157,10 +157,14 @@ export function FinishSummary({
                   type="button"
                   className="secondary"
                   disabled={asking}
+                  aria-describedby="ai-advice-cost"
                   onClick={() => void askCoach()}
                 >
-                  問 AI 教練（會用掉 1 次問 AI 的次數）
+                  問 AI 教練
                 </button>
+                <p id="ai-advice-cost" className="muted">
+                  會用掉 1 次問 AI 的次數
+                </p>
               </>
             )
           )}
