@@ -31,11 +31,7 @@ const SCHEMA = deepFreeze({
   },
 });
 
-/** Trimmed and cut to `max` code points. */
-const clip = (s: string, max: number) =>
-  Array.from(s.trim()).slice(0, max).join("").trimEnd();
-
-/** Like {@link clip}, but a cut text ends with "…" (still `max` code points). */
+/** Trimmed; a text over `max` code points is cut to `max - 1` plus "…". */
 const clipWithEllipsis = (s: string, max: number) => {
   const chars = Array.from(s.trim());
   if (chars.length <= max) return chars.join("");
@@ -51,7 +47,7 @@ export function parseWorkoutAdvice(data: unknown): RawWorkoutAdvice | null {
   const { title, points } = data as Record<string, unknown>;
   if (typeof title !== "string" || !Array.isArray(points)) return null;
   if (!points.every((p) => typeof p === "string")) return null;
-  const t = clip(title, WORKOUT_ADVICE_LIMITS.titleChars);
+  const t = clipWithEllipsis(title, WORKOUT_ADVICE_LIMITS.titleChars);
   const ps = (points as string[])
     .map((p) => clipWithEllipsis(p, WORKOUT_ADVICE_LIMITS.pointChars))
     .filter((p) => p.length > 0)

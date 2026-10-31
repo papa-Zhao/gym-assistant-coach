@@ -235,7 +235,12 @@ async function main(): Promise<void> {
           ok++;
           line =
             `OK   ${c.name}\n  title: ${r.advice.title}\n` +
-            r.advice.points.map((p) => `  - ${p}`).join("\n") +
+            r.advice.points
+              .map(
+                (p) =>
+                  `  - ${p}（${Array.from(p).length} 字${p.endsWith("…") ? "，被截斷" : ""}）`,
+              )
+              .join("\n") +
             `\n  ${tokens}`;
         } else {
           line = `FAIL ${c.name} | ${r.kind}\n  ${tokens}`;

@@ -94,7 +94,7 @@ describe("workout advisor", () => {
     );
     const r = await advisor.advise("CTX");
     if (r.kind !== "ok") throw new Error(r.kind);
-    expect(Array.from(r.advice.title)).toHaveLength(20);
+    expect(r.advice.title).toBe(`${"長".repeat(19)}…`);
     expect(r.advice.points).toHaveLength(3);
     expect(Array.from(r.advice.points[0]!)).toHaveLength(60);
     // A cut point ends with an ellipsis so it does not read as a full sentence.
@@ -104,6 +104,7 @@ describe("workout advisor", () => {
 
   it("asks for one short sentence per point", () => {
     expect(WORKOUT_ADVICE_SYSTEM).toContain("每條一句話，50 個字以內");
+    expect(WORKOUT_ADVICE_SYSTEM).toContain("title：一句話的總評，15 個字以內");
   });
 
   it("missing points is invalid", async () => {
