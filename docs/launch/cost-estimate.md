@@ -53,7 +53,7 @@ group by kind
 order by kind;
 ```
 
-- `kind`：`photo`（餐點照片和器材照片都算這個）、`text`（文字記餐）、`chat`（問 AI）。
+- `kind`：`photo`（餐點照片和器材照片都算這個）、`text`（文字記餐）、`chat`（問 AI，以及訓練完的 AI 建議）。
 - 某個 kind 的 `calls` 少於 20 次時，用對應 eval 腳本（`apps/api/scripts/meal-photo-eval.ts`、`meal-text-eval.ts`、`ask-eval.ts`，每題會印 token）的平均值補。
 - 每次呼叫成本 = (`avg_in` × 0.10 + `avg_out` × 0.50 + `avg_cache_read` × 0.01 + `avg_cache_write` × 0.125) ÷ 1,000,000 美元。
 
@@ -68,6 +68,8 @@ order by kind;
 | chat | 1,500 | 3,500 | 800 | US$0.000786 |
 
 每人每月 AI = 30 × (3 × photo + 2 × text + 2 × chat) = 30 × (0.001209 + 0.000466 + 0.001572) ≈ **US$0.097**（暫定）。
+
+**訓練完的 AI 建議（PR 11.4）**：記在 `chat` 底下（和問 AI 共用每日次數），所以上面的查詢會把兩者混在一起；`ai_call` 日誌的 `kind: "workout_advice"` 可以分開看。系統提示約 500 tokens，可能短於模型的最小快取長度，先當作不快取；使用者資料約 600 tokens、output 約 300。每次約 (1,100 × 0.10 + 300 × 0.50) ÷ 1,000,000 ≈ **US$0.00026**（暫定，還沒用真的金鑰量過）。就算每次訓練（每天 0.5 次）都按，每人每月也只多 30 × 0.5 × 0.00026 ≈ US$0.004，不改上面的總數。
 
 ## 各項服務每月成本
 

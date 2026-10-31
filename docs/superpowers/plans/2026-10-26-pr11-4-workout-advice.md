@@ -173,11 +173,26 @@
 
 ## 狀態
 
-- 計畫（2026-10-26），尚未實作。
+- 實作完成（2026-10-31），分支 `pr11-4-workout-advice`，等開 PR 與合併。
+- 待使用者做：用真的 API 金鑰在本機打一次 `POST /workouts/:id/advice`，確認回覆品質與 token 數（Task 5 第 2 點）；`docs/launch/cost-estimate.md` 目前是暫定數字。
+- 待確認：實體手機驗證（見「部署」）——結束訓練後看到「訓練建議」、按「問 AI 教練」後出現建議、再按一次不會再扣次數。
 
 ## 交接備註
 
-（實作時填寫。）
+- 規則建議的「本週」和星期幾用 session 的 `performed_on`（開始那天的台北日期），不是結束時間；跨午夜的訓練會算在開始那週。
+- `finishSession` 現在回傳 `Omit<FinishSummary, "aiAdviceAvailable">`，由路由補上 `aiAdviceAvailable`（問 `canUseWorkoutAiAdvice`，測試可以用 `deps.canUseWorkoutAiAdvice` 換掉）。
+- `workoutAdviceContext` 在 `apps/api/src/workouts/advice-context.ts`，用 `getSessionById` 拿「上一次」，所以跟訓練畫面的「上次」是同一個查詢。`GOAL_LABELS` 從 `ask/context.ts` export 出來共用。
+- AI 建議的標題／條數／字數上限放在 shared 的 `WORKOUT_ADVICE_LIMITS`；超過就截斷，標題空白或沒有任何一條就當作 `invalid`。
+- `refused` 和 `invalid` 都回 `outcome: "refused"`，而且會扣掉那 1 次（`withAiUse` 只有 `AiUnavailable` 會退回，和問 AI、拍器材一樣）。
+- 快取：已經有建議就直接回傳，就算超過 24 小時也一樣；`too_old` 只擋「要重新呼叫 AI」的情況。兩個請求同時進來仍可能各扣 1 次，`saveSessionAdvice` 只保留第一個存進去的建議，兩邊拿到同一份。LIFF 送出中會停用按鈕。
+- `not_finished`／`too_old` 只在 advice 路由對應成 409 `{ error: "not_finished" | "too_old" }`；`sendWorkoutError` 沒改，所以「從訓練存成範本」的 409 仍然是 `conflict`。`ApiError` 加了 `not_allowed`、`not_finished`、`too_old`。
+- LIFF：按鈕文字改成「問 AI 教練」，下面一行小字「會用掉 1 次問 AI 的次數」（`aria-describedby`），因為整句放在按鈕裡 375 px 會斷成兩行。瀏覽器窗格 375 px 確認過版面。
+- 測試用的 `fakeApi` 現在會 `await` handler，可以讓請求停在送出中。
+- 整支分支審查（2026-10-31）：沒有 Critical／Important。延後的小問題：
+  - 「上一次」是「最新的另一次已結束訓練」，不是「這次之前」；只有回頭問 24 小時內較舊那次訓練時才會不準。
+  - 使用者自己打的範本名稱、自訂動作名稱原樣放進訓練資料（只影響自己，和問 AI 一樣）。
+  - 建議清單用文字當 React key，AI 回兩條一樣的會有重複 key 警告。
+  - 409 `too_old` 在畫面上也顯示「請稍後再試」，但其實再試也不會成功。
 
 ## 下一個 PR 需要知道的事
 
