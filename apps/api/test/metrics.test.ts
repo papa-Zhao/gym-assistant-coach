@@ -10,6 +10,7 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const BOT = "bot-runtime@x.iam.gserviceaccount.com";
@@ -94,6 +95,7 @@ describe("metrics routes", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

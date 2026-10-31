@@ -26,6 +26,7 @@ import {
   unusedAdvisor,
   unusedMealParser,
   unusedPhotoStore,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
@@ -119,6 +120,7 @@ describe("identifyEquipment and POST /exercises/identify", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: identifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

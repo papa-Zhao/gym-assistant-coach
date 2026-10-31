@@ -31,6 +31,7 @@ import {
   weekStats,
 } from "./repo";
 import { WorkoutError } from "./repo";
+import { canUseWorkoutAiAdvice } from "./ai-advice-access";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const DEFAULT_NOTIFY_TIMEOUT_MS = 5000;
@@ -158,6 +159,7 @@ export const sessionRoutes =
   async (app) => {
     const { db, sessionSecret, now, notifyWorkoutFinished } = deps;
     const notifyTimeoutMs = deps.notifyTimeoutMs ?? DEFAULT_NOTIFY_TIMEOUT_MS;
+    const canUseAiAdvice = deps.canUseWorkoutAiAdvice ?? canUseWorkoutAiAdvice;
     app.setErrorHandler(apiErrorHandler);
     const authenticate = workoutAuth(db, sessionSecret);
     const auth = { onRequest: authenticate };
@@ -376,9 +378,13 @@ export const sessionRoutes =
         const sessionId = req.params.id;
         let summary: FinishSummary;
         try {
-          summary = await finishSession(db, userId, sessionId, {
+          const finished = await finishSession(db, userId, sessionId, {
             requireContent: true,
           });
+          summary = {
+            ...finished,
+            aiAdviceAvailable: await canUseAiAdvice({ db }, userId),
+          };
         } catch (err) {
           sendWorkoutError(reply, err);
           return;

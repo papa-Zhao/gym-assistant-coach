@@ -28,6 +28,7 @@ import {
   unusedEquipmentIdentifier,
   unusedMealParser,
   unusedPhotoStore,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const NOW = new Date("2026-10-22T04:00:00Z");
@@ -77,7 +78,16 @@ async function seed(db: Db, userId: string, tag: string) {
   });
   const [session] = await db
     .insert(workoutSessions)
-    .values({ userId, performedOn: "2026-10-21", endedAt: NOW })
+    .values({
+      userId,
+      performedOn: "2026-10-21",
+      endedAt: NOW,
+      aiAdvice: {
+        title: "建議A",
+        points: ["重點A"],
+        createdAt: NOW.toISOString(),
+      },
+    })
     .returning({ id: workoutSessions.id });
   await db.insert(workoutSets).values({
     sessionId: must(session).id,
@@ -187,6 +197,7 @@ describe("exportUserData", () => {
     expect(out.workoutSessions[0]).toMatchObject({
       performedOn: "2026-10-21",
       sets: [expect.objectContaining({ exercise: "槓鈴臥推", reps: 8 })],
+      aiAdvice: { title: "建議A", points: ["重點A"] },
     });
     expect(out.workoutTemplates).toEqual([
       expect.objectContaining({
@@ -292,6 +303,7 @@ describe("GET /me/export", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "https://liff.example",

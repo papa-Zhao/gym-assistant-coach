@@ -15,6 +15,7 @@ import {
   unusedEquipmentIdentifier,
   unusedMealParser,
   unusedPhotoStore,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const SECRET = new Uint8Array(32).fill(7);
@@ -47,6 +48,7 @@ describe("rate limit", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

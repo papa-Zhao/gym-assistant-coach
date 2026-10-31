@@ -111,5 +111,6 @@ export const SUMMARY: FinishSummary = {
     },
   ],
   tips: [],
+  aiAdviceAvailable: false,
   notified: true,
 };

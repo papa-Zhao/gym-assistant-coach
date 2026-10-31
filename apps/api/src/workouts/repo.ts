@@ -1016,13 +1016,13 @@ export async function discardSession(
 
 // ---------- finishing and stats ----------
 
-/** Throws `already_finished` if the session has ended, and `empty_session` (rolled back) when `requireContent` is set and nothing was recorded. `notified` is set by the caller. */
+/** Throws `already_finished` if the session has ended, and `empty_session` (rolled back) when `requireContent` is set and nothing was recorded. `notified` and `aiAdviceAvailable` are set by the caller. */
 export async function finishSession(
   db: Db,
   userId: string,
   sessionId: string,
   opts: { requireContent?: boolean } = {},
-): Promise<FinishSummary> {
+): Promise<Omit<FinishSummary, "aiAdviceAvailable">> {
   return db.transaction(async (tx) => {
     // Atomic claim: only one concurrent finish can flip ended_at.
     const claimed = await tx
