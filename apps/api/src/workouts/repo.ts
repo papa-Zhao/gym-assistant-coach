@@ -6,6 +6,7 @@ import {
   estimate1RM,
   overloadHint,
   volume,
+  weekRange,
   type ActiveSession,
   type CardioEntry,
   type Equipment,
@@ -15,6 +16,7 @@ import {
   type FinishSummary,
   type MuscleGroup,
   type SessionItem,
+  type SetLike,
   type Template,
   type WeekStats,
   type WorkoutHistoryEntry,
@@ -47,6 +49,7 @@ import {
   workoutTemplates,
 } from "../db/schema";
 import type { Db } from "../users/repo";
+import { buildWorkoutTips } from "./tips";
 
 /** Longest template name, in code points. */
 export const MAX_TEMPLATE_NAME = 30;
@@ -1032,8 +1035,12 @@ export async function finishSession(
           isNull(workoutSessions.endedAt),
         ),
       )
-      .returning({ id: workoutSessions.id });
-    if (claimed.length === 0) {
+      .returning({
+        templateId: workoutSessions.templateId,
+        performedOn: workoutSessions.performedOn,
+      });
+    const [session] = claimed;
+    if (!session) {
       await requireSession(tx, userId, sessionId); // not_found if foreign
       throw new WorkoutError("already_finished");
     }
@@ -1111,14 +1118,19 @@ export async function finishSession(
       ...byExercise.keys(),
       ...cardio.map((c) => c.exerciseId),
     ]);
+    const volumeKg = volume(
+      mine.map((m) => ({
+        weightKg: Number(m.set.weightKg),
+        reps: m.set.reps,
+      })),
+    );
+    const tips = await finishTips(tx, userId, sessionId, session, {
+      byExercise,
+      volumeKg,
+    });
     return {
       sessionId,
-      volumeKg: volume(
-        mine.map((m) => ({
-          weightKg: Number(m.set.weightKg),
-          reps: m.set.reps,
-        })),
-      ),
+      volumeKg,
       exerciseCount: touched.size,
       setCount: mine.length,
       cardioMinutes: cardio.reduce((sum, c) => sum + c.durationMin, 0),
@@ -1127,8 +1139,78 @@ export async function finishSession(
           ? null
           : Math.round(restSecs.reduce((a, b) => a + b, 0) / restSecs.length),
       prs,
+      tips,
       notified: false,
     };
+  });
+}
+
+/** Gathers {@link buildWorkoutTips} inputs for a session that was just claimed as finished. */
+async function finishTips(
+  db: Db,
+  userId: string,
+  sessionId: string,
+  session: { templateId: string | null; performedOn: string },
+  current: {
+    byExercise: Map<string, { ex: ExerciseRow; sets: SetLike[] }>;
+    volumeKg: number;
+  },
+): Promise<string[]> {
+  const items = await db
+    .select({
+      exerciseId: workoutSessionItems.exerciseId,
+      targetReps: workoutSessionItems.targetReps,
+    })
+    .from(workoutSessionItems)
+    .where(eq(workoutSessionItems.sessionId, sessionId))
+    .orderBy(asc(workoutSessionItems.position));
+  const exercisesInOrder = items.flatMap(({ exerciseId, targetReps }) => {
+    const done = current.byExercise.get(exerciseId);
+    return done
+      ? [{ nameZh: done.ex.nameZh, sets: done.sets, targetReps }]
+      : [];
+  });
+
+  let previousVolumeKg: number | null = null;
+  if (session.templateId) {
+    const [prev] = await db
+      .select({ id: workoutSessions.id })
+      .from(workoutSessions)
+      .where(
+        and(
+          eq(workoutSessions.userId, userId),
+          eq(workoutSessions.templateId, session.templateId),
+          isNotNull(workoutSessions.endedAt),
+          ne(workoutSessions.id, sessionId),
+        ),
+      )
+      .orderBy(desc(workoutSessions.endedAt))
+      .limit(1);
+    if (prev) {
+      const [{ v } = { v: 0 }] = await db
+        .select({
+          v: sql<number>`coalesce(sum(${workoutSets.weightKg} * ${workoutSets.reps}), 0)::float8`,
+        })
+        .from(workoutSets)
+        .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
+        .where(
+          and(
+            eq(workoutSets.sessionId, prev.id),
+            eq(exercises.kind, "strength"),
+          ),
+        );
+      previousVolumeKg = Number(v);
+    }
+  }
+
+  const { from, to } = weekRange(session.performedOn);
+  const week = await weekStats(db, userId, from, to);
+  return buildWorkoutTips({
+    exercises: exercisesInOrder,
+    volumeKg: current.volumeKg,
+    previousVolumeKg,
+    weekSetsByMuscle: week.setsByMuscle,
+    taipeiWeekday: new Date(`${session.performedOn}T00:00:00Z`).getUTCDay(),
   });
 }
 

@@ -110,5 +110,6 @@ export const SUMMARY: FinishSummary = {
       reps: 8,
     },
   ],
+  tips: [],
   notified: true,
 };

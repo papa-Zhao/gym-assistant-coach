@@ -290,6 +290,8 @@ export interface FinishSummary {
     weightKg: number;
     reps: number;
   }[];
+  /** 1-3 rule-based tips (zh-TW); the LIFF may append a rest tip. */
+  tips: string[];
   notified: boolean;
 }
 
