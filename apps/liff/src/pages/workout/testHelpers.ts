@@ -30,7 +30,7 @@ export function fakeApi(handler: Handler): Call[] {
             : JSON.parse(String(init.body)),
       };
       calls.push(call);
-      const out = handler(call);
+      const out = await handler(call);
       if (out instanceof Response) return out;
       if (out === undefined) return new Response(null, { status: 204 });
       return new Response(JSON.stringify(out));
