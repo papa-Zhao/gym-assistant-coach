@@ -97,6 +97,13 @@ describe("workout advisor", () => {
     expect(Array.from(r.advice.title)).toHaveLength(20);
     expect(r.advice.points).toHaveLength(3);
     expect(Array.from(r.advice.points[0]!)).toHaveLength(60);
+    // A cut point ends with an ellipsis so it does not read as a full sentence.
+    expect(r.advice.points[0]).toBe(`${"一".repeat(59)}…`);
+    expect(r.advice.points[1]).toBe("二");
+  });
+
+  it("asks for one short sentence per point", () => {
+    expect(WORKOUT_ADVICE_SYSTEM).toContain("每條一句話，50 個字以內");
   });
 
   it("missing points is invalid", async () => {
