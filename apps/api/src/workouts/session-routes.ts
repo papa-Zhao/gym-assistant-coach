@@ -8,6 +8,7 @@ import {
   WORKOUT_HISTORY_PAGE_SIZE,
   type FinishSummary,
   type WeekStats,
+  type WorkoutAdviceResponse,
   type WorkoutHistoryPage,
 } from "@gac/shared";
 import type { FastifyPluginAsync } from "fastify";
@@ -32,6 +33,7 @@ import {
 } from "./repo";
 import { WorkoutError } from "./repo";
 import { canUseWorkoutAiAdvice } from "./ai-advice-access";
+import { requestWorkoutAdvice } from "./advice";
 import { badRequest, sendWorkoutError, workoutAuth } from "./http";
 
 const DEFAULT_NOTIFY_TIMEOUT_MS = 5000;
@@ -157,7 +159,8 @@ const deadline = (ms: number) => {
 export const sessionRoutes =
   (deps: AppDeps): FastifyPluginAsync =>
   async (app) => {
-    const { db, sessionSecret, now, notifyWorkoutFinished } = deps;
+    const { db, sessionSecret, now, notifyWorkoutFinished, workoutAdvisor } =
+      deps;
     const notifyTimeoutMs = deps.notifyTimeoutMs ?? DEFAULT_NOTIFY_TIMEOUT_MS;
     const canUseAiAdvice = deps.canUseWorkoutAiAdvice ?? canUseWorkoutAiAdvice;
     app.setErrorHandler(apiErrorHandler);
@@ -417,6 +420,35 @@ export const sessionRoutes =
           clear();
         }
         return summary;
+      },
+    );
+
+    app.post<{ Params: { id: string } }>(
+      "/workouts/:id/advice",
+      { ...auth, schema: idSchema },
+      async (req, reply): Promise<WorkoutAdviceResponse | undefined> => {
+        const userId = uid(req);
+        if (!(await canUseAiAdvice({ db }, userId))) {
+          return reply
+            .code(403)
+            .send({ error: "not_allowed" } satisfies ApiError);
+        }
+        try {
+          return await requestWorkoutAdvice(
+            { db, advisor: workoutAdvisor, now },
+            userId,
+            req.params.id,
+          );
+        } catch (err) {
+          // Specific codes here only; other routes keep the generic conflict.
+          if (
+            err instanceof WorkoutError &&
+            (err.code === "not_finished" || err.code === "too_old")
+          ) {
+            return reply.code(409).send({ error: err.code } satisfies ApiError);
+          }
+          return sendWorkoutError(reply, err);
+        }
       },
     );
   };

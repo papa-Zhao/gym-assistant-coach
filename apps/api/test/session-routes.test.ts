@@ -3,10 +3,14 @@ import type {
   Exercise,
   FinishSummary,
   WeekStats,
+  WorkoutAdviceResponse,
   WorkoutHistoryPage,
 } from "@gac/shared";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { AiUnavailable } from "../src/ai/structured-call";
 import { buildApp } from "../src/app.js";
+import { aiUsageDaily, workoutSessions } from "../src/db/schema";
 import type { AppDeps } from "../src/deps.js";
 import { issueSession } from "../src/auth/session";
 import { createBotNotifier } from "../src/notify/bot.js";
@@ -17,7 +21,6 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
-  unusedWorkoutAdvisor,
 } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
@@ -26,6 +29,16 @@ const U2 = `U${"b".repeat(32)}`;
 const ZERO = "00000000-0000-4000-8000-000000000000";
 
 type Notify = AppDeps["notifyWorkoutFinished"];
+type Advise = AppDeps["workoutAdvisor"]["advise"];
+const USAGE = { input: 10, output: 5, cacheRead: 0, cacheCreation: 0 };
+const adviseOk: Advise = async () => ({
+  kind: "ok",
+  advice: { title: "練得很穩", points: ["下次臥推試 62.5 kg"] },
+  usage: USAGE,
+});
+let advise: Advise;
+const adviseCalls: string[] = [];
+let gate = true;
 let notify: Notify;
 const calls: Parameters<Notify>[] = [];
 
@@ -39,13 +52,15 @@ describe("workout session routes", () => {
   let bench: Exercise;
   let squat: Exercise;
   let treadmill: Exercise;
+  let id1: string;
+  let id2: string;
 
   beforeAll(async () => {
     const t = await createTestDb();
     db = t.db;
     closeDb = t.close;
-    const id1 = (await syncUser(db, U1, null)).userId;
-    const id2 = (await syncUser(db, U2, null)).userId;
+    id1 = (await syncUser(db, U1, null)).userId;
+    id2 = (await syncUser(db, U2, null)).userId;
     h1 = { authorization: `Bearer ${await issueSession(SECRET, id1)}` };
     h2 = { authorization: `Bearer ${await issueSession(SECRET, id2)}` };
     deps = {
@@ -60,7 +75,8 @@ describe("workout session routes", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
-      workoutAdvisor: unusedWorkoutAdvisor,
+      workoutAdvisor: { advise: (context) => advise(context) },
+      canUseWorkoutAiAdvice: async () => gate,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",
@@ -94,6 +110,12 @@ describe("workout session routes", () => {
     calls.length = 0;
     notify = async (...args) => {
       calls.push(args);
+    };
+    gate = true;
+    adviseCalls.length = 0;
+    advise = async (context) => {
+      adviseCalls.push(context);
+      return adviseOk(context);
     };
   });
 
@@ -620,6 +642,137 @@ describe("workout session routes", () => {
     expect(calls).toHaveLength(1);
     // editing a finished session is also a conflict
     expect((await putSet(s.id, bench.id, 2)).statusCode).toBe(409);
+  });
+
+  describe("POST /workouts/:id/advice", () => {
+    const ask = (id: string, headers = h1) =>
+      req("POST", `/workouts/${id}/advice`, headers);
+    const chatCount = async (userId: string) => {
+      const [row] = await db
+        .select({ count: aiUsageDaily.count })
+        .from(aiUsageDaily)
+        .where(
+          and(
+            eq(aiUsageDaily.userId, userId),
+            eq(aiUsageDaily.day, "2026-10-19"),
+            eq(aiUsageDaily.kind, "chat"),
+          ),
+        );
+      return row?.count ?? 0;
+    };
+    const finished = async (headers = h1) => {
+      await reset(headers);
+      const s = await start(headers);
+      await putSet(s.id, bench.id, 1, {}, headers);
+      const sum = (await finish(s.id, headers)).json<FinishSummary>();
+      return { id: s.id, sum };
+    };
+
+    it("finish summary offers the button only when the gate allows", async () => {
+      expect((await finished()).sum.aiAdviceAvailable).toBe(true);
+      gate = false;
+      expect((await finished()).sum.aiAdviceAvailable).toBe(false);
+    });
+
+    it("returns advice and stores it", async () => {
+      const { id } = await finished();
+      const res = await ask(id);
+      expect(res.statusCode).toBe(200);
+      const body = res.json<WorkoutAdviceResponse>();
+      expect(body).toMatchObject({
+        outcome: "ok",
+        advice: { title: "練得很穩", points: ["下次臥推試 62.5 kg"] },
+      });
+      expect(adviseCalls[0]).toContain("槓鈴臥推");
+      const [row] = await db
+        .select({ aiAdvice: workoutSessions.aiAdvice })
+        .from(workoutSessions)
+        .where(eq(workoutSessions.id, id));
+      expect(row?.aiAdvice).toMatchObject({ title: "練得很穩" });
+    });
+
+    it("second call returns cached advice without calling the advisor or using quota", async () => {
+      const { id } = await finished();
+      const before = await chatCount(id1);
+      const first = (await ask(id)).json<WorkoutAdviceResponse>();
+      const second = (await ask(id)).json<WorkoutAdviceResponse>();
+      expect(second).toEqual(first);
+      expect(adviseCalls).toHaveLength(1);
+      expect((await chatCount(id1)) - before).toBe(1);
+    });
+
+    it("refused and invalid map to refused and store nothing", async () => {
+      const { id } = await finished();
+      advise = async () => ({ kind: "invalid", usage: USAGE });
+      expect((await ask(id)).json()).toEqual({ outcome: "refused" });
+      advise = async () => ({ kind: "refused", usage: USAGE });
+      expect((await ask(id)).json()).toEqual({ outcome: "refused" });
+      advise = adviseOk;
+      expect((await ask(id)).json()).toMatchObject({ outcome: "ok" });
+    });
+
+    it("unavailable gives the use back", async () => {
+      const { id } = await finished();
+      const before = await chatCount(id1);
+      advise = async () => {
+        throw new AiUnavailable("down");
+      };
+      expect((await ask(id)).json()).toEqual({ outcome: "unavailable" });
+      expect(await chatCount(id1)).toBe(before);
+    });
+
+    it("limit when chat quota used up", async () => {
+      const { id } = await finished(h2);
+      await db
+        .insert(aiUsageDaily)
+        .values({ userId: id2, day: "2026-10-19", kind: "chat", count: 20 })
+        .onConflictDoUpdate({
+          target: [aiUsageDaily.userId, aiUsageDaily.day, aiUsageDaily.kind],
+          set: { count: 20 },
+        });
+      expect((await ask(id, h2)).json()).toEqual({ outcome: "limit" });
+      expect(adviseCalls).toHaveLength(0);
+      await db.delete(aiUsageDaily).where(eq(aiUsageDaily.userId, id2));
+    });
+
+    it("not_allowed when gate is false", async () => {
+      const { id } = await finished();
+      gate = false;
+      const res = await ask(id);
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: "not_allowed" });
+      expect(adviseCalls).toHaveLength(0);
+    });
+
+    it("409 for an active session", async () => {
+      await reset();
+      const s = await start();
+      await putSet(s.id, bench.id, 1);
+      const res = await ask(s.id);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: "not_finished" });
+      await reset();
+    });
+
+    it("409 after 24 hours", async () => {
+      const { id } = await finished();
+      // deps.now() is 2026-10-19T04:00Z
+      await db
+        .update(workoutSessions)
+        .set({ endedAt: new Date("2026-10-18T03:59:00Z") })
+        .where(eq(workoutSessions.id, id));
+      const res = await ask(id);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: "too_old" });
+      expect(adviseCalls).toHaveLength(0);
+    });
+
+    it("404 for another user's session or a missing one", async () => {
+      const { id } = await finished();
+      expect((await ask(id, h2)).statusCode).toBe(404);
+      expect((await ask(ZERO)).statusCode).toBe(404);
+      expect(adviseCalls).toHaveLength(0);
+    });
   });
 });
 

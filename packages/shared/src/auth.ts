@@ -31,6 +31,10 @@ export interface ApiError {
     | "unsupported_media_type"
     | "invalid_image"
     | "rate_limited"
+    // AI workout advice (POST /workouts/:id/advice).
+    | "not_allowed"
+    | "not_finished"
+    | "too_old"
     // Meal input errors (see MealInputErrorCode in the api).
     | "invalid_grams"
     | "unknown_food"

@@ -19,6 +19,7 @@ import {
   type SetLike,
   type Template,
   type WeekStats,
+  type WorkoutAiAdvice,
   type WorkoutHistoryEntry,
   type WorkoutHistoryPage,
   type WorkoutSet,
@@ -60,7 +61,8 @@ export type WorkoutErrorCode =
   | "session_finished"
   | "wrong_kind"
   | "not_finished"
-  | "empty_session";
+  | "empty_session"
+  | "too_old";
 
 /** Typed failure so routes can map it to 404 / 409 / 400. */
 export class WorkoutError extends Error {
@@ -1492,4 +1494,47 @@ export async function todayWorkoutSummary(
     ),
     cardioMinutes: cardio.reduce((sum, c) => sum + c.d, 0),
   };
+}
+
+/** Ended time and cached AI advice of the user's session; `not_found` if foreign. */
+export async function getSessionAdvice(
+  db: Db,
+  userId: string,
+  sessionId: string,
+): Promise<{ endedAt: Date | null; aiAdvice: WorkoutAiAdvice | null }> {
+  const [row] = await db
+    .select({
+      endedAt: workoutSessions.endedAt,
+      aiAdvice: workoutSessions.aiAdvice,
+    })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.userId, userId),
+      ),
+    );
+  if (!row) throw new WorkoutError("not_found");
+  return row;
+}
+
+/** Stores advice unless some is already there; returns whichever is stored. */
+export async function saveSessionAdvice(
+  db: Db,
+  sessionId: string,
+  advice: WorkoutAiAdvice,
+): Promise<WorkoutAiAdvice> {
+  const [saved] = await db
+    .update(workoutSessions)
+    .set({ aiAdvice: advice })
+    .where(
+      and(eq(workoutSessions.id, sessionId), isNull(workoutSessions.aiAdvice)),
+    )
+    .returning({ aiAdvice: workoutSessions.aiAdvice });
+  if (saved?.aiAdvice) return saved.aiAdvice;
+  const [existing] = await db
+    .select({ aiAdvice: workoutSessions.aiAdvice })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.id, sessionId));
+  return existing?.aiAdvice ?? advice;
 }
