@@ -56,6 +56,7 @@ export function parseSeed(sql: string): Exercise[] {
       equipment: equipment as Equipment,
       equipmentCategory: equipmentCategory(equipment as Equipment),
       isCustom: false,
+      photoUrl: null,
     });
   }
   return out.sort(bySlugOrder);

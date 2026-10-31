@@ -1,0 +1,2 @@
+ALTER TABLE "exercises" ADD COLUMN "photo_thumb" "bytea";--> statement-breakpoint
+ALTER TABLE "exercises" ADD CONSTRAINT "exercises_photo_thumb_custom_check" CHECK ("exercises"."photo_thumb" is null or "exercises"."is_custom");

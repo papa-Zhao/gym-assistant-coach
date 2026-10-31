@@ -50,6 +50,7 @@ export const BENCH: Exercise = {
   equipment: "barbell",
   equipmentCategory: "free_weight",
   isCustom: false,
+  photoUrl: null,
 };
 
 export const TREADMILL: Exercise = {
@@ -62,6 +63,7 @@ export const TREADMILL: Exercise = {
   equipment: "treadmill",
   equipmentCategory: "cardio_equipment",
   isCustom: false,
+  photoUrl: null,
 };
 
 export function strengthItem(over: Partial<SessionItem> = {}): SessionItem {

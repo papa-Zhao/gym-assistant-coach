@@ -1,4 +1,4 @@
-export const CONSENT_VERSION = "2026-10-23";
+export const CONSENT_VERSION = "2026-10-30";
 
 export const CONSENT_DOCS = ["terms", "privacy", "age_18_plus"] as const;
 
@@ -29,6 +29,7 @@ export interface ApiError {
     | "internal"
     | "payload_too_large"
     | "unsupported_media_type"
+    | "invalid_image"
     | "rate_limited"
     // Meal input errors (see MealInputErrorCode in the api).
     | "invalid_grams"

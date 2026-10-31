@@ -183,6 +183,8 @@ export interface Exercise {
   equipment: Equipment;
   equipmentCategory: EquipmentCategory;
   isCustom: boolean;
+  /** data: URL of the 192x192 photo thumbnail; custom exercises only. */
+  photoUrl: string | null;
 }
 
 /** Prefill for the custom-exercise form after an equipment photo. */

@@ -139,12 +139,17 @@
 
 ## 狀態
 
-- 計畫（2026-10-26），尚未實作。
-- ⚠️ 待使用者確認：政策改版、所有人重新同意一次（「規劃時的決定」第 1 點）。
+- 已實作（2026-10-30），分支 `pr11-3-photo-thumbnail`，尚未開 PR。
+- 政策改版、所有人重新同意一次：使用者 2026-10-26 已同意。`CONSENT_VERSION` 為 `2026-10-30`。
+- 待確認：實體手機驗證（見「部署」）——同意卡片出現、拍器材後建立自訂動作有照片圖示、重新整理後照片還在。
 
 ## 交接備註
 
-（實作時填寫。）
+- PGlite 讀 `bytea` 回傳的是 `Uint8Array` 不是 `Buffer`，`toExercise` 用 `Buffer.from(...)` 再轉 base64。
+- `ApiError` 加了 `invalid_image`（`packages/shared/src/auth.ts`）。
+- 照片上傳失敗的提示：`ExercisePicker` 選完動作後會關掉，所以多了選用的 `onNotice` prop；`ActiveWorkout` 用獨立的 `notice` state 顯示（不用 `error`，因為 `mutate` 會清掉 `error`），重新打開選動作時清掉。
+- `PUT /exercises/:id/photo` 沒有加 rate limit，和 `/exercises/identify` 一致。
+- 瀏覽器窗格 375 px 確認：訓練畫面的動作卡片和選動作清單都顯示照片縮圖，大小與圓角和內建圖示一致。
 
 ## 下一個 PR 需要知道的事
 

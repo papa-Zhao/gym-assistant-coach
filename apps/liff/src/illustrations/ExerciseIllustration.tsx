@@ -10,9 +10,20 @@ export function ExerciseIllustration({
   exercise,
   size,
 }: {
-  exercise: Pick<Exercise, "slug" | "kind" | "muscleGroup">;
+  exercise: Pick<Exercise, "slug" | "kind" | "muscleGroup" | "photoUrl">;
   size: 40 | 64;
 }) {
+  if (exercise.photoUrl) {
+    return (
+      <img
+        className="illus-photo"
+        src={exercise.photoUrl}
+        alt=""
+        width={size}
+        height={size}
+      />
+    );
+  }
   const pose = poseFor(exercise);
   return (
     <svg

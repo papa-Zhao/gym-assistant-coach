@@ -21,7 +21,12 @@ function Column({ mode }: { mode: ColorMode }) {
     <section className={`col ${mode}`}>
       <h2>{mode === "light" ? "淺色" : "深色"}</h2>
       {Object.keys(POSES).map((slug) => {
-        const exercise = { slug, kind: "strength" as const, muscleGroup: null };
+        const exercise = {
+          slug,
+          kind: "strength" as const,
+          muscleGroup: null,
+          photoUrl: null,
+        };
         return (
           <div className="cell" key={slug}>
             <ExerciseIllustration exercise={exercise} size={64} />

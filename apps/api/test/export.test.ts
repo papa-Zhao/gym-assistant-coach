@@ -61,6 +61,7 @@ async function seed(db: Db, userId: string, tag: string) {
       equipment: "selectorized_machine",
       isCustom: true,
       ownerUserId: userId,
+      photoThumb: Buffer.from("thumb-bytes"),
     })
     .returning({ id: exercises.id });
   const [template] = await db
@@ -237,6 +238,15 @@ describe("exportUserData", () => {
     for (const id of Object.values(seededB)) expect(json).not.toContain(id);
     expect(json).not.toContain("Bob");
     expect(json).not.toMatch(/[一-鿿]B"/);
+  });
+
+  it("export does not include photo bytes", async () => {
+    const { db, a } = await setup();
+    const json = JSON.stringify(await exportUserData(db, a, NOW));
+    // meals legitimately carry source: "photo"; only thumbnail fields matter.
+    for (const bad of ["photoUrl", "photoThumb", "photo_thumb", "data:image"])
+      expect(json).not.toContain(bad);
+    expect(json).not.toContain(Buffer.from("thumb-bytes").toString("base64"));
   });
 
   it("a new user gets a null profile and empty lists", async () => {
