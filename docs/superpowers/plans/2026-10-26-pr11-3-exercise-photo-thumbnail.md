@@ -139,7 +139,7 @@
 
 ## 狀態
 
-- 已實作（2026-10-30），分支 `pr11-3-photo-thumbnail`，尚未開 PR。
+- 已合併：[PR #29](https://github.com/papa-Zhao/gym-assistant-coach/pull/29)，merge commit `284b8bc`（2026-10-31 確認）。
 - 政策改版、所有人重新同意一次：使用者 2026-10-26 已同意。`CONSENT_VERSION` 為 `2026-10-30`。
 - 待確認：實體手機驗證（見「部署」）——同意卡片出現、拍器材後建立自訂動作有照片圖示、重新整理後照片還在。
 
