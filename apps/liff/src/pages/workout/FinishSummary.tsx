@@ -1,8 +1,34 @@
 import { useState, type FormEvent } from "react";
-import type { FinishSummary as FinishSummaryData, Template } from "@gac/shared";
+import type {
+  FinishSummary as FinishSummaryData,
+  Template,
+  WorkoutAdviceResponse,
+  WorkoutAiAdvice,
+} from "@gac/shared";
 import { apiFetch, failureMessage } from "../../api";
 import { isAuthExpired } from "./fields";
 import { formatRest } from "./RestTimer";
+import { getRestSec } from "./restSettings";
+
+/** Average rest this far over the saved target earns a tip. */
+const REST_TIP_OVER_SEC = 60;
+
+const ADVICE_FAILED = "這次沒辦法產生建議，請稍後再試";
+const ADVICE_MESSAGES: Record<
+  Exclude<WorkoutAdviceResponse["outcome"], "ok">,
+  string
+> = {
+  limit: "今天問 AI 的次數用完了，明天再試",
+  refused: ADVICE_FAILED,
+  unavailable: "AI 暫時忙不過來，請稍後再試",
+};
+
+function restTip(avgRestSec: number | null): string | null {
+  if (avgRestSec === null) return null;
+  const target = getRestSec();
+  if (avgRestSec - target < REST_TIP_OVER_SEC) return null;
+  return `平均休息 ${formatRest(avgRestSec)}，比你設定的 ${formatRest(target)} 多，可以縮短一點讓訓練更緊湊`;
+}
 
 interface FinishSummaryProps {
   summary: FinishSummaryData;
@@ -20,6 +46,32 @@ export function FinishSummary({
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tips] = useState(() => {
+    const rest = restTip(summary.avgRestSec);
+    return rest ? [...summary.tips, rest] : summary.tips;
+  });
+  const [advice, setAdvice] = useState<WorkoutAiAdvice | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+
+  const askCoach = async () => {
+    if (asking) return;
+    setAsking(true);
+    setAdviceError(null);
+    try {
+      const r = await apiFetch<WorkoutAdviceResponse>(
+        `/workouts/${summary.sessionId}/advice`,
+        { method: "POST" },
+      );
+      if (r.outcome === "ok") setAdvice(r.advice);
+      else setAdviceError(ADVICE_MESSAGES[r.outcome]);
+    } catch (err) {
+      if (isAuthExpired(err)) onFatal();
+      else setAdviceError(failureMessage(err, ADVICE_FAILED));
+    } finally {
+      setAsking(false);
+    }
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,6 +126,48 @@ export function FinishSummary({
               {pr.reps}（估算 1RM {pr.e1rm} kg）
             </p>
           ))}
+        </section>
+      )}
+      {tips.length > 0 && (
+        <section className="card stack tips" aria-label="訓練建議">
+          <h2>訓練建議</h2>
+          <ul>
+            {tips.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+          {advice ? (
+            <div className="stack" role="status">
+              <h3>{advice.title}</h3>
+              <ul>
+                {advice.points.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            summary.aiAdviceAvailable && (
+              <>
+                {adviceError && (
+                  <p className="error-text" role="alert">
+                    {adviceError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={asking}
+                  aria-describedby="ai-advice-cost"
+                  onClick={() => void askCoach()}
+                >
+                  問 AI 教練
+                </button>
+                <p id="ai-advice-cost" className="muted">
+                  會用掉 1 次問 AI 的次數
+                </p>
+              </>
+            )
+          )}
         </section>
       )}
       <section className="card">

@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { fileURLToPath } from "node:url";
 import type { Db } from "../src/users/repo";
 import type { Advisor } from "../src/ai/advisor";
+import type { WorkoutAdvisor } from "../src/ai/workout-advisor";
 import type { EquipmentIdentifier } from "../src/ai/equipment-identifier";
 import type { MealParser } from "../src/ai/meal-parser";
 import type { PhotoStore } from "../src/photos/store";
@@ -57,6 +58,12 @@ export const unusedEquipmentIdentifier: EquipmentIdentifier = {
 export const unusedAdvisor: Advisor = {
   ask: async () => {
     throw new Error("advisor should not be called");
+  },
+};
+
+export const unusedWorkoutAdvisor: WorkoutAdvisor = {
+  advise: async () => {
+    throw new Error("workout advisor should not be called");
   },
 };
 

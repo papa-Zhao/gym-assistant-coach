@@ -243,6 +243,10 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .card-links a { display: inline-flex; align-items: center; min-height: ${minTouchTarget}px; padding: 0 var(--space-2); }
 .history-item h3 { margin: var(--space-3) 0 var(--space-1); font-size: var(--font-size-body); font-weight: 700; }
 .history-item p { margin: 0; }
+.tips h2, .tips h3 { margin: 0; }
+.tips h3 { font-size: var(--font-size-body); font-weight: 700; }
+.tips ul { margin: 0; padding-left: var(--space-5); line-height: 1.7; }
+.tips li + li { margin-top: var(--space-1); }
 .rest-timer {
   display: flex;
   align-items: center;

@@ -21,6 +21,7 @@ import {
   unusedAdvisor,
   unusedEquipmentIdentifier,
   unusedMealParser,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 // 04:00 in Taipei.
@@ -239,6 +240,7 @@ describe("POST /jobs/daily", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: photos.store,
       sessionSecret: new Uint8Array(32).fill(7),
       corsOrigin: "https://liff.example",

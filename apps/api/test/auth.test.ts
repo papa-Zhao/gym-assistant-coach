@@ -9,6 +9,7 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 import { CONSENT_VERSION } from "@gac/shared";
 
@@ -48,6 +49,7 @@ describe("auth", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: ORIGIN,
@@ -239,6 +241,7 @@ describe("error handling", () => {
         mealParser: unusedMealParser,
         equipmentIdentifier: unusedEquipmentIdentifier,
         advisor: unusedAdvisor,
+        workoutAdvisor: unusedWorkoutAdvisor,
         photoStore: unusedPhotoStore,
         sessionSecret: SECRET,
         corsOrigin: ORIGIN,

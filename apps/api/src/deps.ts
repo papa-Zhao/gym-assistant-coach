@@ -2,6 +2,7 @@ import type { FinishSummary } from "@gac/shared";
 import type { Advisor } from "./ai/advisor";
 import type { EquipmentIdentifier } from "./ai/equipment-identifier";
 import type { MealParser } from "./ai/meal-parser";
+import type { WorkoutAdvisor } from "./ai/workout-advisor";
 import type { DbStats } from "./db/timing.js";
 import type { PhotoStore } from "./photos/store";
 import type { Db } from "./users/repo";
@@ -35,6 +36,13 @@ export interface AppDeps {
   equipmentIdentifier: EquipmentIdentifier;
   /** Answers free-form coaching questions; tests inject a fake. */
   advisor: Advisor;
+  /** Advises on one finished workout; tests inject a fake. */
+  workoutAdvisor: WorkoutAdvisor;
+  /** Who may ask for AI workout advice; defaults to `canUseWorkoutAiAdvice`. Tests only. */
+  canUseWorkoutAiAdvice?: (
+    deps: { db: Db },
+    userId: string,
+  ) => Promise<boolean>;
   /** Meal photo object storage; tests inject an in-memory one. */
   photoStore: PhotoStore;
   /** Per-call GCS deadline override; tests only. */

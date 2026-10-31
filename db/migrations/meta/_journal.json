@@ -99,6 +99,13 @@
       "when": 1793364531925,
       "tag": "0013_exercise_photo_thumb",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793442085892,
+      "tag": "0014_workout_ai_advice",
+      "breakpoints": true
     }
   ]
 }

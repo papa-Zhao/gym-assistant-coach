@@ -290,8 +290,30 @@ export interface FinishSummary {
     weightKg: number;
     reps: number;
   }[];
+  /** 1-3 rule-based tips (zh-TW); the LIFF may append a rest tip. */
+  tips: string[];
+  /** Whether the "ask the AI coach" button is offered for this user. */
+  aiAdviceAvailable: boolean;
   notified: boolean;
 }
+
+/** AI coach advice for one finished session; cached on the session. */
+export interface WorkoutAiAdvice {
+  title: string;
+  points: string[];
+  /** ISO */
+  createdAt: string;
+}
+
+export type WorkoutAdviceResponse =
+  | { outcome: "ok"; advice: WorkoutAiAdvice }
+  | { outcome: "limit" | "refused" | "unavailable" };
+
+export const WORKOUT_ADVICE_LIMITS = {
+  titleChars: 20,
+  pointChars: 60,
+  maxPoints: 3,
+} as const;
 
 export interface Template {
   id: string;
