@@ -173,7 +173,7 @@
 
 ## 狀態
 
-- 實作完成（2026-10-31），分支 `pr11-4-workout-advice`，等開 PR 與合併。
+- 已合併：[PR #30](https://github.com/papa-Zhao/gym-assistant-coach/pull/30)，merge commit `369c4b8`（2026-11-03 確認）。
 - 真的 API 金鑰評測（2026-10-31，使用者執行 `npm run eval:workout-advice -w @gac/api`，共兩次）：都是 4/4 成功。縮短字數後平均每次 US$0.00014，已寫進 `docs/launch/cost-estimate.md`。
 - 待確認：實體手機驗證（見「部署」）——結束訓練後看到「訓練建議」、按「問 AI 教練」後出現建議、再按一次不會再扣次數。
 
