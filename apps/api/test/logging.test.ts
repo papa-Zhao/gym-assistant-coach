@@ -9,6 +9,7 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 function captureStream() {
@@ -38,6 +39,7 @@ const deps: AppDeps = {
   mealParser: unusedMealParser,
   equipmentIdentifier: unusedEquipmentIdentifier,
   advisor: unusedAdvisor,
+  workoutAdvisor: unusedWorkoutAdvisor,
   photoStore: unusedPhotoStore,
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",

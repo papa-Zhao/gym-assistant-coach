@@ -14,6 +14,7 @@
     "eval:meal-text": "tsx scripts/meal-text-eval.ts",
     "eval:meal-photo": "tsx scripts/meal-photo-eval.ts",
     "eval:equipment-photo": "tsx scripts/equipment-photo-eval.ts",
+    "eval:workout-advice": "tsx scripts/workout-advice-eval.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

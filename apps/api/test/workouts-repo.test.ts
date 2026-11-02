@@ -619,6 +619,54 @@ describe("workouts repo", () => {
     });
   });
 
+  it("finish summary carries rule tips", async () => {
+    const { db, userId, slug } = await setup();
+    const bench = slug("barbell-bench-press");
+    // 2026-10-22 is a Thursday: overload plus untrained muscles.
+    const { summary } = await doSession(db, userId, "2026-10-22", bench.id, [
+      [60, 8],
+      [60, 8],
+    ]);
+    expect(summary.tips).toEqual([
+      "下次槓鈴臥推可以試試 62.5 kg",
+      "本週還沒練到：背、肩、二頭",
+    ]);
+  });
+
+  it("finish tips compare volume with the same template's last session", async () => {
+    const { db, userId, slug } = await setup();
+    const bench = slug("barbell-bench-press");
+    const s = await startSession(db, userId, "2026-10-19");
+    await upsertSet(db, userId, s.id, bench.id, {
+      setIndex: 1,
+      weightKg: 60,
+      reps: 8,
+    });
+    const tpl = await createTemplateFromSession(db, userId, s.id, "推日");
+    await finishSession(db, userId, s.id);
+    // A blank session is never the comparison point, even with more volume.
+    const t1 = await startSession(db, userId, "2026-10-20", tpl.id);
+    await upsertSet(db, userId, t1.id, bench.id, {
+      setIndex: 1,
+      weightKg: 60,
+      reps: 6,
+    });
+    expect((await finishSession(db, userId, t1.id)).tips).toEqual([
+      "完成了！記得補充蛋白質和水分。",
+    ]);
+    const t2 = await startSession(db, userId, "2026-10-21", tpl.id);
+    for (const setIndex of [1, 2]) {
+      await upsertSet(db, userId, t2.id, bench.id, {
+        setIndex,
+        weightKg: 60,
+        reps: 6,
+      });
+    }
+    expect((await finishSession(db, userId, t2.id)).tips).toEqual([
+      "總訓練量比上次多 100%",
+    ]);
+  });
+
   describe("round trips", () => {
     const STRENGTH = [
       "barbell-bench-press",

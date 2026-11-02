@@ -6,6 +6,7 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const notUsed = async (): Promise<never> => {
@@ -22,6 +23,7 @@ const deps: AppDeps = {
   mealParser: unusedMealParser,
   equipmentIdentifier: unusedEquipmentIdentifier,
   advisor: unusedAdvisor,
+  workoutAdvisor: unusedWorkoutAdvisor,
   photoStore: unusedPhotoStore,
   sessionSecret: new Uint8Array(32),
   corsOrigin: "http://localhost",

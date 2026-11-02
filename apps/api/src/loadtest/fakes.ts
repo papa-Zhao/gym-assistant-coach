@@ -58,6 +58,7 @@ export function createFakeDeps(opts: {
   | "mealParser"
   | "equipmentIdentifier"
   | "advisor"
+  | "workoutAdvisor"
   | "photoStore"
 > {
   const expected = Buffer.from(opts.internalToken);
@@ -120,6 +121,16 @@ export function createFakeDeps(opts: {
             body: "這是壓測用的固定回覆。",
             program: [],
           },
+          usage: FAKE_USAGE,
+        };
+      },
+    },
+    workoutAdvisor: {
+      advise: async () => {
+        await delay();
+        return {
+          kind: "ok",
+          advice: { title: "壓測建議", points: ["這是壓測用的固定建議。"] },
           usage: FAKE_USAGE,
         };
       },

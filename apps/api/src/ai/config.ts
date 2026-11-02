@@ -10,3 +10,4 @@ export const AI_CLIENT_TIMEOUT_MS = 20_000;
 export const AI_CLIENT_MAX_RETRIES = 0;
 export const EQUIPMENT_PHOTO_MAX_TOKENS = 4000;
 export const ASK_MAX_TOKENS = 4000;
+export const WORKOUT_ADVICE_MAX_TOKENS = 1500;

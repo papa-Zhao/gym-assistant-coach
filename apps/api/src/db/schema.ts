@@ -8,6 +8,7 @@ import {
   MEAL_STATUSES,
   MEAL_TYPES,
   MUSCLE_GROUPS,
+  type WorkoutAiAdvice,
 } from "@gac/shared";
 import { sql } from "drizzle-orm";
 import {
@@ -256,6 +257,8 @@ export const workoutSessions = pgTable(
       onDelete: "set null",
     }),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    /** Cached AI coach advice `{ title, points, createdAt }`; set once per session. */
+    aiAdvice: jsonb("ai_advice").$type<WorkoutAiAdvice>(),
   },
   (t) => [
     uniqueIndex("workout_sessions_one_active_unique")

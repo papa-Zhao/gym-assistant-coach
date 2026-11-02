@@ -26,7 +26,7 @@ const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   active: "活躍（每週 6–7 天）",
   very_active: "非常活躍（體力工作或一天兩練）",
 };
-const GOAL_LABELS: Record<Goal, string> = {
+export const GOAL_LABELS: Record<Goal, string> = {
   cut: "減脂",
   maintain: "維持",
   bulk: "增肌",

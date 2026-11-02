@@ -9,6 +9,7 @@ import {
   unusedPhotoStore,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
@@ -51,6 +52,7 @@ describe("profile routes", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: unusedPhotoStore,
       sessionSecret: SECRET,
       corsOrigin: "http://localhost",

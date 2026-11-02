@@ -94,6 +94,7 @@ export async function exportUserData(
         startedAt: workoutSessions.startedAt,
         endedAt: workoutSessions.endedAt,
         note: workoutSessions.note,
+        aiAdvice: workoutSessions.aiAdvice,
         template: workoutTemplates.name,
       })
       .from(workoutSessions)
@@ -353,6 +354,7 @@ export async function exportUserData(
       endedAt: iso(s.endedAt),
       note: s.note,
       template: s.template,
+      aiAdvice: s.aiAdvice,
       items: (itemsBySession.get(s.id) ?? []).map((i) => ({
         exercise: i.exercise,
         position: i.position,

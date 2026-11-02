@@ -10,6 +10,7 @@ import {
   unusedMealParser,
   unusedAdvisor,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 
 const SECRET = new Uint8Array(32).fill(9);
@@ -49,6 +50,7 @@ describe("meal routes", () => {
       mealParser: unusedMealParser,
       equipmentIdentifier: unusedEquipmentIdentifier,
       advisor: unusedAdvisor,
+      workoutAdvisor: unusedWorkoutAdvisor,
       photoStore: photos.store,
       photoTimeoutMs: 30,
       sessionSecret: SECRET,

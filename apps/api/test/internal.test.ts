@@ -22,6 +22,7 @@ import {
   createTestDb,
   memoryPhotoStore,
   unusedEquipmentIdentifier,
+  unusedWorkoutAdvisor,
 } from "./db";
 import sharp from "sharp";
 import { MEAL_PHOTO_MAX_BYTES } from "@gac/shared";
@@ -82,6 +83,7 @@ describe("/internal/users", () => {
         parsePhoto: (jpeg) => parser.parsePhoto(jpeg),
       },
       equipmentIdentifier: unusedEquipmentIdentifier,
+      workoutAdvisor: unusedWorkoutAdvisor,
       advisor: {
         ask: async (input) => {
           askCalls.push(input);

@@ -1,0 +1,1 @@
+ALTER TABLE "workout_sessions" ADD COLUMN "ai_advice" jsonb;
