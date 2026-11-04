@@ -19,6 +19,7 @@ import { apiFetch, failureMessage } from "../../api";
 import { shortDate } from "../../bodyMetricsView";
 import { ConfirmRow } from "./ConfirmRow";
 import { ExerciseName } from "./ExerciseName";
+import { Icon } from "../../components/Icon";
 import { ExercisePicker } from "./ExercisePicker";
 import { ExerciseIllustration } from "../../illustrations/ExerciseIllustration";
 import {
@@ -88,6 +89,7 @@ function Elapsed({ startedAt }: { startedAt: string }) {
   }, []);
   return (
     <span className="elapsed">
+      <Icon name="timer" size={16} />
       {`訓練 ${formatElapsed(now - Date.parse(startedAt))}`}
     </span>
   );
@@ -255,7 +257,7 @@ export function ActiveWorkout({
       ) : (
         <button
           type="button"
-          className="text-button"
+          className="text-button discard-button"
           disabled={busy}
           onClick={() => setDiscarding(true)}
         >
@@ -311,11 +313,7 @@ export function ActiveWorkout({
             >
               ＋ 加動作
             </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setConfirming(true)}
-            >
+            <button type="button" onClick={() => setConfirming(true)}>
               結束訓練
             </button>
           </>
@@ -352,18 +350,23 @@ function ExerciseCard({
     <section className="card exercise-card" ref={register}>
       <div className="exercise-head">
         <ExerciseIllustration exercise={exercise} size={64} />
-        <h2 className="exercise-name">
-          <ExerciseName exercise={exercise} />
-        </h2>
+        <div className="exercise-title">
+          <h2 className="exercise-name">
+            <ExerciseName exercise={exercise} />
+          </h2>
+          <span className="badge">
+            {EQUIPMENT_CATEGORY_LABELS[exercise.equipmentCategory]}
+          </span>
+        </div>
         {!removing && (
           <button
             type="button"
-            className="text-button"
+            className="icon-btn"
             disabled={busy}
             aria-label={`移除 ${exercise.nameZh}`}
             onClick={() => setRemoving(true)}
           >
-            移除
+            <Icon name="trash" />
           </button>
         )}
       </div>
@@ -383,18 +386,16 @@ function ExerciseCard({
           onCancel={() => setRemoving(false)}
         />
       )}
-      <span className="badge">
-        {EQUIPMENT_CATEGORY_LABELS[exercise.equipmentCategory]}
-      </span>
       {last && last.sets.length > 0 && (
-        <p className="muted">
+        <p className="muted last-time">
           上次（{shortDate(last.date)}）：
           {last.sets[0] && `${last.sets[0].weightKg} kg × `}
           {last.sets.map((s) => s.reps).join("、")}
         </p>
       )}
       {hint && (
-        <p className="explain">
+        <p className="explain hint">
+          <Icon name="sparkles" size={18} />
           上次每組都做到了，今天試試 {hint.suggestWeightKg} kg？
         </p>
       )}
@@ -532,11 +533,11 @@ function StrengthSection({
             </span>
             <button
               type="button"
-              className="secondary mini"
+              className="icon-btn"
               aria-label={`修改第 ${s.setIndex} 組`}
               onClick={() => setEditing(s.setIndex)}
             >
-              修改
+              <Icon name="pencil" size={18} />
             </button>
           </div>
         ),
@@ -557,7 +558,7 @@ function StrengthSection({
       ) : (
         <button
           type="button"
-          className="text-button"
+          className="add-set"
           disabled={busy}
           onClick={() => setDrafting(true)}
         >
@@ -733,7 +734,7 @@ function CardioSection({
           </span>
           <button
             type="button"
-            className="secondary mini"
+            className="icon-btn"
             disabled={busy}
             aria-label={`刪除第 ${c.entryIndex} 筆`}
             onClick={() =>
@@ -742,7 +743,7 @@ function CardioSection({
               )
             }
           >
-            刪除
+            <Icon name="trash" size={18} />
           </button>
         </div>
       ))}

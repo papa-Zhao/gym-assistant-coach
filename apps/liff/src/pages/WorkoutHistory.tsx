@@ -6,6 +6,7 @@ import type {
   WorkoutSet,
 } from "@gac/shared";
 import { apiFetch } from "../api";
+import { Icon } from "../components/Icon";
 import { Skeleton } from "../components/Skeleton";
 import { formatRest } from "./workout/RestTimer";
 import { isAuthExpired } from "./workout/fields";
@@ -41,17 +42,44 @@ function cardioLine(c: CardioEntry): string {
 }
 
 function EntryCard({ entry }: { entry: WorkoutHistoryEntry }) {
+  let sets = 0;
+  let volume = 0;
+  let cardioMin = 0;
+  for (const item of entry.items) {
+    if ("sets" in item) {
+      sets += item.sets.length;
+      for (const s of item.sets) volume += s.weightKg * s.reps;
+    } else {
+      for (const c of item.cardio) cardioMin += c.durationMin;
+    }
+  }
+  const stats = [
+    `${entry.items.length} 個動作`,
+    sets > 0 && `${sets} 組`,
+    volume > 0 && `${Math.round(volume).toLocaleString("en-US")} kg`,
+    cardioMin > 0 && `有氧 ${cardioMin} 分`,
+  ].filter(Boolean);
   return (
-    <section className="card">
-      <h2>
-        {shortDate(entry.date)}・{entry.templateName ?? "訓練"}
-      </h2>
+    <section className="card history-card">
+      <div className="card-head">
+        <span className="card-icon">
+          <Icon name="dumbbell" />
+        </span>
+        <h2>
+          {shortDate(entry.date)}・{entry.templateName ?? "訓練"}
+        </h2>
+      </div>
+      <p className="history-stats muted num">{stats.join(" · ")}</p>
       {entry.items.map((item) => (
         <div className="history-item" key={item.exercise.id}>
           <h3>{item.exercise.nameZh}</h3>
-          {"sets" in item
-            ? item.sets.map((s) => <p key={s.setIndex}>{setLine(s)}</p>)
-            : item.cardio.map((c) => <p key={c.entryIndex}>{cardioLine(c)}</p>)}
+          <div className="history-sets num">
+            {"sets" in item
+              ? item.sets.map((s) => <p key={s.setIndex}>{setLine(s)}</p>)
+              : item.cardio.map((c) => (
+                  <p key={c.entryIndex}>{cardioLine(c)}</p>
+                ))}
+          </div>
         </div>
       ))}
     </section>
@@ -99,7 +127,7 @@ export function WorkoutHistory({ onFatal }: WorkoutHistoryProps) {
   };
 
   return (
-    <main>
+    <main className="history">
       <h1>訓練紀錄</h1>
       {entries === null ? (
         <Skeleton layout="rows" />

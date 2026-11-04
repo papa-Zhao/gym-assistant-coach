@@ -145,7 +145,6 @@ describe("RestTimer", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(toggle);
     const on = screen.getByRole("button", { name: "提示音" });
-    expect(on).toHaveTextContent("🔕");
     expect(on).toHaveAttribute("aria-pressed", "false");
     expect(getRestSound()).toBe(false);
   });

@@ -21,6 +21,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { ConfirmRow } from "../workout/ConfirmRow";
 import { isAuthExpired } from "../workout/fields";
 import { FoodSearch } from "./FoodSearch";
+import { Icon } from "../../components/Icon";
 
 interface MealEditProps {
   /** Existing meal to edit; otherwise a new meal for `today`. */
@@ -276,12 +277,11 @@ export function MealEdit({
       {draft && (
         <p className="muted">AI 估計的草稿，按「儲存並確認」就會記錄</p>
       )}
-      <div className="chips" role="group" aria-label="餐別">
+      <div className="seg meal-types" role="group" aria-label="餐別">
         {MEAL_TYPES.map((t) => (
           <button
             key={t}
             type="button"
-            className={`chip${mealType === t ? " selected" : ""}`}
             aria-pressed={mealType === t}
             onClick={() => setMealType(t)}
           >
@@ -299,23 +299,37 @@ export function MealEdit({
           return (
             <section key={line.key} className="card meal-item">
               <div className="meal-item-head">
-                <strong className="row-name">
-                  {line.name}
-                  {line.aiEstimated && <span className="ai-tag">AI 估計</span>}
-                </strong>
-                <span className="muted">
-                  {n ? `${n.kcal} kcal · 蛋白質 ${n.proteinG} g` : "—"}
-                </span>
+                <div className="meal-item-title">
+                  <strong className="row-name">
+                    {line.name}
+                    {line.aiEstimated && (
+                      <span className="ai-tag">AI 估計</span>
+                    )}
+                  </strong>
+                  <span className="muted">
+                    {n ? `${n.kcal} kcal · 蛋白質 ${n.proteinG} g` : "—"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={`刪除 ${line.name}`}
+                  onClick={() =>
+                    setLines((ls) => ls.filter((l) => l.key !== line.key))
+                  }
+                >
+                  <Icon name="trash" />
+                </button>
               </div>
               <div className="meal-item-controls">
                 <button
                   type="button"
-                  className="secondary step-btn"
+                  className="step-btn"
                   aria-label={`${line.name} 減少 ${STEP_G} 克`}
                   disabled={g === null}
                   onClick={() => bump(line, -1)}
                 >
-                  −
+                  <Icon name="minus" />
                 </button>
                 <input
                   className="grams-input"
@@ -326,24 +340,17 @@ export function MealEdit({
                   value={line.grams}
                   onChange={(e) => patch(line.key, e.target.value)}
                 />
+                <span className="grams-unit" aria-hidden="true">
+                  g
+                </span>
                 <button
                   type="button"
-                  className="secondary step-btn"
+                  className="step-btn"
                   aria-label={`${line.name} 增加 ${STEP_G} 克`}
                   disabled={g === null}
                   onClick={() => bump(line, 1)}
                 >
-                  ＋
-                </button>
-                <button
-                  type="button"
-                  className="text-button"
-                  aria-label={`刪除 ${line.name}`}
-                  onClick={() =>
-                    setLines((ls) => ls.filter((l) => l.key !== line.key))
-                  }
-                >
-                  刪除
+                  <Icon name="plus" />
                 </button>
               </div>
               {g === null && (
@@ -362,9 +369,15 @@ export function MealEdit({
         </p>
       )}
       <div className="bottom-bar meal-bar">
-        <p className="meal-total">
-          合計 <strong>{total.kcal}</strong> kcal
-        </p>
+        <div className="meal-total-row">
+          <p className="meal-total">
+            合計 <strong className="num">{total.kcal}</strong> kcal
+          </p>
+          <p className="meal-total-macros muted num">
+            蛋白質 {total.proteinG} g · 碳水 {total.carbG} g · 脂肪 {total.fatG}{" "}
+            g
+          </p>
+        </div>
         {confirmDelete ? (
           <ConfirmRow
             label="刪除這一餐"
@@ -386,7 +399,7 @@ export function MealEdit({
             {editing && (
               <button
                 type="button"
-                className="text-button"
+                className="text-button danger-text"
                 disabled={busy}
                 onClick={() => setConfirmDelete(true)}
               >

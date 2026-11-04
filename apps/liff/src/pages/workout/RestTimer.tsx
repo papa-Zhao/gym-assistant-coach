@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "../../components/Icon";
 import { alertRestEnd } from "./restAlert";
 import {
   REST_MAX_SEC,
@@ -100,12 +101,12 @@ export function RestTimer({
       <div className="rest-actions">
         <button
           type="button"
-          className="secondary mini"
+          className="secondary mini icon-mini"
           aria-label="提示音"
           aria-pressed={sound}
           onClick={toggleSound}
         >
-          {sound ? "🔔" : "🔕"}
+          <Icon name={sound ? "bell" : "bellOff"} size={18} />
         </button>
         <button
           type="button"
@@ -128,6 +129,7 @@ export function RestTimer({
           className="secondary mini"
           onClick={() => onSkip(lastCompletedAt)}
         >
+          <Icon name="skip" size={16} />
           跳過
         </button>
       </div>
