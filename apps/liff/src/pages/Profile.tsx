@@ -259,8 +259,8 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
 
   if (step === 1)
     return (
-      <main>
-        <p className="step">步驟 1／2</p>
+      <main className="profile">
+        <StepBar step={1} />
         <h1>先認識你一下</h1>
         <form
           className="card stack"
@@ -272,7 +272,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
         >
           <fieldset>
             <legend>生理性別</legend>
-            <div className="chips">
+            <div className="chips split">
               {(Object.keys(SEX_LABELS) as Sex[]).map((sex) => (
                 <Chip
                   key={sex}
@@ -344,13 +344,13 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
   }
 
   return (
-    <main>
-      <p className="step">步驟 2／2</p>
+    <main className="profile">
+      <StepBar step={2} />
       <h1>你的每日目標</h1>
       <section className="card stack">
         <fieldset>
           <legend>目標</legend>
-          <div className="chips">
+          <div className="chips split">
             {(Object.keys(GOAL_LABELS) as Goal[]).map((goal) => (
               <Chip
                 key={goal}
@@ -366,13 +366,13 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
           </div>
         </fieldset>
         <div className="kcal">
-          <span className="kcal-num">{shown.kcal}</span>
+          <span className="kcal-num num">{shown.kcal}</span>
           <span className="kcal-unit">kcal／天</span>
         </div>
         <div className="macros">
-          <Macro label="蛋白質" grams={shown.proteinG} />
-          <Macro label="碳水" grams={shown.carbG} />
-          <Macro label="脂肪" grams={shown.fatG} />
+          <Macro kind="protein" label="蛋白質" grams={shown.proteinG} />
+          <Macro kind="carb" label="碳水" grams={shown.carbG} />
+          <Macro kind="fat" label="脂肪" grams={shown.fatG} />
         </div>
         <div className="explain">
           {keepOverride ? (
@@ -418,7 +418,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
         )}
         <button
           type="button"
-          className="secondary"
+          className="secondary quiet"
           aria-expanded={manualOpen}
           onClick={toggleManual}
         >
@@ -426,7 +426,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
         </button>
         <button
           type="button"
-          className="secondary"
+          className="secondary quiet"
           onClick={() => {
             setKeepOverride(false);
             setStep(1);
@@ -526,11 +526,32 @@ function TextField(props: {
   );
 }
 
-function Macro({ label, grams }: { label: string; grams: number }) {
+function Macro({
+  kind,
+  label,
+  grams,
+}: {
+  kind: string;
+  label: string;
+  grams: number;
+}) {
   return (
-    <div className="macro">
+    <div className={`macro ${kind}`}>
       <span className="muted">{label}</span>
-      <strong>{grams} g</strong>
+      <strong className="num">{grams} g</strong>
+    </div>
+  );
+}
+
+/** "步驟 n／2" plus a two-segment progress bar. */
+function StepBar({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="stepbar">
+      <p className="step">步驟 {step}／2</p>
+      <span className="stepbar-track" aria-hidden="true">
+        <span className="on" />
+        <span className={step === 2 ? "on" : undefined} />
+      </span>
     </div>
   );
 }

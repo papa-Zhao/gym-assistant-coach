@@ -94,7 +94,7 @@ describe("BodyMetrics", () => {
         "這段期間還沒有體脂紀錄。可以在聊天室輸入「體脂 18.6」或按下方「記錄今天的數據」。",
       ),
     ).toBeInTheDocument();
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector("svg.chart")).toBeNull();
     expect(screen.queryByText(/— %/)).not.toBeInTheDocument();
   });
 

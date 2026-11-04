@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { deleteAccount, fetchExport, saveFile } from "../dataRights";
+import { Icon, type IconName } from "../components/Icon";
 
 const SOON = ["訓練範本"] as const;
 const FAILED = "沒有成功，請稍後再試。";
@@ -72,7 +73,12 @@ export function Settings({ today, onClose }: SettingsProps) {
             </p>
           )}
           <div className="confirm-actions">
-            <button type="button" disabled={busy} onClick={confirmDelete}>
+            <button
+              type="button"
+              className="danger"
+              disabled={busy}
+              onClick={confirmDelete}
+            >
               確認刪除
             </button>
             <button
@@ -93,15 +99,19 @@ export function Settings({ today, onClose }: SettingsProps) {
   }
 
   return (
-    <main>
+    <main className="settings">
       <h1>設定</h1>
       <section className="card list">
         <h2>我的資料</h2>
         <a className="row" href="/profile">
-          個人檔案
+          <RowIcon name="user" />
+          <span className="row-name">個人檔案</span>
+          <Icon name="chevronRight" className="row-chevron" />
         </a>
         <a className="row" href="/profile">
-          每日目標
+          <RowIcon name="target" />
+          <span className="row-name">每日目標</span>
+          <Icon name="chevronRight" className="row-chevron" />
         </a>
       </section>
       <section className="card list">
@@ -112,25 +122,28 @@ export function Settings({ today, onClose }: SettingsProps) {
           disabled={busy}
           onClick={exportData}
         >
-          匯出我的資料
+          <RowIcon name="download" />
+          <span className="row-name">匯出我的資料</span>
         </button>
+        {SOON.map((label) => (
+          <button key={label} type="button" className="row" disabled>
+            <RowIcon name="layers" />
+            <span className="row-name">{label}</span>
+            <span className="badge">即將推出</span>
+          </button>
+        ))}
         <button
           type="button"
-          className="row"
+          className="row danger-row"
           disabled={busy}
           onClick={() => {
             setError(false);
             setView("confirm");
           }}
         >
-          刪除我的所有資料
+          <RowIcon name="trash" />
+          <span className="row-name">刪除我的所有資料</span>
         </button>
-        {SOON.map((label) => (
-          <button key={label} type="button" className="row" disabled>
-            <span>{label}</span>
-            <span className="badge">即將推出</span>
-          </button>
-        ))}
         {error && (
           <p className="error-text" role="alert">
             {FAILED}
@@ -140,12 +153,24 @@ export function Settings({ today, onClose }: SettingsProps) {
       <section className="card list">
         <h2>關於</h2>
         <a className="row" href="/terms.html">
-          服務條款
+          <RowIcon name="file" />
+          <span className="row-name">服務條款</span>
+          <Icon name="chevronRight" className="row-chevron" />
         </a>
         <a className="row" href="/privacy.html">
-          隱私權政策
+          <RowIcon name="shield" />
+          <span className="row-name">隱私權政策</span>
+          <Icon name="chevronRight" className="row-chevron" />
         </a>
       </section>
     </main>
+  );
+}
+
+function RowIcon({ name }: { name: IconName }) {
+  return (
+    <span className="row-icon">
+      <Icon name={name} size={18} />
+    </span>
   );
 }

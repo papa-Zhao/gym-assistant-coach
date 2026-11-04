@@ -33,3 +33,10 @@ export function shortDate(date: string): string {
   const [, m = "0", d = "0"] = date.split("-");
   return `${Number(m)}/${Number(d)}`;
 }
+
+/** "down"/"up" for a signed change from `formatChange`, otherwise null. */
+export function trendOf(change: string): "down" | "up" | null {
+  if (change.startsWith("−")) return "down";
+  if (change.startsWith("+")) return "up";
+  return null;
+}

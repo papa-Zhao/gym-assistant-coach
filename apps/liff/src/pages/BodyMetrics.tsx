@@ -13,9 +13,15 @@ import {
   apiFetch,
   failureMessage,
 } from "../api";
-import { formatChange, seriesFor, shortDate } from "../bodyMetricsView";
+import {
+  formatChange,
+  seriesFor,
+  shortDate,
+  trendOf,
+} from "../bodyMetricsView";
 import { TrendChart } from "../components/TrendChart";
 import { Skeleton } from "../components/Skeleton";
+import { Icon } from "../components/Icon";
 
 const RANGES = [7, 30, 90] as const;
 const KEYS: readonly MetricKey[] = ["weightKg", "bodyFatPct", "waistCm"];
@@ -119,7 +125,7 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
   const change = formatChange(series);
 
   return (
-    <main>
+    <main className="body-page">
       <p className="step">我的紀錄</p>
       <h1>身體數據</h1>
       <div className="seg" role="group" aria-label="時間範圍">
@@ -141,17 +147,26 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
         </section>
       ) : (
         <>
-          <section className="card stack">
-            <h2>{label}</h2>
+          <section className="card stack body-main">
+            <div className="card-head">
+              <span className="card-icon">
+                <Icon name="scale" />
+              </span>
+              <h2>{label}</h2>
+            </div>
             <div>
-              <span className="metric-value">
+              <span className="metric-value num">
                 {latest ? latest.value : "—"}
               </span>
               {latest && <span className="metric-unit">{unit}</span>}
             </div>
             {latest && first ? (
               <>
-                <p className="change">
+                <p
+                  className={
+                    trendOf(change) ? `change ${trendOf(change)}` : "change"
+                  }
+                >
                   {days} 天內 {change}
                   {change !== "—" && ` ${unit}`}
                 </p>
@@ -202,8 +217,10 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
                   onClick={() => setMetric(k)}
                 >
                   <span className="muted">{meta.label}</span>
-                  <strong>{v ? `${v.value} ${meta.unit}` : "—"}</strong>
-                  <span className="change">{formatChange(s)}</span>
+                  <strong className="num">
+                    {v ? `${v.value} ${meta.unit}` : "—"}
+                  </strong>
+                  <span className="tile-change">{formatChange(s)}</span>
                 </button>
               );
             })}
@@ -211,7 +228,7 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
         </>
       )}
 
-      <p className="muted">在聊天室輸入「體重 72.4」就能快速記錄。</p>
+      <p className="muted body-tip">在聊天室輸入「體重 72.4」就能快速記錄。</p>
 
       {formOpen ? (
         <form
@@ -255,7 +272,11 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
           </button>
         </form>
       ) : (
-        <button type="button" onClick={() => setFormOpen(true)}>
+        <button
+          type="button"
+          className="block"
+          onClick={() => setFormOpen(true)}
+        >
           記錄今天的數據
         </button>
       )}
