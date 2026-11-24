@@ -12,7 +12,11 @@ import { ActiveWorkout } from "./ActiveWorkout";
 import { ConfirmRow } from "./ConfirmRow";
 import { FinishSummary } from "./FinishSummary";
 import { isAuthExpired } from "./fields";
+import { Icon } from "../../components/Icon";
 import { Skeleton } from "../../components/Skeleton";
+
+/** Muscle groups shown before "看全部". */
+const TOP_MUSCLES = 3;
 
 interface WorkoutHomeProps {
   /** Called when the session cannot be recovered or loading failed. */
@@ -114,6 +118,7 @@ function Home({ data, onData, onStarted, onFatal }: HomeProps) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const { week, templates } = data;
 
   const guard = async (action: () => Promise<void>, fallback: string) => {
@@ -146,82 +151,147 @@ function Home({ data, onData, onStarted, onFatal }: HomeProps) {
       onData({ ...data, templates: templates.filter((t) => t.id !== id) });
     }, "刪除失敗，請再試一次。");
 
-  const muscles = MUSCLE_GROUPS.filter((m) => week.setsByMuscle[m] > 0);
+  const muscles = MUSCLE_GROUPS.filter((m) => week.setsByMuscle[m] > 0).sort(
+    (a, b) => week.setsByMuscle[b] - week.setsByMuscle[a],
+  );
   const maxSets = Math.max(1, ...muscles.map((m) => week.setsByMuscle[m]));
+  const shown = showAll ? muscles : muscles.slice(0, TOP_MUSCLES);
 
   return (
-    <main>
+    <main className="workout-home">
       <h1>記訓練</h1>
-      <section className="card stack">
-        <h2>本週訓練 {week.sessions} 次</h2>
-        {muscles.length === 0 && week.cardioMinutes === 0 && (
-          <p className="muted">本週還沒有紀錄</p>
-        )}
-        {muscles.map((m) => (
-          <div className="bar-row" key={m}>
-            <span>{MUSCLE_GROUP_LABELS[m]}</span>
-            <span className="bar-track">
-              <span
-                className="bar-fill"
-                style={{ width: `${(week.setsByMuscle[m] / maxSets) * 100}%` }}
-              />
+      <section className="card">
+        <div className="card-head">
+          <span className="card-icon">
+            <Icon name="dumbbell" />
+          </span>
+          <h2>本週</h2>
+        </div>
+        <div className="stat-pair">
+          <p className="stat">
+            <span className="stat-label">訓練</span>
+            <span className="stat-value num">
+              {week.sessions}
+              <small>次</small>
             </span>
-            <span className="muted">{week.setsByMuscle[m]} 組</span>
-          </div>
-        ))}
-        {week.cardioMinutes > 0 && <p>有氧 {week.cardioMinutes} 分鐘</p>}
-      </section>
-      <section className="card stack">
-        <h2>我的範本</h2>
-        {templates.length === 0 && <p className="muted">還沒有範本</p>}
-        {templates.map((t) => (
-          <div className="template-row" key={t.id}>
-            <strong>{t.name}</strong>
-            {confirmId === t.id ? (
-              <ConfirmRow
-                label="確認刪除範本"
-                message={`確定刪除「${t.name}」？`}
-                confirmLabel="確定"
-                busy={busy}
-                onConfirm={() => void remove(t.id)}
-                onCancel={() => setConfirmId(null)}
-              />
-            ) : (
-              <div className="editor-actions">
-                <button
-                  type="button"
-                  aria-label={`開始 ${t.name}`}
-                  disabled={busy}
-                  onClick={() => void start(t.id)}
-                >
-                  開始
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  aria-label={`刪除 ${t.name}`}
-                  onClick={() => setConfirmId(t.id)}
-                >
-                  刪除
-                </button>
+          </p>
+          <p className="stat">
+            <span className="stat-label">有氧</span>
+            <span className="stat-value num">
+              {week.cardioMinutes}
+              <small>分鐘</small>
+            </span>
+          </p>
+        </div>
+        {muscles.length > 0 && (
+          <div className="muscle-bars">
+            {shown.map((m) => (
+              <div className="bar-row" key={m}>
+                <span>{MUSCLE_GROUP_LABELS[m]}</span>
+                <span className="bar-track" aria-hidden="true">
+                  <span
+                    className="bar-fill"
+                    style={{
+                      width: `${(week.setsByMuscle[m] / maxSets) * 100}%`,
+                    }}
+                  />
+                </span>
+                <span className="muted num">{week.setsByMuscle[m]} 組</span>
               </div>
+            ))}
+            {muscles.length > TOP_MUSCLES && (
+              <button
+                type="button"
+                className="text-button more-button"
+                aria-expanded={showAll}
+                onClick={() => setShowAll((v) => !v)}
+              >
+                {showAll ? "收合" : `看全部 ${muscles.length} 個部位`}
+              </button>
             )}
           </div>
-        ))}
+        )}
+        <div className="card-links">
+          <a className="pill-link" href="/records/workouts">
+            看訓練紀錄
+            <Icon name="chevronRight" size={18} />
+          </a>
+        </div>
       </section>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        className="start-button"
-        disabled={busy}
-        onClick={() => void start()}
-      >
-        開始訓練
-      </button>
+      <section className="card">
+        <div className="card-head">
+          <span className="card-icon">
+            <Icon name="layers" />
+          </span>
+          <h2>我的範本</h2>
+        </div>
+        {templates.length === 0 ? (
+          <p className="muted">
+            還沒有範本。訓練結束時可以把這次的動作存成範本。
+          </p>
+        ) : (
+          <div className="list template-list">
+            {templates.map((t) =>
+              confirmId === t.id ? (
+                <div className="template-row confirming" key={t.id}>
+                  <ConfirmRow
+                    label="確認刪除範本"
+                    message={`確定刪除「${t.name}」？`}
+                    confirmLabel="確定"
+                    busy={busy}
+                    onConfirm={() => void remove(t.id)}
+                    onCancel={() => setConfirmId(null)}
+                  />
+                </div>
+              ) : (
+                <div className="template-row" key={t.id}>
+                  <button
+                    type="button"
+                    className="row template-start"
+                    aria-label={`開始 ${t.name}`}
+                    disabled={busy}
+                    onClick={() => void start(t.id)}
+                  >
+                    <span className="row-name">
+                      <strong>{t.name}</strong>
+                      <span className="muted">{t.items.length} 個動作</span>
+                    </span>
+                    <span className="template-go">
+                      開始
+                      <Icon name="chevronRight" size={16} />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`刪除 ${t.name}`}
+                    disabled={busy}
+                    onClick={() => setConfirmId(t.id)}
+                  >
+                    <Icon name="trash" size={20} />
+                  </button>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </section>
+      <div className="bottom-bar">
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          className="start-button"
+          disabled={busy}
+          onClick={() => void start()}
+        >
+          <Icon name="plus" size={20} />
+          開始訓練
+        </button>
+      </div>
     </main>
   );
 }

@@ -706,5 +706,44 @@ button.block { width: 100%; }
 .macro.protein { border-top-color: var(--color-primary); }
 .macro.carb { border-top-color: var(--color-accent); }
 .macro.fat { border-top-color: var(--color-text-muted); }
+
+/* Workout home */
+.workout-home { padding-bottom: calc(${minTouchTarget}px + var(--space-8) + env(safe-area-inset-bottom)); }
+.workout-home > .card + .card { margin-top: var(--space-4); }
+.workout-home .bottom-bar { flex-direction: column; gap: var(--space-2); }
+.workout-home .bottom-bar .error-text { margin: 0; text-align: center; }
+.workout-home .start-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); margin-top: 0; }
+.muscle-bars { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.muscle-bars .bar-row { min-height: 28px; }
+button.more-button { align-self: flex-start; min-height: ${minTouchTarget}px; padding: 0; font-weight: 700; }
+.template-list { padding: 0; }
+.template-row { flex-direction: row; align-items: center; gap: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.template-row:last-child { border-bottom: 0; }
+.template-row.confirming { padding: var(--space-3) 0; }
+.template-row.confirming .confirm-row { flex: 1; }
+.list .template-row .row { border-bottom: 0; }
+.template-row .row-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.template-row .row-name .muted { font-size: var(--font-size-caption); }
+.template-go { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: var(--color-primary); font-weight: 700; }
+.template-row .icon-btn { flex-shrink: 0; }
+
+/* Back link to the parent page */
+a.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: ${minTouchTarget}px;
+  margin: calc(var(--space-3) * -1) 0 0 calc(var(--space-1) * -1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  text-decoration: none;
+}
+a.back-link + h1 { margin-top: 0; }
+
+/* Body metric side tiles */
+.tile-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.tile-head .icon { color: var(--color-text-muted); }
+.tile-empty { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-primary); font-weight: 700; }
 `;
 }

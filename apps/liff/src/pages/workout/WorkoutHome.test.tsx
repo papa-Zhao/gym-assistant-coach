@@ -47,12 +47,20 @@ describe("WorkoutHome", () => {
     expect(
       await screen.findByRole("heading", { name: "記訓練" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("本週訓練 3 次")).toBeInTheDocument();
+    expect(screen.getByText("訓練").nextElementSibling).toHaveTextContent(
+      "3次",
+    );
+    expect(screen.getByText("有氧").nextElementSibling).toHaveTextContent(
+      "40分鐘",
+    );
     expect(screen.getByText("胸")).toBeInTheDocument();
     expect(screen.getByText("9 組")).toBeInTheDocument();
     expect(screen.queryByText("肩")).not.toBeInTheDocument();
-    expect(screen.getByText("有氧 40 分鐘")).toBeInTheDocument();
     expect(screen.getByText("推日")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /看訓練紀錄/ })).toHaveAttribute(
+      "href",
+      "/records/workouts",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "開始訓練" }));
     expect(await screen.findByText("訓練進行中")).toBeInTheDocument();
@@ -61,6 +69,28 @@ describe("WorkoutHome", () => {
       path: "/workouts",
       body: {},
     });
+  });
+
+  it("shows the top 3 muscle groups until expanded", async () => {
+    fakeApi(({ path }) => {
+      if (path === "/workouts/active") return null;
+      if (path === "/workouts/week")
+        return {
+          ...WEEK,
+          setsByMuscle: { ...WEEK.setsByMuscle, shoulders: 3, core: 1 },
+        };
+      if (path === "/templates") return [];
+    });
+    render_();
+    expect(await screen.findByText("胸")).toBeInTheDocument();
+    expect(screen.getByText("肩")).toBeInTheDocument();
+    expect(screen.queryByText("核心")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "看全部 4 個部位" }));
+    expect(screen.getByText("核心")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收合" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("discarding the active workout returns to home", async () => {

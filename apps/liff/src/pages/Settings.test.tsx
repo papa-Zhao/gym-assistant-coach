@@ -36,11 +36,11 @@ describe("Settings", () => {
   const renderSettings = () =>
     render(<Settings today={TODAY} onClose={onClose} />);
 
-  it("links profile and targets to the profile page", () => {
+  it("links profile to step 1 and targets to the profile page", () => {
     renderSettings();
     expect(screen.getByRole("link", { name: /個人檔案/ })).toHaveAttribute(
       "href",
-      "/profile",
+      "/profile?step=1",
     );
     expect(screen.getByRole("link", { name: /每日目標/ })).toHaveAttribute(
       "href",
@@ -60,11 +60,13 @@ describe("Settings", () => {
     );
   });
 
-  it("only templates are still coming soon", () => {
+  it("links templates to the workout page; nothing is coming soon", () => {
     renderSettings();
-    const soon = screen.getByRole("button", { name: /訓練範本/ });
-    expect(soon).toBeDisabled();
-    expect(soon).toHaveTextContent("即將推出");
+    expect(screen.getByRole("link", { name: /訓練範本/ })).toHaveAttribute(
+      "href",
+      "/workout",
+    );
+    expect(screen.queryByText("即將推出")).not.toBeInTheDocument();
     for (const name of ["匯出我的資料", "刪除我的所有資料"]) {
       const item = screen.getByRole("button", { name });
       expect(item).toBeEnabled();

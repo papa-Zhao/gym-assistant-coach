@@ -152,6 +152,19 @@ describe("Profile", () => {
     expect(screen.getByText(String(cut.kcal))).toBeInTheDocument();
   });
 
+  it("existing profile opens on step 1 when asked", async () => {
+    current = responseFor(INPUT);
+    render(
+      <Profile
+        today={TODAY}
+        initialStep={1}
+        onClose={onClose}
+        onFatal={onFatal}
+      />,
+    );
+    expect(await screen.findByText("步驟 1／2")).toBeInTheDocument();
+  });
+
   it("override below floor shows warning and still saves", async () => {
     current = responseFor(INPUT);
     renderProfile();

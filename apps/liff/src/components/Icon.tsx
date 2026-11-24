@@ -37,6 +37,7 @@ const PATHS = {
   flame: (
     <path d="M12 3c.5 3 3 4.5 4.5 6.5A6.5 6.5 0 1 1 6 12c0-1.8.8-3.2 2-4.2.2 1.7 1 2.7 2 3.2C9.5 8 10.5 5 12 3z" />
   ),
+  chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
   plus: (
     <>

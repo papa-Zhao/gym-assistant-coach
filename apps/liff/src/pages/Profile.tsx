@@ -135,12 +135,19 @@ function parseManual(m: ManualForm): {
 
 interface ProfileProps {
   today: string;
+  /** Step to open on when a profile exists: 1 edits basic data, 2 the targets. */
+  initialStep?: 1 | 2;
   onClose: () => void;
   /** Called when the session cannot be recovered or loading failed. */
   onFatal: (err?: unknown) => void;
 }
 
-export function Profile({ today, onClose, onFatal }: ProfileProps) {
+export function Profile({
+  today,
+  initialStep = 2,
+  onClose,
+  onFatal,
+}: ProfileProps) {
   const [step, setStep] = useState<Step>("loading");
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [errors, setErrors] = useState<string[]>([]);
@@ -169,7 +176,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
           setHasProfile(true);
           setKeepOverride(targetsOverridden && res.targets !== null);
           setSavedTargets(res.targets);
-          setStep(2);
+          setStep(initialStep);
         } else {
           setStep(1);
         }
@@ -180,7 +187,7 @@ export function Profile({ today, onClose, onFatal }: ProfileProps) {
     return () => {
       live = false;
     };
-  }, [onFatal]);
+  }, [initialStep, onFatal]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) =>
     setForm((f) => ({ ...f, [key]: value }));

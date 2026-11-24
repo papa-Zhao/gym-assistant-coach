@@ -17,8 +17,7 @@ interface MealsCardProps {
   onFatal: (err?: unknown) => void;
 }
 
-const ROW_TYPES: readonly MealType[] = ["breakfast", "lunch", "dinner"];
-const ORDER: readonly MealType[] = [...ROW_TYPES, "snack"];
+const ORDER: readonly MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 /** Up to two item names joined with ＋, then 等 when there are more. */
 export function mealSummary(meal: Meal): string {
@@ -72,7 +71,7 @@ export function MealsCard({ onFatal }: MealsCardProps) {
     (type): { type: MealType; meal: Meal | null }[] => {
       const logged = day.meals.filter((m) => m.mealType === type);
       if (logged.length > 0) return logged.map((meal) => ({ type, meal }));
-      return ROW_TYPES.includes(type) ? [{ type, meal: null }] : [];
+      return [{ type, meal: null }];
     },
   );
   const eaten = day.consumed.kcal;
@@ -169,7 +168,9 @@ export function MealsCard({ onFatal }: MealsCardProps) {
           ) : (
             <a key={type} className="row meal-row" href={`/meal?type=${type}`}>
               <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
-              <span className="row-name muted">還沒記錄</span>
+              <span className="row-name muted">
+                {type === "snack" ? "有吃再記" : "還沒記錄"}
+              </span>
               <span className="meal-add">＋ 記錄</span>
             </a>
           ),

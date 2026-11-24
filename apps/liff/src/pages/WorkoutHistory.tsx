@@ -128,6 +128,10 @@ export function WorkoutHistory({ onFatal }: WorkoutHistoryProps) {
 
   return (
     <main className="history">
+      <a className="back-link" href="/records">
+        <Icon name="chevronLeft" size={18} />
+        我的紀錄
+      </a>
       <h1>訓練紀錄</h1>
       {entries === null ? (
         <Skeleton layout="rows" />

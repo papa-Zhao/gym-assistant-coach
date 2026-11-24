@@ -39,7 +39,16 @@ export function App({
     case "ready":
       switch (route(pathname)) {
         case "profile":
-          return <Profile today={today} onClose={onClose} onFatal={onFatal} />;
+          return (
+            <Profile
+              today={today}
+              initialStep={
+                new URLSearchParams(search).get("step") === "1" ? 1 : 2
+              }
+              onClose={onClose}
+              onFatal={onFatal}
+            />
+          );
         case "settings":
           return <Settings today={today} onClose={onClose} />;
         case "records":
