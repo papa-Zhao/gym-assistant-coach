@@ -1,4 +1,4 @@
-export const PHOTO_MAX_SIDE = 1024;
+const PHOTO_MAX_SIDE = 1024;
 
 /** Scales (w, h) to fit within max on the long side; never enlarges; integer results >= 1. */
 export function fitWithin(

@@ -10,13 +10,13 @@ import { withAiUse } from "../ai/usage";
 import type { Db } from "../users/repo";
 import { createDraftMeal, type DraftItem } from "./repo";
 
-export type AiMealOutcome =
+type AiMealOutcome =
   | { kind: "draft"; meal: Meal }
   | { kind: "limit" }
   | { kind: "not_food" }
   | { kind: "refused" }
   | { kind: "unavailable" };
-export type TextMealOutcome = AiMealOutcome;
+type TextMealOutcome = AiMealOutcome;
 
 const MAX_NAME_CHARS = 30;
 // Columns are numeric(6,1) and integer; anything larger cannot be stored.

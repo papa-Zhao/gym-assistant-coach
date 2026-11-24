@@ -5,7 +5,7 @@ import { extractBearer } from "./http.js";
 
 export const RATE_LIMIT_USER_MAX = 120;
 export const RATE_LIMIT_IP_MAX = 30;
-export const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 // Health checks, the bot (limited per LINE user on its side) and Cloud
 // Scheduler jobs are never limited here.

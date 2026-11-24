@@ -15,7 +15,7 @@ export interface LiffLike {
   closeWindow(): void;
 }
 
-export interface LoginDeps {
+interface LoginDeps {
   liff: LiffLike;
   liffId: string | undefined;
   apiUrl: string | undefined;

@@ -1,4 +1,4 @@
-export type Route =
+type Route =
   "profile" | "settings" | "records" | "body" | "workouts" | "workout" | "meal";
 
 const ROUTES: readonly Route[] = [

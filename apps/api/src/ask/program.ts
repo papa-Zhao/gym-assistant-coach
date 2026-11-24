@@ -5,7 +5,7 @@ import { MAX_TEMPLATE_NAME } from "../workouts/repo";
 export const PROGRAM_MAX_DAYS = 7;
 export const PROGRAM_MAX_EXERCISES = 10;
 
-export interface ShapedProgramDay {
+interface ShapedProgramDay {
   name: string;
   items: { exerciseId: string; nameZh: string; sets: number; reps: number }[];
 }

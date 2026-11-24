@@ -7,7 +7,7 @@ import { WORKOUT_ADVICE_SYSTEM } from "./prompts";
 import { callStructured } from "./structured-call";
 import type { AiTokenUsage } from "./usage";
 
-export interface RawWorkoutAdvice {
+interface RawWorkoutAdvice {
   title: string;
   points: string[];
 }
@@ -42,7 +42,7 @@ const clipWithEllipsis = (s: string, max: number) => {
 };
 
 /** Over-long fields are cut; a blank title or no usable point is invalid. */
-export function parseWorkoutAdvice(data: unknown): RawWorkoutAdvice | null {
+function parseWorkoutAdvice(data: unknown): RawWorkoutAdvice | null {
   if (typeof data !== "object" || data === null) return null;
   const { title, points } = data as Record<string, unknown>;
   if (typeof title !== "string" || !Array.isArray(points)) return null;

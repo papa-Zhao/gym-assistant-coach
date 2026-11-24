@@ -182,7 +182,6 @@ button.tile[aria-pressed="true"] {
 button.tile strong { font-size: var(--font-size-heading); }
 .tile.back { margin-top: var(--space-3); }
 a.card.link { display: block; color: inherit; text-decoration: none; }
-.card.soon { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; min-height: ${minTouchTarget}px; font-weight: 400; color: var(--color-text); text-align: left; }
 .card + a.card, a.card + .card, .tiles + .card, .card + p.muted, p.muted + .card { margin-top: var(--space-4); }
 .workout { padding-bottom: calc(${minTouchTarget}px * 2 + var(--space-8) + env(safe-area-inset-bottom)); }
 .workout-head { display: flex; align-items: baseline; justify-content: space-between; }

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Storage } from "@google-cloud/storage";
 
 /** Deadline for each GCS put/delete, so a slow bucket cannot outlast the bot's 30 s timeout. */
-export const PHOTO_STORE_TIMEOUT_MS = 5_000;
+const PHOTO_STORE_TIMEOUT_MS = 5_000;
 
 /**
  * Rejects after `ms` even if `run` never settles. The timer is cleared as soon

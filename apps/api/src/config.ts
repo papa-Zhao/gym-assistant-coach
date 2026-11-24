@@ -1,4 +1,4 @@
-export interface Config {
+interface Config {
   port: number;
   databaseUrl: string;
   sessionSecret: Uint8Array;
