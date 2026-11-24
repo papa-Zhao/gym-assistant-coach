@@ -307,7 +307,7 @@ button.text-button { background: transparent; color: var(--color-primary); }
 .picker-list { margin-top: var(--space-4); }
 .template-row { display: flex; flex-direction: column; gap: var(--space-2); }
 .bar-row { display: grid; grid-template-columns: 4em 1fr auto; gap: var(--space-2); align-items: center; }
-.bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--color-surface-alt); }
+.bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--color-surface-alt); box-shadow: inset 0 0 0 1px var(--color-border-strong); }
 .bar-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--color-accent); }
 .picker-chips { margin-top: var(--space-3); }
 .picker-actions { margin-top: var(--space-4); }
@@ -444,7 +444,7 @@ a.card.link:active { transform: scale(0.99); }
   justify-content: center;
   gap: var(--space-1);
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   color: var(--color-text);
   font-weight: 700;
@@ -580,7 +580,7 @@ button.discard-button {
 .cardio { display: flex; flex-direction: column; gap: var(--space-2); }
 button.add-set {
   min-height: ${minTouchTarget}px;
-  border: 1.5px dashed var(--color-border);
+  border: 1.5px dashed var(--color-border-strong);
   background: transparent;
   color: var(--color-primary);
 }
