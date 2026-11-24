@@ -1,5 +1,5 @@
 import type { Meal } from "@gac/shared";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi } from "../workout/testHelpers";
 import { MealsCard, mealSummary } from "./MealsCard";
@@ -50,9 +50,9 @@ describe("MealsCard", () => {
         : { profile: null, targets: null },
     );
     render(<MealsCard onFatal={vi.fn()} />);
-    expect(await screen.findByRole("link", { name: /午餐/ })).toHaveTextContent(
-      "234 kcal 草稿",
-    );
+    const row = await screen.findByRole("link", { name: /午餐/ });
+    expect(row).toHaveTextContent("234 kcal");
+    expect(within(row).getByText("草稿")).toHaveClass("badge");
   });
 
   it("orders rows breakfast, lunch, dinner, snack with empty rows in place", async () => {

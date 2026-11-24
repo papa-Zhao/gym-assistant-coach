@@ -159,9 +159,10 @@ export function MealsCard({ onFatal }: MealsCardProps) {
               <span className="meal-type">{MEAL_TYPE_LABELS[type]}</span>
               <span className="row-name">{mealSummary(meal)}</span>
               <span className="meal-row-kcal">
-                <span className="num">
-                  {meal.total.kcal} kcal{meal.status === "draft" ? " 草稿" : ""}
-                </span>
+                {meal.status === "draft" && (
+                  <span className="badge draft-badge">草稿</span>
+                )}
+                <span className="num">{meal.total.kcal} kcal</span>
                 <Icon name="chevronRight" size={16} />
               </span>
             </a>

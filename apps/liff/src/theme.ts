@@ -745,5 +745,13 @@ a.back-link + h1 { margin-top: 0; }
 .tile-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .tile-head .icon { color: var(--color-text-muted); }
 .tile-empty { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-primary); font-weight: 700; }
+
+/* Active workout polish */
+.set-row.done .empty { opacity: 0.5; }
+.rest-auto { color: var(--color-text-muted); font-size: var(--font-size-caption); text-align: center; }
+.discard-zone { display: flex; flex-direction: column; align-items: center; margin-top: var(--space-8); }
+.discard-zone .confirm-row { align-self: stretch; }
+.discard-zone button.discard-button { min-height: ${minTouchTarget}px; margin: 0; }
+.draft-badge { margin-right: var(--space-1); }
 `;
 }

@@ -245,25 +245,6 @@ export function ActiveWorkout({
         <h1>{session.templateName ?? "訓練進行中"}</h1>
         <Elapsed startedAt={session.startedAt} />
       </header>
-      {discarding ? (
-        <ConfirmRow
-          label="確認放棄訓練"
-          message="放棄後，這次的紀錄都會刪除。"
-          confirmLabel="確定放棄"
-          busy={busy}
-          onConfirm={() => void discard()}
-          onCancel={() => setDiscarding(false)}
-        />
-      ) : (
-        <button
-          type="button"
-          className="text-button discard-button"
-          disabled={busy}
-          onClick={() => setDiscarding(true)}
-        >
-          放棄這次訓練
-        </button>
-      )}
       {session.items.length === 0 && (
         <p className="muted">還沒有動作，按下方「＋ 加動作」開始。</p>
       )}
@@ -291,6 +272,27 @@ export function ActiveWorkout({
           {error}
         </p>
       )}
+      <div className="discard-zone">
+        {discarding ? (
+          <ConfirmRow
+            label="確認放棄訓練"
+            message="放棄後，這次的紀錄都會刪除。"
+            confirmLabel="確定放棄"
+            busy={busy}
+            onConfirm={() => void discard()}
+            onCancel={() => setDiscarding(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            className="text-button discard-button"
+            disabled={busy}
+            onClick={() => setDiscarding(true)}
+          >
+            放棄這次訓練
+          </button>
+        )}
+      </div>
       <div className="bottom-bar">
         {confirming ? (
           <ConfirmRow
@@ -305,16 +307,19 @@ export function ActiveWorkout({
           <>
             <button
               type="button"
-              className="secondary outline"
+              className="secondary"
+              onClick={() => setConfirming(true)}
+            >
+              結束訓練
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setNotice(null);
                 setPicking(true);
               }}
             >
               ＋ 加動作
-            </button>
-            <button type="button" onClick={() => setConfirming(true)}>
-              結束訓練
             </button>
           </>
         )}
@@ -396,7 +401,9 @@ function ExerciseCard({
       {hint && (
         <p className="explain hint">
           <Icon name="sparkles" size={18} />
-          上次每組都做到了，今天試試 {hint.suggestWeightKg} kg？
+          {"sets" in item && item.sets.length === 0
+            ? `上次每組都做到了，已幫你填好 ${hint.suggestWeightKg} kg。`
+            : `上次每組都做到了，建議今天用 ${hint.suggestWeightKg} kg。`}
         </p>
       )}
       {isCardio(item) ? (
@@ -527,8 +534,16 @@ function StrengthSection({
             </span>
             <span role="cell">{s.weightKg}</span>
             <span role="cell">{s.reps}</span>
-            <span role="cell">{s.rpe ?? "—"}</span>
-            <span role="cell">
+            <span
+              role="cell"
+              className={s.rpe === undefined ? "empty" : undefined}
+            >
+              {s.rpe ?? "—"}
+            </span>
+            <span
+              role="cell"
+              className={s.restSec === undefined ? "empty" : undefined}
+            >
               {s.restSec === undefined ? "—" : formatRest(s.restSec)}
             </span>
             <button
@@ -642,13 +657,15 @@ function SetEditor({
         {input("weight", "重量", { primary: true, step: "0.1" })}
         {input("reps", "次數", { step: "1" })}
         {input("rpe", "RPE", { step: "0.5" })}
-        <span />
+        <span className="rest-auto">自動</span>
         <span />
       </div>
       <Err message={errors.weight} />
       <Err message={errors.reps} />
       <Err message={errors.rpe} />
-      <p className="muted set-hint">1 很輕鬆 – 10 力竭</p>
+      <p className="muted set-hint">
+        RPE 選填：1 很輕鬆 – 10 力竭。休息時間會自動記錄。
+      </p>
       <div className="editor-actions">
         <button type="submit" disabled={busy}>
           {submitLabel}
