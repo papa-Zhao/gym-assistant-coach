@@ -47,7 +47,7 @@ legend { padding: 0; margin-bottom: var(--space-2); font-weight: 700; }
   min-height: ${minTouchTarget}px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   cursor: pointer;
@@ -60,11 +60,12 @@ legend { padding: 0; margin-bottom: var(--space-2); font-weight: 700; }
 .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .field { display: flex; flex-direction: column; gap: var(--space-2); font-weight: 700; }
+::placeholder { color: var(--color-text-muted); opacity: 1; }
 .field input, .field select {
   min-height: ${minTouchTarget}px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
@@ -181,7 +182,6 @@ button.tile[aria-pressed="true"] {
 button.tile strong { font-size: var(--font-size-heading); }
 .tile.back { margin-top: var(--space-3); }
 a.card.link { display: block; color: inherit; text-decoration: none; }
-.card.soon { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; min-height: ${minTouchTarget}px; font-weight: 400; color: var(--color-text); text-align: left; }
 .card + a.card, a.card + .card, .tiles + .card, .card + p.muted, p.muted + .card { margin-top: var(--space-4); }
 .workout { padding-bottom: calc(${minTouchTarget}px * 2 + var(--space-8) + env(safe-area-inset-bottom)); }
 .workout-head { display: flex; align-items: baseline; justify-content: space-between; }
@@ -204,7 +204,7 @@ a.card.link { display: block; color: inherit; text-decoration: none; }
   width: 100%;
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-1);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
@@ -330,7 +330,7 @@ button.chip { color: var(--color-text); font-weight: 400; }
   min-width: 0;
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
@@ -603,7 +603,7 @@ button.add-set {
 .meal-item-controls {
   gap: 0;
   padding: 2px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-bg);
 }
@@ -656,7 +656,7 @@ button.danger-text { color: var(--color-danger); }
 .danger-row .row-icon { color: var(--color-danger); }
 .settings > .card + .card { margin-top: var(--space-4); }
 button.danger { background: var(--color-danger); color: var(--color-on-primary); }
-button.secondary.quiet { border-color: var(--color-border); color: var(--color-text); }
+button.secondary.quiet { border-color: var(--color-border-strong); color: var(--color-text); }
 button.block { width: 100%; }
 
 /* Body metrics */
@@ -695,7 +695,7 @@ button.block { width: 100%; }
   width: 18px;
   height: 18px;
   box-sizing: border-box;
-  border: 2px solid var(--color-border);
+  border: 2px solid var(--color-border-strong);
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -706,5 +706,52 @@ button.block { width: 100%; }
 .macro.protein { border-top-color: var(--color-primary); }
 .macro.carb { border-top-color: var(--color-accent); }
 .macro.fat { border-top-color: var(--color-text-muted); }
+
+/* Workout home */
+.workout-home { padding-bottom: calc(${minTouchTarget}px + var(--space-8) + env(safe-area-inset-bottom)); }
+.workout-home > .card + .card { margin-top: var(--space-4); }
+.workout-home .bottom-bar { flex-direction: column; gap: var(--space-2); }
+.workout-home .bottom-bar .error-text { margin: 0; text-align: center; }
+.workout-home .start-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); margin-top: 0; }
+.muscle-bars { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.muscle-bars .bar-row { min-height: 28px; }
+button.more-button { align-self: flex-start; min-height: ${minTouchTarget}px; padding: 0; font-weight: 700; }
+.template-list { padding: 0; }
+.template-row { flex-direction: row; align-items: center; gap: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.template-row:last-child { border-bottom: 0; }
+.template-row.confirming { padding: var(--space-3) 0; }
+.template-row.confirming .confirm-row { flex: 1; }
+.list .template-row .row { border-bottom: 0; }
+.template-row .row-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.template-row .row-name .muted { font-size: var(--font-size-caption); }
+.template-go { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: var(--color-primary); font-weight: 700; }
+.template-row .icon-btn { flex-shrink: 0; }
+
+/* Back link to the parent page */
+a.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: ${minTouchTarget}px;
+  margin: calc(var(--space-3) * -1) 0 0 calc(var(--space-1) * -1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  text-decoration: none;
+}
+a.back-link + h1 { margin-top: 0; }
+
+/* Body metric side tiles */
+.tile-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.tile-head .icon { color: var(--color-text-muted); }
+.tile-empty { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-primary); font-weight: 700; }
+
+/* Active workout polish */
+.set-row.done .empty { color: var(--color-text-muted); }
+.rest-auto { color: var(--color-text-muted); font-size: var(--font-size-caption); text-align: center; }
+.discard-zone { display: flex; flex-direction: column; align-items: center; margin-top: var(--space-8); }
+.discard-zone .confirm-row { align-self: stretch; }
+.discard-zone button.discard-button { min-height: ${minTouchTarget}px; margin: 0; }
+.draft-badge { margin-right: var(--space-1); }
 `;
 }

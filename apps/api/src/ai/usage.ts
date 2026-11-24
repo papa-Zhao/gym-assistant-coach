@@ -82,7 +82,7 @@ function rowKey(userId: string, kind: AiKind, day: string) {
   );
 }
 
-export type AiUseOutcome<T> =
+type AiUseOutcome<T> =
   { kind: "limit" } | { kind: "unavailable" } | { kind: "done"; result: T };
 
 /**

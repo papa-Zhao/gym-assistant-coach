@@ -1,5 +1,5 @@
 export const REST_KEY = "gac.restSec";
-export const REST_DEFAULT_SEC = 90;
+const REST_DEFAULT_SEC = 90;
 export const REST_MIN_SEC = 30;
 export const REST_MAX_SEC = 300;
 export const REST_STEP_SEC = 15;
@@ -29,7 +29,7 @@ export function setRestSec(n: number): void {
   }
 }
 
-export const REST_SOUND_KEY = "gac.restSound";
+const REST_SOUND_KEY = "gac.restSound";
 
 /** Whether the rest-end beep is on; true when storage is unusable. */
 export function getRestSound(): boolean {

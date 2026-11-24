@@ -31,8 +31,8 @@ export async function normalizePhoto(input: Buffer): Promise<Buffer> {
   }
 }
 
-export const THUMB_EDGE = 192;
-export const THUMB_MAX_BYTES = 32 * 1024;
+const THUMB_EDGE = 192;
+const THUMB_MAX_BYTES = 32 * 1024;
 const THUMB_QUALITY = 70;
 const THUMB_FALLBACK_QUALITY = 50;
 

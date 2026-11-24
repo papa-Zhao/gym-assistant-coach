@@ -3,8 +3,6 @@ import type { RawAdvice } from "../ai/advisor";
 import { programText } from "./program";
 import { lowKcalWarning, MEDICAL_NOTICE, needsMedicalNotice } from "./safety";
 
-export const DISCLAIMER = "AI 建議僅供參考，不能取代醫師或營養師的專業意見。";
-
 const MAX_TITLE = 30;
 const MAX_ITEMS = 3;
 const MAX_ITEM_TEXT = 40;

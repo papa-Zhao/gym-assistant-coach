@@ -6,7 +6,7 @@ interface Range {
   max: number;
 }
 
-export interface FieldSpec {
+interface FieldSpec {
   limits: Range;
   /** Whole numbers only. */
   integer?: boolean;
@@ -53,7 +53,7 @@ export const SPEC = {
 
 export type FieldName = keyof typeof SPEC;
 
-export type Parsed =
+type Parsed =
   { ok: true; value: number | undefined } | { ok: false; message: string };
 
 /** Parses one text input; empty is `undefined` when optional, an error when required. */

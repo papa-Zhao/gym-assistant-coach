@@ -6,7 +6,7 @@ import { workoutAdviceContext } from "./advice-context";
 import { WorkoutError, getSessionAdvice, saveSessionAdvice } from "./repo";
 
 /** Advice may be asked for this long after the session ended. */
-export const ADVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ADVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * AI advice for one finished session, cached on the session: a second call

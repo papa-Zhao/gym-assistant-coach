@@ -12,7 +12,7 @@ import {
 import { aiConversations, aiMessages, aiPrograms } from "../db/schema";
 import type { Db } from "../users/repo";
 
-export const ASK_HISTORY_MESSAGES = 10;
+const ASK_HISTORY_MESSAGES = 10;
 export const ASK_RETENTION_DAYS = 90;
 
 export interface ChatTurn {

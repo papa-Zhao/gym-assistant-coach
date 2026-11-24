@@ -25,7 +25,7 @@ const ROW =
   /^\s*\(((?:'(?:[^']|'')*'|null)(?:\s*,\s*(?:'(?:[^']|'')*'|null))*)\)/;
 const FIELD = /'((?:[^']|'')*)'|null/g;
 
-export function parseSeed(sql: string): Exercise[] {
+function parseSeed(sql: string): Exercise[] {
   const out: Exercise[] = [];
   for (const line of sql.split("\n")) {
     const row = ROW.exec(line);

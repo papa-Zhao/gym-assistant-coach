@@ -1,6 +1,6 @@
 import { getAccessToken, type AuthState } from "./auth";
 
-export interface ApiConfig {
+interface ApiConfig {
   apiUrl: string;
   /** Re-posts a fresh LIFF ID token; must update the in-memory session. */
   relogin: () => Promise<AuthState>;

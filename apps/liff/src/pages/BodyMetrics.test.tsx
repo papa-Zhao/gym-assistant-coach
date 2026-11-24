@@ -133,6 +133,15 @@ describe("BodyMetrics", () => {
     expect(calls.filter((c) => c.method === "GET")).toHaveLength(1);
   });
 
+  it("links back to the records page", async () => {
+    render(<BodyMetrics onFatal={onFatal} />);
+    await screen.findByText("72.4");
+    expect(screen.getByRole("link", { name: "我的紀錄" })).toHaveAttribute(
+      "href",
+      "/records",
+    );
+  });
+
   it("tapping body fat card switches chart label", async () => {
     render(<BodyMetrics onFatal={onFatal} />);
     await screen.findByText("72.4");

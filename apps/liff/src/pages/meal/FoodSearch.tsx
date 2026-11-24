@@ -13,7 +13,7 @@ interface FoodSearchProps {
 const DEBOUNCE_MS = 300;
 const MAX_QUERY = 40;
 
-export const FOOD_SOURCE_LINE =
+const FOOD_SOURCE_LINE =
   "資料來源：衛生福利部食品藥物管理署 食品營養成分資料庫";
 
 export function FoodSearch({ onPick, onFatal }: FoodSearchProps) {

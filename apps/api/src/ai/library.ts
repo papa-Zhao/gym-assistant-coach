@@ -4,7 +4,7 @@ import {
   type Exercise,
 } from "@gac/shared";
 
-export interface LibraryView {
+interface LibraryView {
   /** Changes whenever any prompt-visible field of the library changes. */
   key: string;
   slugs: string[];

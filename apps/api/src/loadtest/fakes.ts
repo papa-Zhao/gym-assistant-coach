@@ -10,7 +10,7 @@ export const LOADTEST_BOT_SA = "loadtest-bot@loadtest.invalid";
 /** No fake token ever verifies as this, so /jobs always rejects. */
 export const LOADTEST_SCHEDULER_SA = "loadtest-scheduler@loadtest.invalid";
 /** k6 (loadtest/api.js) signs in with `loadtest:<LINE user id>`. */
-export const FAKE_LINE_TOKEN_PREFIX = "loadtest:";
+const FAKE_LINE_TOKEN_PREFIX = "loadtest:";
 
 /** Fixed so the cost records have plausible numbers. */
 const FAKE_USAGE: AiTokenUsage = {

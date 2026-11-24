@@ -118,10 +118,10 @@ describe("ActiveWorkout", () => {
       screen.getByText("上次（10/13）：80 kg × 8、8、8"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("上次每組都做到了，今天試試 82.5 kg？"),
+      screen.getByText("上次每組都做到了，已幫你填好 82.5 kg。"),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/上次（/)).toHaveLength(1);
-    expect(screen.getAllByText(/今天試試/)).toHaveLength(1);
+    expect(screen.getAllByText(/上次每組都做到了/)).toHaveLength(1);
     // prefill falls back to the hint weight and target reps
     expect(screen.getAllByLabelText("第 1 組重量")[0]).toHaveValue("82.5");
     expect(screen.getAllByLabelText("第 1 組次數")[0]).toHaveValue("8");
@@ -367,12 +367,50 @@ describe("ActiveWorkout", () => {
     expect(screen.getByText("訓練 00:00")).toBeInTheDocument();
   });
 
+  it("hint says suggested weight once a set is done", () => {
+    setup(
+      session([
+        strengthItem({
+          hint: { suggestWeightKg: 82.5 },
+          sets: [
+            {
+              setIndex: 1,
+              weightKg: 82.5,
+              reps: 8,
+              completedAt: "2026-10-20T04:00:00.000Z",
+            },
+          ],
+        }),
+      ]),
+    );
+    expect(
+      screen.getByText("上次每組都做到了，建議今天用 82.5 kg。"),
+    ).toBeInTheDocument();
+  });
+
+  it("add exercise is the primary action; discard sits below the cards", () => {
+    setup(session([strengthItem()]));
+    const add = screen.getByRole("button", { name: "＋ 加動作" });
+    const finish = screen.getByRole("button", { name: "結束訓練" });
+    expect(add).not.toHaveClass("secondary");
+    expect(finish).toHaveClass("secondary");
+    expect(finish.nextElementSibling).toBe(add);
+    const discard = screen.getByRole("button", { name: "放棄這次訓練" });
+    const card = document.querySelector(".exercise-card")!;
+    expect(
+      card.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("RPE header has Chinese label and hint", () => {
     setup(session([strengthItem()]));
     expect(
       screen.getByRole("columnheader", { name: "RPE" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 很輕鬆 – 10 力竭")).toBeInTheDocument();
+    expect(
+      screen.getByText("RPE 選填：1 很輕鬆 – 10 力竭。休息時間會自動記錄。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("自動")).toBeInTheDocument();
   });
 
   it("set list shows rest column", () => {

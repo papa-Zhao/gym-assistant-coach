@@ -2,7 +2,7 @@
 // Cache figures are assumed multipliers of the input price (read 0.1x,
 // write 1.25x), not published rates. Estimate only.
 const INPUT_PRICE = 0.1;
-export const PRICE_PER_MTOK = {
+const PRICE_PER_MTOK = {
   input: INPUT_PRICE,
   output: 0.5,
   cacheRead: INPUT_PRICE * 0.1,

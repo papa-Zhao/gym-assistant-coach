@@ -44,6 +44,16 @@ describe("color tokens", () => {
       expect(contrast(fg, bg), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
     }
   });
+
+  it.each(modes)("%s: control borders meet WCAG 1.4.11 (3:1)", (mode) => {
+    const c = colors[mode];
+    for (const bg of [c.bg, c.surface]) {
+      expect(
+        contrast(c.borderStrong, bg),
+        `${c.borderStrong} on ${bg}`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe("cssVariables", () => {

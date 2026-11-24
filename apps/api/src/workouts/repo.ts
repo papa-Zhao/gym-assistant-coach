@@ -55,7 +55,7 @@ import { buildWorkoutTips } from "./tips";
 /** Longest template name, in code points. */
 export const MAX_TEMPLATE_NAME = 30;
 
-export type WorkoutErrorCode =
+type WorkoutErrorCode =
   | "not_found"
   | "already_finished"
   | "session_finished"
@@ -151,7 +151,7 @@ export async function listBuiltinExercises(db: Db): Promise<Exercise[]> {
   return rows.map(toExercise);
 }
 
-export interface CustomExerciseInput {
+interface CustomExerciseInput {
   nameZh: string;
   nameEn?: string | null;
   kind: ExerciseKind;

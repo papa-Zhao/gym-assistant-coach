@@ -6,7 +6,7 @@ import type { AiTokenUsage } from "./usage";
 /** Thrown on network errors, timeouts, 429, 5xx and any other API error. */
 export class AiUnavailable extends Error {}
 
-export type StructuredResult<T> =
+type StructuredResult<T> =
   | { kind: "ok"; value: T; usage: AiTokenUsage }
   | { kind: "invalid"; usage: AiTokenUsage } // max_tokens, non-JSON, parser returned null
   | { kind: "refused"; usage: AiTokenUsage };

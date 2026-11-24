@@ -2,7 +2,6 @@ import { useState } from "react";
 import { deleteAccount, fetchExport, saveFile } from "../dataRights";
 import { Icon, type IconName } from "../components/Icon";
 
-const SOON = ["訓練範本"] as const;
 const FAILED = "沒有成功，請稍後再試。";
 
 interface SettingsProps {
@@ -103,7 +102,7 @@ export function Settings({ today, onClose }: SettingsProps) {
       <h1>設定</h1>
       <section className="card list">
         <h2>我的資料</h2>
-        <a className="row" href="/profile">
+        <a className="row" href="/profile?step=1">
           <RowIcon name="user" />
           <span className="row-name">個人檔案</span>
           <Icon name="chevronRight" className="row-chevron" />
@@ -125,13 +124,11 @@ export function Settings({ today, onClose }: SettingsProps) {
           <RowIcon name="download" />
           <span className="row-name">匯出我的資料</span>
         </button>
-        {SOON.map((label) => (
-          <button key={label} type="button" className="row" disabled>
-            <RowIcon name="layers" />
-            <span className="row-name">{label}</span>
-            <span className="badge">即將推出</span>
-          </button>
-        ))}
+        <a className="row" href="/workout">
+          <RowIcon name="layers" />
+          <span className="row-name">訓練範本</span>
+          <Icon name="chevronRight" className="row-chevron" />
+        </a>
         <button
           type="button"
           className="row danger-row"

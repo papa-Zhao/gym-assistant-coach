@@ -1,6 +1,6 @@
 export const UNKNOWN_FLOOR_KCAL = 1500;
 
-export const MEDICAL_KEYWORDS: readonly string[] = [
+const MEDICAL_KEYWORDS: readonly string[] = [
   "受傷",
   "拉傷",
   "扭傷",

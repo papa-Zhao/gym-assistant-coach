@@ -68,6 +68,15 @@ describe("WorkoutHistory", () => {
     expect(screen.getByText(/60 kg × 8・休息 1:30/)).toBeInTheDocument();
   });
 
+  it("links back to the records page", async () => {
+    pages = [{ entries: [STRENGTH], nextBefore: null }];
+    render(<WorkoutHistory onFatal={vi.fn()} />);
+    expect(screen.getByRole("link", { name: "我的紀錄" })).toHaveAttribute(
+      "href",
+      "/records",
+    );
+  });
+
   it("cardio entry shows minutes", async () => {
     pages = [{ entries: [CARDIO], nextBefore: null }];
     render(<WorkoutHistory onFatal={vi.fn()} />);

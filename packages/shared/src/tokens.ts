@@ -9,6 +9,8 @@ export interface ColorTokens {
   surface: string;
   surfaceAlt: string;
   border: string;
+  /** Boundary of inputs and unselected controls; ≥3:1 on bg and surface. */
+  borderStrong: string;
   text: string;
   textMuted: string;
   primary: string;
@@ -27,6 +29,7 @@ export const colors: Record<ColorMode, ColorTokens> = {
     surface: "#FFFDF8",
     surfaceAlt: "#F1E8DB",
     border: "#E6DCCD",
+    borderStrong: "#9C8B79",
     text: "#2B2420",
     textMuted: "#6B5E55",
     primary: "#B4492A",
@@ -43,6 +46,7 @@ export const colors: Record<ColorMode, ColorTokens> = {
     surface: "#26201C",
     surfaceAlt: "#312923",
     border: "#3D342D",
+    borderStrong: "#857769",
     text: "#F3ECE3",
     textMuted: "#BFB2A5",
     primary: "#E07A55",

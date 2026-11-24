@@ -1,5 +1,5 @@
 import type { Meal } from "@gac/shared";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi } from "../workout/testHelpers";
 import { MealsCard, mealSummary } from "./MealsCard";
@@ -22,7 +22,7 @@ describe("MealsCard", () => {
     expect(lunch).toHaveTextContent("白飯");
     expect(lunch).toHaveTextContent("234 kcal");
     expect(lunch).toHaveAttribute("href", "/meal?id=m1");
-    expect(screen.getAllByText("＋ 記錄")).toHaveLength(2);
+    expect(screen.getAllByText("＋ 記錄")).toHaveLength(3);
     expect(screen.getByRole("link", { name: /早餐/ })).toHaveAttribute(
       "href",
       "/meal?type=breakfast",
@@ -30,6 +30,10 @@ describe("MealsCard", () => {
     expect(screen.getByRole("link", { name: /晚餐/ })).toHaveAttribute(
       "href",
       "/meal?type=dinner",
+    );
+    expect(screen.getByRole("link", { name: /點心/ })).toHaveAttribute(
+      "href",
+      "/meal?type=snack",
     );
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
@@ -46,19 +50,19 @@ describe("MealsCard", () => {
         : { profile: null, targets: null },
     );
     render(<MealsCard onFatal={vi.fn()} />);
-    expect(await screen.findByRole("link", { name: /午餐/ })).toHaveTextContent(
-      "234 kcal 草稿",
-    );
+    const row = await screen.findByRole("link", { name: /午餐/ });
+    expect(row).toHaveTextContent("234 kcal");
+    expect(within(row).getByText("草稿")).toHaveClass("badge");
   });
 
-  it("orders rows breakfast, lunch, dinner with empty rows in place", async () => {
+  it("orders rows breakfast, lunch, dinner, snack with empty rows in place", async () => {
     api(2000);
     render(<MealsCard onFatal={vi.fn()} />);
     await screen.findByRole("link", { name: /午餐/ });
     const labels = screen
       .getAllByRole("link")
       .map((a) => a.querySelector(".meal-type")?.textContent);
-    expect(labels).toEqual(["早餐", "午餐", "晚餐"]);
+    expect(labels).toEqual(["早餐", "午餐", "晚餐", "點心"]);
   });
 
   it("summarises 3+ items with 等", () => {

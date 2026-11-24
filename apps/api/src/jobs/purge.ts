@@ -6,7 +6,7 @@ import type { Db } from "../users/repo";
 /** With the job at 04:00 daily, an account is gone by day 7 after deletion. */
 export const DELETION_GRACE_DAYS = 6;
 /** Keeps one run well inside the Cloud Run request timeout; the rest wait a day. */
-export const PURGE_BATCH = 100;
+const PURGE_BATCH = 100;
 
 const DAY_MS = 86_400_000;
 

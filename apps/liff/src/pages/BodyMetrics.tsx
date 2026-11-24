@@ -126,7 +126,10 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
 
   return (
     <main className="body-page">
-      <p className="step">我的紀錄</p>
+      <a className="back-link" href="/records">
+        <Icon name="chevronLeft" size={18} />
+        我的紀錄
+      </a>
       <h1>身體數據</h1>
       <div className="seg" role="group" aria-label="時間範圍">
         {RANGES.map((r) => (
@@ -216,11 +219,18 @@ export function BodyMetrics({ onFatal }: BodyMetricsProps) {
                   aria-pressed={metric === k}
                   onClick={() => setMetric(k)}
                 >
-                  <span className="muted">{meta.label}</span>
-                  <strong className="num">
-                    {v ? `${v.value} ${meta.unit}` : "—"}
-                  </strong>
-                  <span className="tile-change">{formatChange(s)}</span>
+                  <span className="tile-head">
+                    <span className="muted">{meta.label}</span>
+                    <Icon name="chevronRight" size={16} />
+                  </span>
+                  {v ? (
+                    <>
+                      <strong className="num">{`${v.value} ${meta.unit}`}</strong>
+                      <span className="tile-change">{formatChange(s)}</span>
+                    </>
+                  ) : (
+                    <span className="tile-empty">尚未記錄</span>
+                  )}
                 </button>
               );
             })}

@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { minTouchTarget } from "@gac/shared";
 
 /** Which page layout the placeholder blocks should mimic. */
-export type SkeletonLayout = "profile" | "body" | "workout" | "value" | "rows";
+type SkeletonLayout = "profile" | "body" | "workout" | "value" | "rows";
 
 interface BlockProps {
   width?: CSSProperties["width"];

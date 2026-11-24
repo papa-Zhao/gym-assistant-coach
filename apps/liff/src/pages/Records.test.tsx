@@ -69,7 +69,7 @@ describe("Records", () => {
   it("shows the meals card instead of a coming-soon diet button", async () => {
     render(<Records onFatal={vi.fn()} />);
     await screen.findByText("72.4");
-    expect(await screen.findAllByText("＋ 記錄")).toHaveLength(3);
+    expect(await screen.findAllByText("＋ 記錄")).toHaveLength(4);
     expect(screen.queryByText("即將推出")).not.toBeInTheDocument();
   });
 

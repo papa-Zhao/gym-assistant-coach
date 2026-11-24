@@ -11,7 +11,7 @@ import type { Db } from "../users/repo";
 import { addMealPhoto } from "./repo";
 import { runAiMeal } from "./text";
 
-export type PhotoMealOutcome =
+type PhotoMealOutcome =
   | { kind: "draft"; meal: Meal }
   | { kind: "invalid_image" }
   | { kind: "limit" }

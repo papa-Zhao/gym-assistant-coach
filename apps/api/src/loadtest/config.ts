@@ -1,4 +1,4 @@
-export interface LoadtestConfig {
+interface LoadtestConfig {
   port: number;
   databaseUrl: string;
   sessionSecret: Uint8Array;

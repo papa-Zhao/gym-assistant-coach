@@ -20,7 +20,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { foods, mealItems, mealPhotos, meals } from "../db/schema";
 import type { Db } from "../users/repo";
 
-export type MealInputErrorCode =
+type MealInputErrorCode =
   "unknown_food" | "unknown_item" | "empty" | "too_many";
 
 /** Typed failure so routes can map it to 400. */

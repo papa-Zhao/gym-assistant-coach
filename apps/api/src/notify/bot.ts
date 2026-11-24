@@ -3,7 +3,7 @@ import type { NotifyWorkoutFinished } from "../deps.js";
 
 const TIMEOUT_MS = 5000;
 
-export interface BotNotifierOptions {
+interface BotNotifierOptions {
   fetchImpl?: typeof fetch;
   /** Returns a Google ID token for the audience; injectable for tests. */
   getIdToken?: (audience: string) => Promise<string>;

@@ -530,8 +530,8 @@ export const FALLBACK_BY_MUSCLE: Record<MuscleGroup, string> = {
   calves: "standing-calf-raise",
   core: "plank",
 };
-export const CARDIO_FALLBACK = "treadmill-run";
-export const DEFAULT_FALLBACK = "barbell-bench-press";
+const CARDIO_FALLBACK = "treadmill-run";
+const DEFAULT_FALLBACK = "barbell-bench-press";
 
 /** The exercise's own pose, else one borrowed by kind / muscle group. */
 export function poseFor(
