@@ -47,7 +47,7 @@ legend { padding: 0; margin-bottom: var(--space-2); font-weight: 700; }
   min-height: ${minTouchTarget}px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   cursor: pointer;
@@ -60,11 +60,12 @@ legend { padding: 0; margin-bottom: var(--space-2); font-weight: 700; }
 .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .field { display: flex; flex-direction: column; gap: var(--space-2); font-weight: 700; }
+::placeholder { color: var(--color-text-muted); opacity: 1; }
 .field input, .field select {
   min-height: ${minTouchTarget}px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
@@ -204,7 +205,7 @@ a.card.link { display: block; color: inherit; text-decoration: none; }
   width: 100%;
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-1);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
@@ -330,7 +331,7 @@ button.chip { color: var(--color-text); font-weight: 400; }
   min-width: 0;
   min-height: ${minTouchTarget}px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
@@ -603,7 +604,7 @@ button.add-set {
 .meal-item-controls {
   gap: 0;
   padding: 2px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-bg);
 }
@@ -656,7 +657,7 @@ button.danger-text { color: var(--color-danger); }
 .danger-row .row-icon { color: var(--color-danger); }
 .settings > .card + .card { margin-top: var(--space-4); }
 button.danger { background: var(--color-danger); color: var(--color-on-primary); }
-button.secondary.quiet { border-color: var(--color-border); color: var(--color-text); }
+button.secondary.quiet { border-color: var(--color-border-strong); color: var(--color-text); }
 button.block { width: 100%; }
 
 /* Body metrics */
@@ -695,7 +696,7 @@ button.block { width: 100%; }
   width: 18px;
   height: 18px;
   box-sizing: border-box;
-  border: 2px solid var(--color-border);
+  border: 2px solid var(--color-border-strong);
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -747,7 +748,7 @@ a.back-link + h1 { margin-top: 0; }
 .tile-empty { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-primary); font-weight: 700; }
 
 /* Active workout polish */
-.set-row.done .empty { opacity: 0.5; }
+.set-row.done .empty { color: var(--color-text-muted); }
 .rest-auto { color: var(--color-text-muted); font-size: var(--font-size-caption); text-align: center; }
 .discard-zone { display: flex; flex-direction: column; align-items: center; margin-top: var(--space-8); }
 .discard-zone .confirm-row { align-self: stretch; }
